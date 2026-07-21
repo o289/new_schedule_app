@@ -1,0 +1,37 @@
+# dependencies / build
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# database data and backups
+backups/
+*.dump
+*.sql.gz
+postgres_data/
+
+# logs / caches
+*.log
+npm-debug.log*
+.cache/
+.vite/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# local-only files
+mock.html
+docs

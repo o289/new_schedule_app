@@ -1,0 +1,67 @@
+/* FullCalendarの標準イベントを完全無効化 */
+
+.fc-event {
+  background: transparent !important;
+  border: none !important;
+}
+
+.fc-event-main {
+  padding: 0 !important;
+}
+
+.fc-timegrid-event.fc-event-main {
+  padding: 0 !important;
+}
+
+.fc-timegrid-event {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.fc-event {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.fc-event-main {
+  padding: 0 !important;
+  height: 100%;
+}
+
+.fc-event-main-frame {
+  height: 100%;
+}
+
+.fc-timegrid-event-harness {
+  padding: 2px;
+}
+
+.fc-v-event {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.fc-event-main-frame {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* 枠線 */
+
+.fc .fc-timegrid-slot-minor {
+  border-top-style: none !important;
+}
+
+/* 日曜日 */
+.fc-day-sun .fc-col-header-cell-cushion {
+  color: red;
+}
+
+/* 土曜日 */
+.fc-day-sat .fc-col-header-cell-cushion {
+  color: blue;
+}

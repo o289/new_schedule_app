@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    
+
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.backend.tsbuildinfo"
+  },
+  "include": ["apps/backend/**/*.ts", "packages/**/*.ts"],
+  "exclude": ["node_modules", "dist", "apps/frontend"]
+}
