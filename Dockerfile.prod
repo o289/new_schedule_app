@@ -1,0 +1,43 @@
+# Shared Node.js and pnpm setup for all production image targets.
+FROM node:22-alpine AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable
+
+WORKDIR /app
+
+FROM base AS dependencies
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM dependencies AS migration
+
+COPY . ./
+
+# This target is executed once by `docker compose run --rm migrate`.
+# It contains Drizzle's SQL files and drizzle-kit, but is never used to run
+# the long-lived application container.
+CMD ["pnpm", "db:migrate"]
+
+FROM dependencies AS build
+
+COPY . ./
+
+RUN pnpm build:frontend && pnpm build:backend && pnpm prune --prod
+
+FROM node:22-alpine AS production
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist/backend ./dist/backend
+COPY --from=build /app/dist/frontend ./public
+
+EXPOSE 8000
+
+CMD ["node", "dist/backend/index.js"]

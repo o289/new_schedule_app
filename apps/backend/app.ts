@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { serveStatic } from "@hono/node-server/serve-static";
 
 import { ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
@@ -25,6 +26,13 @@ app.route("/", authRouter);
 app.route("/", userRouter);
 app.route("/", categoryRouter);
 app.route("/", scheduleRouter);
+
+if (process.env.NODE_ENV === "production") {
+  // 本番コンテナでは React のビルド結果を同じオリジンから配信する。
+  // API ルートを先に登録するため、API リクエストは静的ファイル配信へ流れない。
+  app.use("/*", serveStatic({ root: "./public" }));
+  app.get("*", serveStatic({ path: "./public/index.html" }));
+}
 
 app.onError((error, context) => {
   if (error instanceof ApiError) {

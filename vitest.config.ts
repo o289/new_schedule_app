@@ -12,6 +12,13 @@ export default defineConfig({
       // Router unit tests load the complete app, including repositories that
       // read DATABASE_URL at import time. No test connects to this database.
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5433/app_test",
+      WEBAUTHN_RP_ID: "localhost",
+      WEBAUTHN_RP_NAME: "Schedule App Test",
+      WEBAUTHN_ORIGIN: "http://localhost:3001",
+      SECRET_KEY: "unit-test-secret-key",
+      ACCESS_TOKEN_EXPIRES_IN: "5",
+      REFRESH_TOKEN_EXPIRES_IN: "7",
+      ALGORITHM: "HS256",
     },
 
     exclude: ["node_modules", "dist"],

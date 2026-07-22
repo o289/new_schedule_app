@@ -1,0 +1,23 @@
+# 最初に VPS で `docker network create schedule-gateway` を実行する。
+
+name: schedule-gateway
+
+services:
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - gateway
+    volumes:
+      - ./nginx/ingress.prod.conf:/etc/nginx/conf.d/production.conf:ro
+      - ./nginx/ingress.stg.conf:/etc/nginx/conf.d/staging.conf:ro
+      - ./nginx/ingress.common.conf:/etc/nginx/snippets/proxy-headers.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: unless-stopped
+
+networks:
+  gateway:
+    external: true
+    name: schedule-gateway

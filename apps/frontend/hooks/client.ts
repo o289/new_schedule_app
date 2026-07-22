@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL;
+// 本番・ステージングでは同一オリジンの application が API も配信する。
+// 開発時だけ .env.dev の VITE_API_URL で別ポートの Hono を指定する。
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 interface AuthOptions {
   accessToken?: string | null;
