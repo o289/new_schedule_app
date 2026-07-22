@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
-import { LinearProgress } from "@mui/material";
+import { CircularProgress } from "@mui/material";
 
 import { useCategory } from "./useCategory";
 
@@ -26,7 +26,11 @@ export default function CategoryAsidePage({
   const [expanded, setExpanded] = useState(false);
 
   if (isFetching) {
-    return <LinearProgress aria-label="処理中" />;
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <CircularProgress aria-label="処理中" className="w-64 max-w-full" />
+      </div>
+    );
   }
 
   return (
