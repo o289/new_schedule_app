@@ -1,0 +1,199 @@
+name: 承認済みPlanを本番へ手動デプロイ
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  packages: read
+
+concurrency:
+  group: deployment-pipeline
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: 承認済みDeployment Planを検証
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+      application_image: ${{ steps.validate.outputs.application_image }}
+      migration_image: ${{ steps.validate.outputs.migration_image }}
+      run_migration: ${{ steps.validate.outputs.run_migration }}
+      recreate_application: ${{ steps.validate.outputs.recreate_application }}
+      plan_id: ${{ steps.validate.outputs.plan_id }}
+    steps:
+      - name: 承認済みPlanを特定
+        id: approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh variable get APPROVED_PLAN_STATUS --repo "$GITHUB_REPOSITORY")" = approved
+          run_id="$(gh variable get APPROVED_PLAN_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: 承認済みPlanを取得
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-deployment-plan
+          path: plan
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.approved.outputs.run_id }}
+
+      - name: Plan・承認・最新候補・未適用を検証
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          file=plan/verified-deployment-plan.json
+          sha="$(jq -r .commitSha "$file")"
+          source_run_id="$(jq -r .stagingRunId "$file")"
+          plan_id="$(jq -r .planId "$file")"
+          test "$(jq -r .status "$file")" = approved
+          test "$(jq -r .stagingDeployment "$file")" = success
+          test "$(jq -r .healthCheck "$file")" = success
+          test "$(date -u +%s)" -lt "$(jq -r '.expiresAt | fromdateiso8601' "$file")"
+          test "$(jq -r '.verification.verifier // empty' "$file")" != ""
+          test "$(jq -r '.verification.verifiedAt // empty' "$file")" != ""
+          test "$sha" = "$(gh variable get APPROVED_PLAN_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$(gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$(gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$source_run_id" = "$(gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          test "$(gh run view "$source_run_id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)" = success
+          deployed_plan_id="$(gh variable get PRODUCTION_DEPLOYED_PLAN_ID --repo "$GITHUB_REPOSITORY" 2>/dev/null || true)"
+          test "$deployed_plan_id" != "$plan_id"
+
+          application_image="$(jq -r .applicationImage "$file")"
+          migration_image="$(jq -r .migrationImage "$file")"
+          case "$application_image" in ghcr.io/*@sha256:*) ;; *) exit 1 ;; esac
+          case "$migration_image" in ghcr.io/*@sha256:*) ;; *) exit 1 ;; esac
+          {
+            echo "commit_sha=$sha"
+            echo "application_image=$application_image"
+            echo "migration_image=$migration_image"
+            echo "run_migration=$(jq -r .runMigration "$file")"
+            echo "recreate_application=$(jq -r .recreateApplication "$file")"
+            echo "plan_id=$plan_id"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: GHCR上の同一digestを検証
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION_IMAGE: ${{ steps.validate.outputs.application_image }}
+          MIGRATION_IMAGE: ${{ steps.validate.outputs.migration_image }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools inspect "$APPLICATION_IMAGE" >/dev/null
+          docker buildx imagetools inspect "$MIGRATION_IMAGE" >/dev/null
+
+      - name: 本番適用前の内容をSummaryへ表示
+        run: |
+          file=plan/verified-deployment-plan.json
+          {
+            echo "## 本番Environment最終承認の対象"
+            echo "- Plan ID: \`$(jq -r .planId "$file")\`"
+            echo "- 対象SHA: \`$(jq -r .commitSha "$file")\`"
+            echo "- application image: \`$(jq -r .applicationImage "$file")\`"
+            echo "- migration image: \`$(jq -r .migrationImage "$file")\`"
+            echo "- migration実行: \`$(jq -r .runMigration "$file")\`"
+            echo "- application再作成: \`$(jq -r .recreateApplication "$file")\`"
+            echo "- ステージング確認者: \`$(jq -r .verification.verifier "$file")\`"
+            echo "- ステージング確認日時: \`$(jq -r .verification.verifiedAt "$file")\`"
+            echo "- ステージングへのデプロイ: **成功**"
+            echo "- 人間によるUI・機能確認: **完了**"
+            echo "- 本番利用可否: **承認済み**"
+            echo "- 本番への適用: **未実施**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  inject-env:
+    needs: plan
+    uses: ./.github/workflows/inject-env.yml
+    with:
+      target: prod
+      application_image: ${{ needs.plan.outputs.application_image }}
+      migration_image: ${{ needs.plan.outputs.migration_image }}
+    secrets: inherit
+
+  migrate:
+    needs: [plan, inject-env]
+    uses: ./.github/workflows/build-and-migrate.yml
+    with:
+      target: prod
+      commit_sha: ${{ needs.plan.outputs.commit_sha }}
+      build_images: false
+      run_migration: ${{ needs.plan.outputs.run_migration == 'true' }}
+    secrets: inherit
+
+  deploy:
+    needs: [plan, inject-env, migrate]
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: VPSへのSSHを準備
+        if: needs.plan.outputs.recreate_application == 'true'
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: applicationを更新してヘルスチェック
+        if: needs.plan.outputs.recreate_application == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" "VPS_DEPLOY_PATH='$VPS_DEPLOY_PATH' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' sh -s" <<'REMOTE'
+          set -eu
+          # 実行終了後にVPSのDocker認証情報を消す。一時トークンを残さない。
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          cd "$VPS_DEPLOY_PATH"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          docker compose --env-file .env.prod -f compose.prod.yml pull application
+          docker compose --env-file .env.prod -f compose.prod.yml up -d --no-deps --force-recreate application
+          health_ok=false
+          for attempt in $(seq 1 10); do
+            if docker compose --env-file .env.prod -f compose.prod.yml exec -T application \
+              node -e 'fetch("http://127.0.0.1:8000/ping").then(async (response) => { if (!response.ok) process.exit(1); console.log(await response.text()); })'; then
+              health_ok=true
+              break
+            fi
+            sleep 2
+          done
+          test "$health_ok" = true
+
+          # applicationは再作成でIPが変わる。Gateway稼働中なら名前解決を更新する。
+          # 初回移行ではGateway未起動でもapplicationを先に準備できるよう、その場合だけ省略する。
+          if docker compose -f compose.gatway.yml ps --status running -q gateway | grep -q .; then
+            docker compose -f compose.gatway.yml exec -T gateway nginx -s reload
+          else
+            echo "Gatewayは未起動のため、reloadを省略します。初回移行時に起動してください。"
+          fi
+          REMOTE
+
+      - name: Planを本番適用済みとして記録
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAN_ID: ${{ needs.plan.outputs.plan_id }}
+          SHA: ${{ needs.plan.outputs.commit_sha }}
+        run: |
+          gh variable set PRODUCTION_DEPLOYED_PLAN_ID --body "$PLAN_ID" --repo "$GITHUB_REPOSITORY"
+          gh variable set PRODUCTION_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          gh variable set APPROVED_PLAN_STATUS --body deployed --repo "$GITHUB_REPOSITORY"
+          {
+            echo "## 本番デプロイ完了"
+            echo "- Plan ID: \`$PLAN_ID\`"
+            echo "- 対象SHA: \`$SHA\`"
+            echo "- ステージングへのデプロイ: **成功**"
+            echo "- 人間によるUI・機能確認: **完了**"
+            echo "- 本番利用可否: **承認済み（適用済み）**"
+            echo "- 本番への適用: **完了**"
+          } >> "$GITHUB_STEP_SUMMARY"

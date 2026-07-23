@@ -56,9 +56,7 @@ export class CategoryRepository extends BaseRepository {
   async delete(categoryId: string, userId: string): Promise<boolean> {
     const deleted = await this.database
       .delete(categories)
-      .where(
-        and(eq(categories.id, categoryId), eq(categories.userId, userId)),
-      )
+      .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)))
       .returning({ id: categories.id });
 
     return deleted.length > 0;

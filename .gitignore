@@ -33,4 +33,5 @@ npm-debug.log*
 
 # local-only files
 mock.html
-docs
+docs/*
+!docs/本番環境構成.md

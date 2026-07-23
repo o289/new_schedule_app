@@ -1,0 +1,45 @@
+name: CI
+
+# すべてのブランチへのpushとPull Requestで品質確認だけを行う。
+# このWorkflowはイメージのpushやVPSへの接続を行わない。
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 型・テスト・書式の確認
+    runs-on: ubuntu-latest
+
+    steps:
+      # 実行対象のコミットを取得する。
+      - name: ソースコードを取得
+        uses: actions/checkout@v4
+
+      # AGENTS.md と package.json が要求するNode.jsを固定する。
+      - name: Node.js 22.23.1を設定
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+
+      # packageManagerの指定に従い、lockfileどおりに依存関係を入れる。
+      - name: pnpmを有効化
+        run: corepack enable
+
+      - name: 依存関係をインストール
+        run: pnpm install --frozen-lockfile
+
+      # アプリケーションの型、テスト、フォーマットを順に確認する。
+      - name: 型チェック
+        run: pnpm typecheck
+
+      - name: テスト
+        run: pnpm test
+
+      - name: フォーマット確認
+        run: pnpm format:check

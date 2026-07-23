@@ -1,0 +1,83 @@
+name: 環境変数をVPSへ注入
+
+# 単独実行は許可せず、ステージング・本番デプロイからだけ呼び出す。
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "注入先（stg または prod）"
+        required: true
+        type: string
+      application_image:
+        description: "applicationイメージの完全なタグ"
+        required: true
+        type: string
+      migration_image:
+        description: "migrationイメージの完全なタグ"
+        required: true
+        type: string
+
+jobs:
+  inject:
+    # targetに対応するGitHub EnvironmentのSecretだけを利用する。
+    environment: ${{ inputs.target == 'prod' && 'production' || 'staging' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      # SSHの接続先を偽装されないよう、known_hostsを必ず登録する。
+      - name: VPSへのSSHを準備
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # Secretをログへ出さず、一時ファイルからVPSへ原子的に配置する。
+      - name: .envファイルを安全に生成
+        env:
+          TARGET: ${{ inputs.target }}
+          APPLICATION_IMAGE: ${{ inputs.application_image }}
+          MIGRATION_IMAGE: ${{ inputs.migration_image }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          WEBAUTHN_RP_ID: ${{ secrets.WEBAUTHN_RP_ID }}
+          WEBAUTHN_RP_NAME: ${{ secrets.WEBAUTHN_RP_NAME }}
+          WEBAUTHN_ORIGIN: ${{ secrets.WEBAUTHN_ORIGIN }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ACCESS_TOKEN_EXPIRES_IN: ${{ secrets.ACCESS_TOKEN_EXPIRES_IN }}
+          REFRESH_TOKEN_EXPIRES_IN: ${{ secrets.REFRESH_TOKEN_EXPIRES_IN }}
+          ALGORITHM: ${{ secrets.ALGORITHM }}
+        run: |
+          env_file="$RUNNER_TEMP/.env.$TARGET"
+          {
+            printf 'APPLICATION_IMAGE=%s\n' "$APPLICATION_IMAGE"
+            printf 'MIGRATION_IMAGE=%s\n' "$MIGRATION_IMAGE"
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'WEBAUTHN_RP_ID=%s\n' "$WEBAUTHN_RP_ID"
+            printf 'WEBAUTHN_RP_NAME=%s\n' "$WEBAUTHN_RP_NAME"
+            printf 'WEBAUTHN_ORIGIN=%s\n' "$WEBAUTHN_ORIGIN"
+            printf 'SECRET_KEY=%s\n' "$SECRET_KEY"
+            printf 'ACCESS_TOKEN_EXPIRES_IN=%s\n' "$ACCESS_TOKEN_EXPIRES_IN"
+            printf 'REFRESH_TOKEN_EXPIRES_IN=%s\n' "$REFRESH_TOKEN_EXPIRES_IN"
+            printf 'ALGORITHM=%s\n' "$ALGORITHM"
+          } > "$env_file"
+
+          # 改行を含む値は.envを壊すため、配置前に拒否する。
+          test "$(wc -l < "$env_file")" -eq 13
+          base64 --wrap=0 "$env_file" > "$env_file.base64"
+
+          remote_file=".env.$TARGET"
+          ssh "$VPS_USER@$VPS_HOST" "mkdir -p '$VPS_DEPLOY_PATH'"
+          base64 -d "$env_file.base64" | ssh "$VPS_USER@$VPS_HOST" \
+            "umask 077 && cat > '$VPS_DEPLOY_PATH/$remote_file.tmp' && chmod 600 '$VPS_DEPLOY_PATH/$remote_file.tmp' && mv '$VPS_DEPLOY_PATH/$remote_file.tmp' '$VPS_DEPLOY_PATH/$remote_file'"

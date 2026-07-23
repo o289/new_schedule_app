@@ -1,0 +1,226 @@
+name: ステージングへデプロイ
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "対象SHA（空欄なら現在のmain）"
+        required: false
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+  packages: write
+
+concurrency:
+  # 候補更新・確認・本番適用の途中で、最新候補が入れ替わる競合を防ぐ。
+  group: deployment-pipeline
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.plan.outputs.commit_sha }}
+      should_deploy: ${{ steps.plan.outputs.should_deploy }}
+      build_images: ${{ steps.plan.outputs.build_images }}
+      run_migration: ${{ steps.plan.outputs.run_migration }}
+      recreate_application: ${{ steps.plan.outputs.recreate_application }}
+    steps:
+      - name: workflow_runの対象SHAを決定
+        if: github.event_name == 'workflow_run'
+        id: workflow-run-target
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: 手動実行の対象SHAを決定
+        if: github.event_name == 'workflow_dispatch'
+        id: manual-target
+        env:
+          INPUT_SHA: ${{ inputs.commit_sha }}
+        run: echo "sha=${INPUT_SHA:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: 対象コミットを取得
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.workflow-run-target.outputs.sha || steps.manual-target.outputs.sha }}
+          fetch-depth: 2
+
+      - name: デプロイ計画を自動判定
+        id: plan
+        run: |
+          sha="$(git rev-parse HEAD)"
+          changed_files="$(git diff --name-only "$sha^" "$sha" 2>/dev/null || git diff-tree --no-commit-id --name-only -r "$sha")"
+          should_deploy=false
+          run_migration=false
+
+          if printf '%s\n' "$changed_files" | grep -Eq '^(apps/|packages/|drizzle/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|Dockerfile\.prod$|compose\.(stg|prod)\.yml$|vite\.config\.ts$|tsconfig)'; then
+            should_deploy=true
+          fi
+          if printf '%s\n' "$changed_files" | grep -Eq '^(drizzle/|apps/backend/.*/model\.ts$|apps/backend/database/schema\.ts$)'; then
+            run_migration=true
+          fi
+
+          # 候補ごとに不変のdigestを作るため、配置対象は必ず同じSHAから再ビルドする。
+          build_images="$should_deploy"
+          recreate_application="$should_deploy"
+          {
+            echo "commit_sha=$sha"
+            echo "should_deploy=$should_deploy"
+            echo "build_images=$build_images"
+            echo "run_migration=$run_migration"
+            echo "recreate_application=$recreate_application"
+          } >> "$GITHUB_OUTPUT"
+
+  build-images:
+    needs: plan
+    if: needs.plan.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/build-and-migrate.yml
+    with:
+      target: stg
+      commit_sha: ${{ needs.plan.outputs.commit_sha }}
+      build_images: true
+      run_migration: false
+    secrets: inherit
+
+  inject-env:
+    needs: [plan, build-images]
+    uses: ./.github/workflows/inject-env.yml
+    with:
+      target: stg
+      application_image: ${{ needs.build-images.outputs.application_image }}
+      migration_image: ${{ needs.build-images.outputs.migration_image }}
+    secrets: inherit
+
+  migrate:
+    needs: [plan, inject-env]
+    uses: ./.github/workflows/build-and-migrate.yml
+    with:
+      target: stg
+      commit_sha: ${{ needs.plan.outputs.commit_sha }}
+      build_images: false
+      run_migration: ${{ needs.plan.outputs.run_migration == 'true' }}
+    secrets: inherit
+
+  deploy:
+    needs: [plan, build-images, inject-env, migrate]
+    environment: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: VPSへのSSHを準備
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: application-stgを更新してヘルスチェック
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" "VPS_DEPLOY_PATH='$VPS_DEPLOY_PATH' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' sh -s" <<'REMOTE'
+          set -eu
+          # 実行終了後にVPSのDocker認証情報を消す。一時トークンを残さない。
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          cd "$VPS_DEPLOY_PATH"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          docker compose --env-file .env.stg -f compose.stg.yml pull application-stg
+          docker compose --env-file .env.stg -f compose.stg.yml up -d --no-deps --force-recreate application-stg
+          health_ok=false
+          for attempt in $(seq 1 10); do
+            if docker compose --env-file .env.stg -f compose.stg.yml exec -T application-stg \
+              node -e 'fetch("http://127.0.0.1:8000/ping").then(async (response) => { if (!response.ok) process.exit(1); console.log(await response.text()); })'; then
+              health_ok=true
+              break
+            fi
+            sleep 2
+          done
+          test "$health_ok" = true
+
+          # application-stgは再作成でIPが変わる。Gateway稼働中なら名前解決を更新する。
+          # 初回移行ではGateway未起動でもapplicationを先に準備できるよう、その場合だけ省略する。
+          if docker compose -f compose.gatway.yml ps --status running -q gateway | grep -q .; then
+            docker compose -f compose.gatway.yml exec -T gateway nginx -s reload
+          else
+            echo "Gatewayは未起動のため、reloadを省略します。初回移行時に起動してください。"
+          fi
+          REMOTE
+
+      - name: UI確認待ちDeployment Planを作成
+        env:
+          SHA: ${{ needs.plan.outputs.commit_sha }}
+          APPLICATION_IMAGE: ${{ needs.build-images.outputs.application_image }}
+          MIGRATION_IMAGE: ${{ needs.build-images.outputs.migration_image }}
+          RUN_MIGRATION: ${{ needs.plan.outputs.run_migration }}
+          RECREATE_APPLICATION: ${{ needs.plan.outputs.recreate_application }}
+        run: |
+          created_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          expires_at="$(date -u -d '+90 days' +'%Y-%m-%dT%H:%M:%SZ')"
+          jq -n \
+            --argjson version 1 \
+            --arg planId "$GITHUB_RUN_ID-$SHA" \
+            --arg commitSha "$SHA" \
+            --arg stagingRunId "$GITHUB_RUN_ID" \
+            --arg status pending_verification \
+            --arg applicationImage "$APPLICATION_IMAGE" \
+            --arg migrationImage "$MIGRATION_IMAGE" \
+            --argjson runMigration "$RUN_MIGRATION" \
+            --argjson recreateApplication "$RECREATE_APPLICATION" \
+            --arg createdAt "$created_at" \
+            --arg expiresAt "$expires_at" \
+            '{version:$version,planId:$planId,commitSha:$commitSha,stagingRunId:$stagingRunId,status:$status,applicationImage:$applicationImage,migrationImage:$migrationImage,runMigration:$runMigration,recreateApplication:$recreateApplication,stagingDeployment:"success",healthCheck:"success",createdAt:$createdAt,expiresAt:$expiresAt}' \
+            > deployment-plan.json
+
+      - name: Deployment Planを保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-plan
+          path: deployment-plan.json
+          retention-days: 90
+
+      - name: 最新候補をUI確認待ちとして記録
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.plan.outputs.commit_sha }}
+        run: |
+          gh variable set STAGING_CANDIDATE_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+          gh variable set STAGING_CANDIDATE_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          gh variable set STAGING_CANDIDATE_STATUS --body pending_verification --repo "$GITHUB_REPOSITORY"
+          gh variable set STAGING_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          gh variable set APPROVED_PLAN_STATUS --body superseded --repo "$GITHUB_REPOSITORY"
+
+      - name: 状態をSummaryへ表示
+        env:
+          SHA: ${{ needs.plan.outputs.commit_sha }}
+          APPLICATION_IMAGE: ${{ needs.build-images.outputs.application_image }}
+          MIGRATION_IMAGE: ${{ needs.build-images.outputs.migration_image }}
+          RUN_MIGRATION: ${{ needs.plan.outputs.run_migration }}
+          RECREATE_APPLICATION: ${{ needs.plan.outputs.recreate_application }}
+        run: |
+          {
+            echo "## Deployment Plan: UI確認待ち"
+            echo "- 対象SHA: \`$SHA\`"
+            echo "- application image: \`$APPLICATION_IMAGE\`"
+            echo "- migration image: \`$MIGRATION_IMAGE\`"
+            echo "- migration実行: \`$RUN_MIGRATION\`"
+            echo "- application再作成: \`$RECREATE_APPLICATION\`"
+            echo "- ステージングへのデプロイ: **成功**"
+            echo "- 自動ヘルスチェック: **成功**"
+            echo "- 人間によるUI・機能確認: **未完了**"
+            echo "- 本番利用可否: **未承認**"
+            echo "- 本番への適用: **未実施**"
+          } >> "$GITHUB_STEP_SUMMARY"

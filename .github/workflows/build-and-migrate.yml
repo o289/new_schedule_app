@@ -1,0 +1,133 @@
+name: イメージビルドとmigration
+
+# ステージング・本番デプロイから呼び出す共通処理。
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "対象環境（stg または prod）"
+        required: true
+        type: string
+      commit_sha:
+        description: "イメージ化する、または既存イメージを使うコミットSHA"
+        required: true
+        type: string
+      build_images:
+        description: "application/migrationイメージをGHCRへpushするか"
+        required: true
+        type: boolean
+      run_migration:
+        description: "DB migrationを一度だけ実行するか"
+        required: true
+        type: boolean
+    outputs:
+      application_image:
+        description: "pushしたapplicationイメージのdigest参照"
+        value: ${{ jobs.build.outputs.application_image }}
+      migration_image:
+        description: "pushしたmigrationイメージのdigest参照"
+        value: ${{ jobs.build.outputs.migration_image }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    # 本番昇格ではステージングで作成済みの同一SHAを使うため、再ビルドしない。
+    if: inputs.build_images
+    runs-on: ubuntu-latest
+    outputs:
+      application_image: ${{ steps.digests.outputs.application_image }}
+      migration_image: ${{ steps.digests.outputs.migration_image }}
+    steps:
+      - name: 対象コミットを取得
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: GHCRへログイン
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # 同じSHAから、用途の異なる2つのイメージを作る。
+      - name: applicationイメージをビルド・push
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          SHA: ${{ inputs.commit_sha }}
+        run: |
+          docker build --file Dockerfile.prod --target production --tag "$IMAGE:$SHA" .
+          docker push "$IMAGE:$SHA"
+
+      - name: migrationイメージをビルド・push
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          SHA: ${{ inputs.commit_sha }}
+        run: |
+          docker build --file Dockerfile.prod --target migration --tag "$IMAGE:$SHA-migration" .
+          docker push "$IMAGE:$SHA-migration"
+
+      # タグは後から付け替えられるため、以後の環境では不変のdigest参照だけを使う。
+      - name: pushしたイメージのdigestを確定
+        id: digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          SHA: ${{ inputs.commit_sha }}
+        run: |
+          application_digest="$(docker buildx imagetools inspect "$IMAGE:$SHA" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          migration_digest="$(docker buildx imagetools inspect "$IMAGE:$SHA-migration" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          case "$application_digest" in sha256:*) ;; *) exit 1 ;; esac
+          case "$migration_digest" in sha256:*) ;; *) exit 1 ;; esac
+          echo "application_image=$IMAGE@$application_digest" >> "$GITHUB_OUTPUT"
+          echo "migration_image=$IMAGE@$migration_digest" >> "$GITHUB_OUTPUT"
+
+  migrate:
+    # DBスキーマに変更がない場合は、このジョブを完全に省略する。
+    needs: build
+    # buildを省略した本番昇格でも実行できるようにする。
+    if: ${{ always() && inputs.run_migration && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    environment: ${{ inputs.target == 'prod' && 'production' || 'staging' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: VPSへのSSHを準備
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # DBと同じinternalネットワーク内で、migrationコンテナだけを一度実行する。
+      - name: migrationを実行
+        env:
+          TARGET: ${{ inputs.target }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$TARGET" = "prod" ]; then
+            compose_file=compose.prod.yml
+            migration_service=migrate
+            env_file=.env.prod
+          else
+            compose_file=compose.stg.yml
+            migration_service=migrate-stg
+            env_file=.env.stg
+          fi
+
+          ssh "$VPS_USER@$VPS_HOST" "VPS_DEPLOY_PATH='$VPS_DEPLOY_PATH' COMPOSE_FILE='$compose_file' ENV_FILE='$env_file' MIGRATION_SERVICE='$migration_service' GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' sh -s" <<'REMOTE'
+          set -eu
+          # 実行終了後にVPSのDocker認証情報を消す。一時トークンを残さない。
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          cd "$VPS_DEPLOY_PATH"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile migration pull "$MIGRATION_SERVICE"
+          docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile migration run --rm "$MIGRATION_SERVICE"
+          REMOTE
