@@ -125,24 +125,32 @@ jobs:
       migration_image: ${{ needs.plan.outputs.migration_image }}
     secrets: inherit
 
-  migrate:
+  prepare-database:
     needs: [plan, inject-env]
+    uses: ./.github/workflows/prepare-database.yml
+    with:
+      target: prod
+    secrets: inherit
+
+  migrate:
+    needs: [plan, inject-env, prepare-database]
     uses: ./.github/workflows/build-and-migrate.yml
     with:
       target: prod
       commit_sha: ${{ needs.plan.outputs.commit_sha }}
       build_images: false
-      run_migration: ${{ needs.plan.outputs.run_migration == 'true' }}
+      run_migration: ${{ needs.plan.outputs.run_migration == 'true' || needs.prepare-database.outputs.needs_initial_migration == 'true' }}
     secrets: inherit
 
   deploy:
-    needs: [plan, inject-env, migrate]
+    needs: [plan, inject-env, prepare-database, migrate]
     # migration不要時は migrate が skipped になる。Planと環境変数の準備が成功していれば本番反映を続ける。
     if: >-
       ${{
         always() &&
         needs.plan.result == 'success' &&
         needs.inject-env.result == 'success' &&
+        needs.prepare-database.result == 'success' &&
         (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
       }}
     environment: production

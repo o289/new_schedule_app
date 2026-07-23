@@ -1,0 +1,94 @@
+name: DBを起動して初回migration要否を判定
+
+# ステージング・本番のデプロイから呼び出す共通処理。
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: "対象環境（stg または prod）"
+        required: true
+        type: string
+    outputs:
+      needs_initial_migration:
+        description: "Drizzleのmigration履歴がまだないDBか"
+        value: ${{ jobs.prepare.outputs.needs_initial_migration }}
+
+jobs:
+  prepare:
+    environment: ${{ inputs.target == 'prod' && 'production' || 'staging' }}
+    runs-on: ubuntu-latest
+    outputs:
+      needs_initial_migration: ${{ steps.database-state.outputs.needs_initial_migration }}
+    steps:
+      - name: VPSへのSSHを準備
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # 通常更新では既存DBをそのまま使う。初回だけDBを起動し、Drizzleの履歴がないことを返す。
+      - name: DBを起動し、初回migration要否を確認
+        id: database-state
+        env:
+          TARGET: ${{ inputs.target }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          if [ "$TARGET" = "prod" ]; then
+            compose_file=compose.prod.yml
+            env_file=.env.prod
+            database_service=database
+          else
+            compose_file=compose.stg.yml
+            env_file=.env.stg
+            database_service=database-stg
+          fi
+
+          needs_initial_migration="$(ssh "$VPS_USER@$VPS_HOST" "VPS_DEPLOY_PATH='$VPS_DEPLOY_PATH' COMPOSE_FILE='$compose_file' ENV_FILE='$env_file' DATABASE_SERVICE='$database_service' sh -s" <<'REMOTE'
+          set -eu
+          cd "$VPS_DEPLOY_PATH"
+          docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d "$DATABASE_SERVICE" >&2
+
+          database_id="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q "$DATABASE_SERVICE")"
+          test -n "$database_id"
+
+          health_status=""
+          for attempt in $(seq 1 30); do
+            health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$database_id")"
+            if [ "$health_status" = "healthy" ]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$health_status" = healthy
+
+          migration_table="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T "$DATABASE_SERVICE" \
+            sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "SELECT to_regclass('\''drizzle.__drizzle_migrations'\'');"')"
+
+          if [ "$migration_table" = "drizzle.__drizzle_migrations" ]; then
+            migration_count="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T "$DATABASE_SERVICE" \
+              sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "SELECT count(*) FROM drizzle.__drizzle_migrations;"')"
+            if [ "$migration_count" -gt 0 ]; then
+              printf false
+            else
+              printf true
+            fi
+          else
+            printf true
+          fi
+          REMOTE
+          )"
+
+          case "$needs_initial_migration" in
+            true | false) ;;
+            *)
+              echo "初回migration要否を判定できませんでした: $needs_initial_migration" >&2
+              exit 1
+              ;;
+          esac
+          echo "needs_initial_migration=$needs_initial_migration" >> "$GITHUB_OUTPUT"

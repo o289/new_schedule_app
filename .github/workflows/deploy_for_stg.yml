@@ -11,6 +11,11 @@ on:
         description: "対象SHA（空欄なら現在のmain）"
         required: false
         type: string
+      force_deploy:
+        description: "変更判定にかかわらず、初回準備または再実行のために反映する"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: write
@@ -55,6 +60,8 @@ jobs:
 
       - name: デプロイ計画を自動判定
         id: plan
+        env:
+          FORCE_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy || 'false' }}
         run: |
           sha="$(git rev-parse HEAD)"
           changed_files="$(git diff --name-only "$sha^" "$sha" 2>/dev/null || git diff-tree --no-commit-id --name-only -r "$sha")"
@@ -62,6 +69,9 @@ jobs:
           run_migration=false
 
           if printf '%s\n' "$changed_files" | grep -Eq '^(apps/|packages/|drizzle/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|Dockerfile\.prod$|compose\.(stg|prod)\.yml$|vite\.config\.ts$|tsconfig)'; then
+            should_deploy=true
+          fi
+          if [ "$FORCE_DEPLOY" = true ]; then
             should_deploy=true
           fi
           if printf '%s\n' "$changed_files" | grep -Eq '^(drizzle/|apps/backend/.*/model\.ts$|apps/backend/database/schema\.ts$)'; then
@@ -99,18 +109,31 @@ jobs:
       migration_image: ${{ needs.build-images.outputs.migration_image }}
     secrets: inherit
 
-  migrate:
+  prepare-database:
     needs: [plan, inject-env]
+    if: >-
+      ${{
+        always() &&
+        needs.plan.outputs.should_deploy == 'true' &&
+        needs.inject-env.result == 'success'
+      }}
+    uses: ./.github/workflows/prepare-database.yml
+    with:
+      target: stg
+    secrets: inherit
+
+  migrate:
+    needs: [plan, inject-env, prepare-database]
     uses: ./.github/workflows/build-and-migrate.yml
     with:
       target: stg
       commit_sha: ${{ needs.plan.outputs.commit_sha }}
       build_images: false
-      run_migration: ${{ needs.plan.outputs.run_migration == 'true' }}
+      run_migration: ${{ needs.plan.outputs.run_migration == 'true' || needs.prepare-database.outputs.needs_initial_migration == 'true' }}
     secrets: inherit
 
   deploy:
-    needs: [plan, build-images, inject-env, migrate]
+    needs: [plan, build-images, inject-env, prepare-database, migrate]
     # migration不要時は migrate が skipped になる。必要な前提Jobが成功していればデプロイを続ける。
     if: >-
       ${{
@@ -118,6 +141,7 @@ jobs:
         needs.plan.outputs.should_deploy == 'true' &&
         needs.build-images.result == 'success' &&
         needs.inject-env.result == 'success' &&
+        needs.prepare-database.result == 'success' &&
         (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
       }}
     environment: staging
