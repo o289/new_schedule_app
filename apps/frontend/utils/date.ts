@@ -99,6 +99,75 @@ export function toISODatetime(isoDate: string, time: string): string {
   return `${isoDate}T${time}:00`;
 }
 
+/** 時刻を除いたローカル日付を返す。 */
+export function toDateOnly(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** DateをYYYY-MM-DD形式へ変換する。 */
+export function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** 指定日から日数を加減する。 */
+export function addDays(date: Date, offset: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + offset);
+  return result;
+}
+
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+export function getMonthDates(year: number, month: number): Date[] {
+  return Array.from(
+    { length: getDaysInMonth(year, month) },
+    (_, index) => new Date(year, month - 1, index + 1),
+  );
+}
+
+/** 指定日を含む日曜始まりの7日間を返す。 */
+export function getWeekDates(baseDate: Date): Date[] {
+  const date = toDateOnly(baseDate);
+  const start = addDays(date, -date.getDay());
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+}
+
+export function isSameDate(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function isToday(date: Date): boolean {
+  return isSameDate(date, new Date());
+}
+
+/** endは排他的。 */
+export function isInRange(
+  date: Date,
+  rangeStart: Date,
+  rangeEnd: Date,
+): boolean {
+  const target = toDateOnly(date).getTime();
+  const start = toDateOnly(rangeStart).getTime();
+  const end = toDateOnly(rangeEnd).getTime();
+  return target >= start && target < end;
+}
+
+export function isWeekCrossingMonth(weekDates: Date[]): boolean {
+  const firstDate = weekDates[0];
+  return firstDate
+    ? weekDates.some((date) => date.getMonth() !== firstDate.getMonth())
+    : false;
+}
+
 /*
 ----------------------------------------------------
 使い方例（コメントアウト／参考）

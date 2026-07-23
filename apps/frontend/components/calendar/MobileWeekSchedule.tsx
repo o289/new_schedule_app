@@ -1,9 +1,10 @@
 import { useCalendar } from "../../context/CalendarContext";
-import { getWeekDates } from "../../utils/dateUtils";
+import { getWeekDates } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import type { EventInput } from "@fullcalendar/core";
 import type { Dispatch, SetStateAction } from "react";
 import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 
 interface MobileWeekScheduleProps {
   selectedDate: Date;
@@ -109,13 +110,7 @@ export default function MobileWeekSchedule({
                     onClick={() => {
                       setSelectedEvent(null);
                       setSelectedSchedule(schedule);
-                      setDraftSchedule({
-                        id: schedule.id,
-                        title: schedule.title ?? "",
-                        note: schedule.note ?? "",
-                        categoryId: schedule.categoryId ?? "",
-                        dates: schedule.dates,
-                      });
+                      setDraftSchedule(toScheduleForm(schedule));
                       if (setIsDrawerOpen) {
                         setIsDrawerOpen(true);
                       }

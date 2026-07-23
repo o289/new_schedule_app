@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import { toScheduleForm } from "./scheduleFormAdapter";
 
 export type ScheduleChangeEvent = {
   target: {
@@ -43,12 +44,7 @@ export function useScheduleForm() {
   };
   const resetDraft = () => setDraftSchedule(initialSchedule);
   const loadSchedule = (schedule: ScheduleResponse) => {
-    setDraftSchedule({
-      title: schedule.title ?? "",
-      note: schedule.note ?? "",
-      dates: schedule.dates,
-      categoryId: schedule.categoryId ?? "",
-    });
+    setDraftSchedule(toScheduleForm(schedule));
   };
   return {
     draftSchedule,

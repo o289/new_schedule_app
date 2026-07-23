@@ -16,6 +16,7 @@ import type { AsideMode, CalendarView } from "../../context/CalendarContext";
 import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
 import useIsMobile from "../../hooks/useIsMobile";
 import EventCard from "./EventCard";
+import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 import "./FullCalendarWrapper.css";
 
 type FullCalendarProps = ComponentProps<typeof FullCalendar>;
@@ -110,13 +111,7 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
 
       setSelectedEvent(info.event);
       setSelectedSchedule(schedule);
-      setDraftSchedule({
-        id: schedule.id,
-        title: schedule.title ?? "",
-        note: schedule.note ?? "",
-        categoryId: schedule.categoryId ?? "",
-        dates: schedule.dates,
-      });
+      setDraftSchedule(toScheduleForm(schedule));
       setIsDrawerOpen?.(true);
       setAsideMode("detail");
     };

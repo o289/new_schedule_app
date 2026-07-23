@@ -1,25 +1,4 @@
-// frontend/src/utils/monthGrid.js
-
-/**
- * YYYY-MM-DD 形式に変換
- */
-export function formatDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-/**
- * 今日判定
- */
-export function isSameDate(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
+import { formatDate, isSameDate } from "./date";
 
 /**
  * 月を週配列（最大6行）に変換
@@ -105,7 +84,7 @@ function createDayObject(
 ): MonthGridDay {
   return {
     date,
-    dateString: formatDateString(date),
+    dateString: formatDate(date),
     day: date.getDate(),
     isCurrentMonth,
     isToday: isSameDate(date, today),

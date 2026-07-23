@@ -69,7 +69,7 @@ export default function CalendarAside({
             onSubmit={handleScheduleCreate}
             onCancel={() => {
               setAsideMode(null);
-              resetForm;
+              resetForm();
             }}
           />
         );

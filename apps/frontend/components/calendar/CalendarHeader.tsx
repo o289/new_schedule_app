@@ -5,7 +5,7 @@ import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 
 import { useCalendar } from "../../context/CalendarContext";
-import { getWeekDates } from "../../utils/dateUtils";
+import { getWeekDates } from "../../utils/date";
 import type { Dispatch, SetStateAction } from "react";
 
 interface CalendarHeaderProps {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 
-import { isSameDate } from "../../utils/dateUtils";
+import { isSameDate } from "../../utils/date";
 import { generateMonthGrid } from "../../utils/monthGrid";
 import type { Dispatch, SetStateAction } from "react";
 
