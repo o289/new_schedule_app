@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
-import { CircularProgress } from "@mui/material";
 
 import { useCategory } from "./useCategory";
 
