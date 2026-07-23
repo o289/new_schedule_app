@@ -18,28 +18,32 @@ jobs:
     steps:
       # 実行対象のコミットを取得する。
       - name: ソースコードを取得
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # AGENTS.md と package.json が要求するNode.jsを固定する。
+      # setup-nodeのpnpmキャッシュはpnpmコマンドを使うため、先に有効化する。
+      - name: pnpm 11.13.0を有効化
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.0
+
+      # AGENTS.md と package.json が要求するNode.jsを固定し、pnpm storeをキャッシュする。
       - name: Node.js 22.23.1を設定
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22.23.1
           cache: pnpm
 
-      # packageManagerの指定に従い、lockfileどおりに依存関係を入れる。
-      - name: pnpmを有効化
-        run: corepack enable
-
+      # lockfileどおりに依存関係を入れる。
       - name: 依存関係をインストール
         run: pnpm install --frozen-lockfile
 
-      # アプリケーションの型、テスト、フォーマットを順に確認する。
+      # もっとも短時間で失敗を判定できる書式を、型チェック・テストより先に確認する。
+      - name: フォーマット確認
+        run: pnpm format:check
+
+      # アプリケーションの型とテストを順に確認する。
       - name: 型チェック
         run: pnpm typecheck
 
       - name: テスト
         run: pnpm test
-
-      - name: フォーマット確認
-        run: pnpm format:check

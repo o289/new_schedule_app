@@ -42,7 +42,7 @@ jobs:
       migration_image: ${{ steps.digests.outputs.migration_image }}
     steps:
       - name: 対象コミットを取得
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.commit_sha }}
 

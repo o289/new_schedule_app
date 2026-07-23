@@ -48,7 +48,7 @@ jobs:
         run: echo "sha=${INPUT_SHA:-main}" >> "$GITHUB_OUTPUT"
 
       - name: 対象コミットを取得
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.workflow-run-target.outputs.sha || steps.manual-target.outputs.sha }}
           fetch-depth: 2
