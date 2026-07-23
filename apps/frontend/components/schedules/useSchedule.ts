@@ -95,7 +95,6 @@ export function useSchedule(id: string | null = null) {
 
   // --- 削除 ---
   const handleScheduleDelete = async () => {
-    if (!window.confirm("本当に削除しますか？")) return;
     await apiFetch(
       `${base_url}/${draftSchedule.id}`,
       { method: "DELETE" },

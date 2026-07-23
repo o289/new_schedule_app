@@ -111,6 +111,15 @@ jobs:
 
   deploy:
     needs: [plan, build-images, inject-env, migrate]
+    # migration不要時は migrate が skipped になる。必要な前提Jobが成功していればデプロイを続ける。
+    if: >-
+      ${{
+        always() &&
+        needs.plan.outputs.should_deploy == 'true' &&
+        needs.build-images.result == 'success' &&
+        needs.inject-env.result == 'success' &&
+        (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+      }}
     environment: staging
     runs-on: ubuntu-latest
     steps:

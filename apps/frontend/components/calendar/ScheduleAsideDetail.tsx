@@ -6,6 +6,7 @@ import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import LocalOfferOutlinedIcon from "@mui/icons-material/LocalOfferOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import type { EventApi } from "@fullcalendar/core";
+import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
 import type { ScheduleResponse } from "../../types/schedule";
@@ -13,6 +14,7 @@ import { formatDateTime } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { buildTimeGroupsFromDates } from "./scheduleViewAdapter";
 import { DateTimeCard } from "./DateTimeCard";
+import ConfirmDialog from "../ConfirmDialog";
 
 interface Props {
   schedule: ScheduleResponse;
@@ -29,6 +31,8 @@ export default function ScheduleAsideDetail({
   selectedEvent,
   setIsDrawerOpen,
 }: Props) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const theme = getCategoryTheme(schedule.category?.color);
   const iconColor = theme.border;
   const selectedScheduleDate =
@@ -48,6 +52,18 @@ export default function ScheduleAsideDetail({
         return dStr !== selectedDateStr;
       })
     : [];
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await handleScheduleDelete();
+      setIsDeleteDialogOpen(false);
+      setAsideMode(null);
+      setIsDrawerOpen?.(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <>
@@ -168,15 +184,20 @@ export default function ScheduleAsideDetail({
             color="error"
             startIcon={<DeleteIcon />}
             size="large"
-            onClick={() => {
-              handleScheduleDelete();
-              setAsideMode(null);
-            }}
+            onClick={() => setIsDeleteDialogOpen(true)}
           >
             削除
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        title="削除しますか？"
+        message={`スケジュール「${schedule.title}」を削除しますか？`}
+        isProcessing={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+      />
     </>
   );
 }

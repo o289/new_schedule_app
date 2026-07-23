@@ -128,6 +128,14 @@ jobs:
 
   deploy:
     needs: [plan, inject-env, migrate]
+    # migration不要時は migrate が skipped になる。Planと環境変数の準備が成功していれば本番反映を続ける。
+    if: >-
+      ${{
+        always() &&
+        needs.plan.result == 'success' &&
+        needs.inject-env.result == 'success' &&
+        (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+      }}
     environment: production
     runs-on: ubuntu-latest
     steps:

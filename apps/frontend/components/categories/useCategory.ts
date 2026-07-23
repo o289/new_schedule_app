@@ -141,8 +141,6 @@ export function useCategory() {
   // ========================
 
   const handleDelete = async (category: Category) => {
-    if (!window.confirm("本当に削除しますか？")) return;
-
     setEditingId(category.id);
 
     await apiFetch(

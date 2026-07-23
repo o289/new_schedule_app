@@ -1,11 +1,13 @@
 import { renderCategories } from "./categoryUI";
 import CategoryCard from "./CategoryCard";
+import ConfirmDialog from "../ConfirmDialog";
 import { CATEGORY_COLORS } from "../../constants/categoryColors";
 
 import { Button } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
 import type {
@@ -46,6 +48,20 @@ export default function CategoryPanel({
   onCancelEdit: () => void;
 }) {
   const visibleCategories = renderCategories(categories, expanded);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(deleteTarget);
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <>
@@ -130,7 +146,7 @@ export default function CategoryPanel({
               key={cat.id}
               category={cat}
               onEdit={() => onEdit(cat)}
-              onDelete={() => onDelete(cat)}
+              onDelete={() => setDeleteTarget(cat)}
             />
           ))}
         </div>
@@ -144,6 +160,18 @@ export default function CategoryPanel({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="削除しますか？"
+        message={
+          deleteTarget
+            ? `カテゴリー「${deleteTarget.name}」を削除しますか？`
+            : "カテゴリーを削除しますか？"
+        }
+        isProcessing={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 }
