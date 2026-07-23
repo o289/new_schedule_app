@@ -34,12 +34,16 @@ jobs:
       - name: 最新のステージング候補を特定
         id: candidate
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
           INPUT_SHA: ${{ inputs.candidate_sha }}
         run: |
-          run_id="$(gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
-          candidate_sha="$(gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
-          status="$(gh variable get STAGING_CANDIDATE_STATUS --repo "$GITHUB_REPOSITORY")"
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
+          run_id="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          candidate_sha="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
+          status="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_STATUS --repo "$GITHUB_REPOSITORY")"
           test -n "$run_id"
           test "$status" = pending_verification
           test "$candidate_sha" = "$INPUT_SHA"
@@ -57,16 +61,21 @@ jobs:
       - name: Planと現在のステージング状態を検証
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
           EXPECTED_RUN_ID: ${{ steps.candidate.outputs.run_id }}
           EXPECTED_SHA: ${{ steps.candidate.outputs.candidate_sha }}
         run: |
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
           test "$(jq -r .status plan/deployment-plan.json)" = pending_verification
           test "$(jq -r .stagingDeployment plan/deployment-plan.json)" = success
           test "$(jq -r .healthCheck plan/deployment-plan.json)" = success
           test "$(jq -r .stagingRunId plan/deployment-plan.json)" = "$EXPECTED_RUN_ID"
           test "$(jq -r .commitSha plan/deployment-plan.json)" = "$EXPECTED_SHA"
           test "$(date -u +%s)" -lt "$(jq -r '.expiresAt | fromdateiso8601' plan/deployment-plan.json)"
-          test "$(gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")" = "$EXPECTED_SHA"
+          test "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")" = "$EXPECTED_SHA"
           test "$(gh run view "$EXPECTED_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)" = success
 
       - name: GHCR上の同一digestを検証
@@ -105,15 +114,19 @@ jobs:
 
       - name: 確認状態を更新
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
           DECISION: ${{ inputs.decision }}
           SHA: ${{ steps.candidate.outputs.candidate_sha }}
         run: |
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
           if [ "$DECISION" = approve ]; then status=approved; else status=rejected; fi
-          gh variable set STAGING_CANDIDATE_STATUS --body "$status" --repo "$GITHUB_REPOSITORY"
-          gh variable set APPROVED_PLAN_STATUS --body "$status" --repo "$GITHUB_REPOSITORY"
-          gh variable set APPROVED_PLAN_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-          gh variable set APPROVED_PLAN_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_STATUS --body "$status" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_STATUS --body "$status" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
 
       - name: 確認結果をSummaryへ表示
         env:

@@ -203,14 +203,18 @@ jobs:
 
       - name: 最新候補をUI確認待ちとして記録
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
           SHA: ${{ needs.plan.outputs.commit_sha }}
         run: |
-          gh variable set STAGING_CANDIDATE_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
-          gh variable set STAGING_CANDIDATE_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
-          gh variable set STAGING_CANDIDATE_STATUS --body pending_verification --repo "$GITHUB_REPOSITORY"
-          gh variable set STAGING_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
-          gh variable set APPROVED_PLAN_STATUS --body superseded --repo "$GITHUB_REPOSITORY"
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_STATUS --body pending_verification --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_STATUS --body superseded --repo "$GITHUB_REPOSITORY"
 
       - name: 状態をSummaryへ表示
         env:

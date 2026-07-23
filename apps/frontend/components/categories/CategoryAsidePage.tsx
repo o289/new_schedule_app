@@ -14,7 +14,7 @@ export default function CategoryAsidePage({
   const {
     categories,
     form,
-    isFetching,
+    // isFetching,
     editingId,
     handleChange,
     handleSubmit,
@@ -24,14 +24,6 @@ export default function CategoryAsidePage({
   } = useCategory();
 
   const [expanded, setExpanded] = useState(false);
-
-  if (isFetching) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <CircularProgress aria-label="処理中" className="w-64 max-w-full" />
-      </div>
-    );
-  }
 
   return (
     <CategoryPanel

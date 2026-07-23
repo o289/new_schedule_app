@@ -27,10 +27,14 @@ jobs:
       - name: 承認済みPlanを特定
         id: approved
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
         run: |
-          test "$(gh variable get APPROVED_PLAN_STATUS --repo "$GITHUB_REPOSITORY")" = approved
-          run_id="$(gh variable get APPROVED_PLAN_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
+          test "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_STATUS --repo "$GITHUB_REPOSITORY")" = approved
+          run_id="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_RUN_ID --repo "$GITHUB_REPOSITORY")"
           test -n "$run_id"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
@@ -46,7 +50,12 @@ jobs:
         id: validate
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
         run: |
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
           file=plan/verified-deployment-plan.json
           sha="$(jq -r .commitSha "$file")"
           source_run_id="$(jq -r .stagingRunId "$file")"
@@ -57,12 +66,12 @@ jobs:
           test "$(date -u +%s)" -lt "$(jq -r '.expiresAt | fromdateiso8601' "$file")"
           test "$(jq -r '.verification.verifier // empty' "$file")" != ""
           test "$(jq -r '.verification.verifiedAt // empty' "$file")" != ""
-          test "$sha" = "$(gh variable get APPROVED_PLAN_SHA --repo "$GITHUB_REPOSITORY")"
-          test "$sha" = "$(gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
-          test "$sha" = "$(gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")"
-          test "$source_run_id" = "$(gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$source_run_id" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
           test "$(gh run view "$source_run_id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)" = success
-          deployed_plan_id="$(gh variable get PRODUCTION_DEPLOYED_PLAN_ID --repo "$GITHUB_REPOSITORY" 2>/dev/null || true)"
+          deployed_plan_id="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get PRODUCTION_DEPLOYED_PLAN_ID --repo "$GITHUB_REPOSITORY" 2>/dev/null || true)"
           test "$deployed_plan_id" != "$plan_id"
 
           application_image="$(jq -r .applicationImage "$file")"
@@ -189,13 +198,17 @@ jobs:
 
       - name: Planを本番適用済みとして記録
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
           PLAN_ID: ${{ needs.plan.outputs.plan_id }}
           SHA: ${{ needs.plan.outputs.commit_sha }}
         run: |
-          gh variable set PRODUCTION_DEPLOYED_PLAN_ID --body "$PLAN_ID" --repo "$GITHUB_REPOSITORY"
-          gh variable set PRODUCTION_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
-          gh variable set APPROVED_PLAN_STATUS --body deployed --repo "$GITHUB_REPOSITORY"
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set PRODUCTION_DEPLOYED_PLAN_ID --body "$PLAN_ID" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set PRODUCTION_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_STATUS --body deployed --repo "$GITHUB_REPOSITORY"
           {
             echo "## 本番デプロイ完了"
             echo "- Plan ID: \`$PLAN_ID\`"
