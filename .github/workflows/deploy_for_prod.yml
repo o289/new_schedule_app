@@ -1,5 +1,6 @@
-name: 承認済みPlanを本番へ手動デプロイ
+name: 最新ステージングPlanを本番へ手動デプロイ
 
+# このworkflowの手動開始を、人間によるステージングUI・主要機能確認完了の意思表示とする。
 on:
   workflow_dispatch:
 
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   plan:
-    name: 承認済みDeployment Planを検証
+    name: 最新ステージングPlanを検証・承認
     runs-on: ubuntu-latest
     outputs:
       commit_sha: ${{ steps.validate.outputs.commit_sha }}
@@ -24,8 +25,8 @@ jobs:
       recreate_application: ${{ steps.validate.outputs.recreate_application }}
       plan_id: ${{ steps.validate.outputs.plan_id }}
     steps:
-      - name: 承認済みPlanを特定
-        id: approved
+      - name: 最新のステージング候補を特定
+        id: candidate
         env:
           REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
         run: |
@@ -33,40 +34,51 @@ jobs:
             echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
             exit 1
           }
-          test "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_STATUS --repo "$GITHUB_REPOSITORY")" = approved
-          run_id="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          run_id="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
+          candidate_sha="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
+          candidate_status="$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_STATUS --repo "$GITHUB_REPOSITORY")"
           test -n "$run_id"
+          test -n "$candidate_sha"
+          case "$candidate_status" in
+            pending_verification|approved) ;;
+            *)
+              echo "最新のステージング候補は本番へ進められない状態です: $candidate_status" >&2
+              exit 1
+              ;;
+          esac
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
 
-      - name: 承認済みPlanを取得
+      - name: ステージング成功時のPlanを取得
         uses: actions/download-artifact@v4
         with:
-          name: verified-deployment-plan
+          name: deployment-plan
           path: plan
           github-token: ${{ github.token }}
-          run-id: ${{ steps.approved.outputs.run_id }}
+          run-id: ${{ steps.candidate.outputs.run_id }}
 
-      - name: Plan・承認・最新候補・未適用を検証
+      - name: Plan・最新候補・未適用を検証
         id: validate
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
+          EXPECTED_RUN_ID: ${{ steps.candidate.outputs.run_id }}
+          EXPECTED_SHA: ${{ steps.candidate.outputs.candidate_sha }}
         run: |
           test -n "$REPOSITORY_VARIABLES_TOKEN" || {
             echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
             exit 1
           }
-          file=plan/verified-deployment-plan.json
+          file=plan/deployment-plan.json
           sha="$(jq -r .commitSha "$file")"
           source_run_id="$(jq -r .stagingRunId "$file")"
           plan_id="$(jq -r .planId "$file")"
-          test "$(jq -r .status "$file")" = approved
+          test "$(jq -r .status "$file")" = pending_verification
           test "$(jq -r .stagingDeployment "$file")" = success
           test "$(jq -r .healthCheck "$file")" = success
           test "$(date -u +%s)" -lt "$(jq -r '.expiresAt | fromdateiso8601' "$file")"
-          test "$(jq -r '.verification.verifier // empty' "$file")" != ""
-          test "$(jq -r '.verification.verifiedAt // empty' "$file")" != ""
-          test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get APPROVED_PLAN_SHA --repo "$GITHUB_REPOSITORY")"
+          test "$sha" = "$EXPECTED_SHA"
+          test "$source_run_id" = "$EXPECTED_RUN_ID"
           test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_SHA --repo "$GITHUB_REPOSITORY")"
           test "$sha" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_DEPLOYED_SHA --repo "$GITHUB_REPOSITORY")"
           test "$source_run_id" = "$(GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable get STAGING_CANDIDATE_RUN_ID --repo "$GITHUB_REPOSITORY")"
@@ -97,9 +109,39 @@ jobs:
           docker buildx imagetools inspect "$APPLICATION_IMAGE" >/dev/null
           docker buildx imagetools inspect "$MIGRATION_IMAGE" >/dev/null
 
+      - name: UI・主要機能確認完了をPlanへ記録
+        run: |
+          verified_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          jq \
+            --arg verifier "$GITHUB_ACTOR" \
+            --arg verifiedAt "$verified_at" \
+            '.status="approved" | .verification={verifier:$verifier,verifiedAt:$verifiedAt,method:"production_workflow_dispatch"}' \
+            plan/deployment-plan.json > production-deployment-plan.json
+
+      - name: 本番へ進めるPlanを保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-deployment-plan
+          path: production-deployment-plan.json
+          retention-days: 90
+
+      - name: 最新候補を承認済みとして記録
+        env:
+          REPOSITORY_VARIABLES_TOKEN: ${{ secrets.REPOSITORY_VARIABLES_TOKEN }}
+          SHA: ${{ steps.validate.outputs.commit_sha }}
+        run: |
+          test -n "$REPOSITORY_VARIABLES_TOKEN" || {
+            echo "REPOSITORY_VARIABLES_TOKEN がRepository Secretに登録されていません。" >&2
+            exit 1
+          }
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_STATUS --body approved --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_STATUS --body approved --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_RUN_ID --body "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+          GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+
       - name: 本番適用前の内容をSummaryへ表示
         run: |
-          file=plan/verified-deployment-plan.json
+          file=production-deployment-plan.json
           {
             echo "## 本番Environment最終承認の対象"
             echo "- Plan ID: \`$(jq -r .planId "$file")\`"

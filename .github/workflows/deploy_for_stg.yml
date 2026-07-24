@@ -238,6 +238,7 @@ jobs:
           GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
           GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_CANDIDATE_STATUS --body pending_verification --repo "$GITHUB_REPOSITORY"
           GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set STAGING_DEPLOYED_SHA --body "$SHA" --repo "$GITHUB_REPOSITORY"
+          # 新しい候補がステージングへ配置された時点で、以前の承認済み候補は利用不可にする。
           GH_TOKEN="$REPOSITORY_VARIABLES_TOKEN" gh variable set APPROVED_PLAN_STATUS --body superseded --repo "$GITHUB_REPOSITORY"
 
       - name: 状態をSummaryへ表示
