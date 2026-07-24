@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 
@@ -9,6 +9,20 @@ import { scheduleRouter } from "./features/schedule/router";
 import { userRouter } from "./features/user/router";
 
 export const app = new Hono();
+
+const noStore: MiddlewareHandler = async (context, next) => {
+  await next();
+  context.header("Cache-Control", "no-store");
+};
+
+const setStaticCacheHeader = (path: string, context: Context) => {
+  if (/-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(path)) {
+    context.header("Cache-Control", "public, max-age=31536000, immutable");
+    return;
+  }
+
+  context.header("Cache-Control", "no-cache");
+};
 
 app.use(
   "*",
@@ -22,6 +36,11 @@ app.use(
 
 app.get("/ping", (c) => c.json({ message: "pong" }));
 
+// 認証状態やユーザー固有データを含むAPIは、ブラウザ・中継キャッシュへ保存させない。
+app.use("/auth/*", noStore);
+app.use("/categories/*", noStore);
+app.use("/schedules/*", noStore);
+
 app.route("/", authRouter);
 app.route("/", userRouter);
 app.route("/", categoryRouter);
@@ -30,8 +49,14 @@ app.route("/", scheduleRouter);
 if (process.env.NODE_ENV === "production") {
   // 本番コンテナでは React のビルド結果を同じオリジンから配信する。
   // API ルートを先に登録するため、API リクエストは静的ファイル配信へ流れない。
-  app.use("/*", serveStatic({ root: "./public" }));
-  app.get("*", serveStatic({ path: "./public/index.html" }));
+  app.use(
+    "/*",
+    serveStatic({ root: "./public", onFound: setStaticCacheHeader }),
+  );
+  app.get(
+    "*",
+    serveStatic({ path: "./public/index.html", onFound: setStaticCacheHeader }),
+  );
 }
 
 app.onError((error, context) => {

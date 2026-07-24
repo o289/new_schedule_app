@@ -81,6 +81,7 @@ describe("auth router", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toEqual(result);
     expect(serviceMocks.registerOptions).toHaveBeenCalledWith({
       email: "test@example.com",
@@ -138,6 +139,7 @@ describe("auth router", () => {
     });
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toEqual({
       code: "INVALID_REQUEST",
     });

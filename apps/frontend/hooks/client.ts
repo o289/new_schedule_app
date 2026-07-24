@@ -14,8 +14,37 @@ interface FetchConfig {
   silentCodes?: string[];
 }
 
-interface ErrorResponse {
-  code?: string;
+const INVALID_RESPONSE_CODE = "INVALID_RESPONSE";
+
+function getErrorCode(data: unknown, fallback = "SERVER_ERROR"): string {
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "code" in data &&
+    typeof data.code === "string"
+  ) {
+    return data.code;
+  }
+
+  return fallback;
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  // 204は本文を返さない正しい成功レスポンスである。
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API response is not JSON");
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error("API response contains invalid JSON");
+  }
 }
 
 export async function apiFetch<T = unknown>(
@@ -44,8 +73,18 @@ export async function apiFetch<T = unknown>(
     "Content-Type": "application/json",
   };
 
-  let res = await fetch(`${API_URL}${url}`, { ...options, headers });
-  const data: ErrorResponse = await res.json().catch(() => ({}));
+  const res = await fetch(`${API_URL}${url}`, { ...options, headers });
+  let data: T;
+
+  try {
+    data = await parseJsonResponse<T>(res);
+  } catch {
+    const code = INVALID_RESPONSE_CODE;
+    if (!silentCodes.includes(code)) {
+      showAlert?.(code);
+    }
+    throw { code };
+  }
 
   if (!res.ok) {
     // 401 特例: refresh → retry
@@ -63,12 +102,22 @@ export async function apiFetch<T = unknown>(
           headers: retryHeaders,
         });
 
+        let retryData: T;
+        try {
+          retryData = await parseJsonResponse<T>(retryRes);
+        } catch {
+          const code = INVALID_RESPONSE_CODE;
+          if (!silentCodes.includes(code)) {
+            showAlert?.(code);
+          }
+          throw { code };
+        }
+
         if (retryRes.ok) {
-          const retryData: T = await retryRes.json().catch(() => ({}) as T);
           return retryData;
         }
       } else {
-        const code = data?.code || "INVALID_REFRESH_TOKEN";
+        const code = getErrorCode(data, "INVALID_REFRESH_TOKEN");
         clearSession?.();
         if (!silentCodes.includes(code)) {
           showAlert?.(code);
@@ -78,12 +127,12 @@ export async function apiFetch<T = unknown>(
     }
 
     // 上記以外のエラーは code のみで扱う
-    const code = data?.code || "SERVER_ERROR";
+    const code = getErrorCode(data);
     if (!silentCodes.includes(code)) {
       showAlert?.(code);
     }
     throw { code };
   }
 
-  return data as T;
+  return data;
 }
