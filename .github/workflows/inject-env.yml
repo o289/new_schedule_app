@@ -82,7 +82,8 @@ jobs:
             local value="${!name}"
 
             # 単一引用符で囲み、$・#・空白をComposeに展開させない。
-            value="${value//\'/\\'}"
+            single_quote="'"
+            value="${value//"$single_quote"/\\$single_quote}"
             printf "%s='%s'\n" "$name" "$value"
           }
 
