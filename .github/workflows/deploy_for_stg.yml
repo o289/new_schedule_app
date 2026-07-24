@@ -20,7 +20,7 @@ on:
 permissions:
   actions: write
   contents: read
-  packages: write
+  packages: read
 
 concurrency:
   # 候補更新・確認・本番適用の途中で、最新候補が入れ替わる競合を防ぐ。
@@ -92,6 +92,10 @@ jobs:
   build-images:
     needs: plan
     if: needs.plan.outputs.should_deploy == 'true'
+    # GHCRへpushするこの呼び出しだけに書き込み権限を限定する。
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/build-and-migrate.yml
     with:
       target: stg
@@ -124,6 +128,10 @@ jobs:
 
   migrate:
     needs: [plan, inject-env, prepare-database]
+    # ビルドは行わず、VPSから既存migrationイメージをpullするだけ。
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/build-and-migrate.yml
     with:
       target: stg

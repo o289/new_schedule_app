@@ -176,6 +176,10 @@ jobs:
 
   migrate:
     needs: [plan, inject-env, prepare-database]
+    # 本番では再ビルド・pushせず、ステージングで確定したイメージをpullするだけ。
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/build-and-migrate.yml
     with:
       target: prod

@@ -28,10 +28,6 @@ on:
         description: "pushしたmigrationイメージのdigest参照"
         value: ${{ jobs.build.outputs.migration_image }}
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
   build:
     # 本番昇格ではステージングで作成済みの同一SHAを使うため、再ビルドしない。
