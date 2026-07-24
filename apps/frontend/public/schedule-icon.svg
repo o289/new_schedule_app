@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Schedule</title>
+  <desc id="desc">A calendar with a check mark</desc>
+  <rect width="64" height="64" rx="14" fill="#2563eb"/>
+  <rect x="13" y="16" width="38" height="35" rx="6" fill="#fff"/>
+  <path d="M20 12v9M44 12v9M13 27h38" fill="none" stroke="#1d4ed8" stroke-linecap="round" stroke-width="4"/>
+  <path d="m23 38 6 6 13-13" fill="none" stroke="#2563eb" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+</svg>
