@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Compose設定を取得
+        uses: actions/checkout@v5
+
       # SSHの接続先を偽装されないよう、known_hostsを必ず登録する。
       - name: VPSへのSSHを準備
         env:
@@ -56,25 +59,78 @@ jobs:
           REFRESH_TOKEN_EXPIRES_IN: ${{ secrets.REFRESH_TOKEN_EXPIRES_IN }}
           ALGORITHM: ${{ secrets.ALGORITHM }}
         run: |
+          normalize_single_line_value() {
+            local name="$1"
+            local value="${!name}"
+
+            # Secret登録時に混入した末尾のLF・CRLFだけを取り除く。
+            while [[ "$value" == *$'\n' || "$value" == *$'\r' ]]; do
+              value="${value%?}"
+            done
+
+            # 値の途中の改行は、異なる認証情報へ黙って変換しない。
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              echo "$name の値の途中に改行があります。" >&2
+              exit 1
+            fi
+
+            printf -v "$name" '%s' "$value"
+          }
+
+          write_env_value() {
+            local name="$1"
+            local value="${!name}"
+
+            # 単一引用符で囲み、$・#・空白をComposeに展開させない。
+            value="${value//\'/\\'}"
+            printf "%s='%s'\n" "$name" "$value"
+          }
+
+          env_names=(
+            APPLICATION_IMAGE
+            MIGRATION_IMAGE
+            DATABASE_URL
+            POSTGRES_USER
+            POSTGRES_PASSWORD
+            POSTGRES_DB
+            WEBAUTHN_RP_ID
+            WEBAUTHN_RP_NAME
+            WEBAUTHN_ORIGIN
+            SECRET_KEY
+            ACCESS_TOKEN_EXPIRES_IN
+            REFRESH_TOKEN_EXPIRES_IN
+            ALGORITHM
+          )
+
+          for name in "${env_names[@]}"; do
+            normalize_single_line_value "$name"
+          done
+
           env_file="$RUNNER_TEMP/.env.$TARGET"
           {
-            printf 'APPLICATION_IMAGE=%s\n' "$APPLICATION_IMAGE"
-            printf 'MIGRATION_IMAGE=%s\n' "$MIGRATION_IMAGE"
-            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
-            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
-            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
-            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
-            printf 'WEBAUTHN_RP_ID=%s\n' "$WEBAUTHN_RP_ID"
-            printf 'WEBAUTHN_RP_NAME=%s\n' "$WEBAUTHN_RP_NAME"
-            printf 'WEBAUTHN_ORIGIN=%s\n' "$WEBAUTHN_ORIGIN"
-            printf 'SECRET_KEY=%s\n' "$SECRET_KEY"
-            printf 'ACCESS_TOKEN_EXPIRES_IN=%s\n' "$ACCESS_TOKEN_EXPIRES_IN"
-            printf 'REFRESH_TOKEN_EXPIRES_IN=%s\n' "$REFRESH_TOKEN_EXPIRES_IN"
-            printf 'ALGORITHM=%s\n' "$ALGORITHM"
+            for name in "${env_names[@]}"; do
+              write_env_value "$name"
+            done
           } > "$env_file"
 
-          # 改行を含む値は.envを壊すため、配置前に拒否する。
+          # 正規化後も必ず1変数1行であることを確認する。
           test "$(wc -l < "$env_file")" -eq 13
+
+          case "$TARGET" in
+            prod) compose_file=compose.prod.yml ;;
+            stg) compose_file=compose.stg.yml ;;
+            *)
+              echo "未対応のデプロイ先です: $TARGET" >&2
+              exit 1
+              ;;
+          esac
+
+          # env_file参照も含めて検証できるよう、検証中だけComposeファイルの隣へ配置する。
+          local_env_file="$GITHUB_WORKSPACE/.env.$TARGET"
+          trap 'rm -f -- "$local_env_file"' EXIT
+          install -m 600 "$env_file" "$local_env_file"
+          docker compose --env-file "$env_file" -f "$compose_file" config --quiet
+
           base64 --wrap=0 "$env_file" > "$env_file.base64"
 
           remote_file=".env.$TARGET"
