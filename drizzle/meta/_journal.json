@@ -15,6 +15,13 @@
       "when": 1784530004927,
       "tag": "0001_gigantic_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784902699300,
+      "tag": "0002_prevent_schedule_date_overlap",
+      "breakpoints": true
     }
   ]
 }

@@ -39,6 +39,10 @@ export const ALERT_MESSAGES = {
     type: "warning",
     message: "終了時刻を開始時刻より前に入力しないでください",
   },
+  SCHEDULE_TIME_OVERLAP: {
+    type: "warning",
+    message: "ほかの予定と時間が重なっています",
+  },
   NOT_FOUND_SCHEDULE: {
     type: "warning",
     message: "指定された予定が見つかりませんでした",

@@ -1,12 +1,39 @@
 import type {
   ScheduleCreate,
+  ScheduleDateCreate,
   ScheduleDateUpdate,
   ScheduleUpdate,
 } from "../../../../packages/schemas/schedule";
-import { BadRequestError, NotFoundError } from "../../core/api-error";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../../core/api-error";
 import type { User } from "../user/repository";
 import { CategoryRepository } from "../category/repository";
-import { ScheduleRepository, type Schedule } from "./repository";
+import {
+  ScheduleRepository,
+  type Schedule,
+  type ScheduleDate,
+} from "./repository";
+
+function hasPostgresErrorCode(error: unknown, code: string): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  if ("code" in error && error.code === code) {
+    return true;
+  }
+
+  return (
+    "cause" in error &&
+    typeof error.cause === "object" &&
+    error.cause !== null &&
+    "code" in error.cause &&
+    error.cause.code === code
+  );
+}
 
 export class ScheduleService {
   private readonly repository: ScheduleRepository;
@@ -39,10 +66,80 @@ export class ScheduleService {
     }
   }
 
+  private normalizeDateTime(value: string): string {
+    return value.replace(" ", "T");
+  }
+
+  private resolveUpdateDates(
+    existingDates: ScheduleDate[],
+    inputDates: ScheduleDateUpdate[],
+  ): ScheduleDateCreate[] {
+    const existingById = new Map(existingDates.map((date) => [date.id, date]));
+
+    return inputDates.map((date) => {
+      const existing = date.id ? existingById.get(date.id) : undefined;
+      const startDate = date.startDate ?? existing?.startDate;
+      const endDate = date.endDate ?? existing?.endDate;
+
+      if (startDate === undefined || endDate === undefined) {
+        throw new BadRequestError("INVALID_TIME");
+      }
+
+      return {
+        startDate: this.normalizeDateTime(startDate),
+        endDate: this.normalizeDateTime(endDate),
+      };
+    });
+  }
+
+  private async assertDatesDoNotOverlap(
+    userId: string,
+    dates: ScheduleDateCreate[],
+    excludedScheduleId?: string,
+  ): Promise<void> {
+    for (let index = 0; index < dates.length; index += 1) {
+      const candidate = dates[index]!;
+
+      for (const other of dates.slice(index + 1)) {
+        if (
+          candidate.startDate < other.endDate &&
+          candidate.endDate > other.startDate
+        ) {
+          throw new ConflictError("SCHEDULE_TIME_OVERLAP");
+        }
+      }
+
+      if (
+        await this.repository.hasOverlappingDate(
+          userId,
+          candidate.startDate,
+          candidate.endDate,
+          excludedScheduleId,
+        )
+      ) {
+        throw new ConflictError("SCHEDULE_TIME_OVERLAP");
+      }
+    }
+  }
+
+  private rethrowScheduleTimeOverlap(error: unknown): never {
+    if (hasPostgresErrorCode(error, "23P01")) {
+      throw new ConflictError("SCHEDULE_TIME_OVERLAP");
+    }
+
+    throw error;
+  }
+
   async createSchedule(user: User, input: ScheduleCreate): Promise<Schedule> {
     this.validateDates(input.dates);
     await this.assertOwnedCategory(user.id, input.categoryId);
-    return this.repository.create(input, user.id);
+    await this.assertDatesDoNotOverlap(user.id, input.dates);
+
+    try {
+      return await this.repository.create(input, user.id);
+    } catch (error) {
+      return this.rethrowScheduleTimeOverlap(error);
+    }
   }
 
   async listSchedules(user: User): Promise<Schedule[]> {
@@ -70,7 +167,21 @@ export class ScheduleService {
       await this.assertOwnedCategory(user.id, input.categoryId);
     }
 
-    const updated = await this.repository.update(schedule.id, input);
+    if (input.dates !== undefined) {
+      const resolvedDates = this.resolveUpdateDates(
+        schedule.dates,
+        input.dates,
+      );
+      this.validateDates(resolvedDates);
+      await this.assertDatesDoNotOverlap(user.id, resolvedDates, schedule.id);
+    }
+
+    let updated: Schedule | null;
+    try {
+      updated = await this.repository.update(schedule.id, input);
+    } catch (error) {
+      return this.rethrowScheduleTimeOverlap(error);
+    }
     if (!updated) {
       throw new NotFoundError("NOT_FOUND_SCHEDULE");
     }
