@@ -43,7 +43,7 @@ export default function CalendarAside({
   const {
     selectedDate,
     setSelectedDate,
-    selectedEvent,
+    selectedScheduleDateId,
     selectedSchedule,
     asideMode,
     setAsideMode,
@@ -95,7 +95,7 @@ export default function CalendarAside({
             schedule={selectedSchedule}
             handleScheduleDelete={handleScheduleDelete}
             setAsideMode={setAsideMode}
-            selectedEvent={selectedEvent}
+            selectedScheduleDateId={selectedScheduleDateId}
             {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
           />
         );

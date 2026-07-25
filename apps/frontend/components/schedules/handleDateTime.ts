@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 
 import type { ScheduleForm, ScheduleFormDate } from "../../types/schedule";
-import { toISODatetime } from "../../utils/date";
-import { getMostFrequentTimeRange, updateAllDatesTime } from "./scheduleTime";
+import {
+  buildScheduleDateRange,
+  getMostFrequentTimeRange,
+  updateAllDatesTime,
+} from "./scheduleTime";
 
 interface ChangeTarget {
   name: "dates";
@@ -29,7 +32,7 @@ export function useScheduleDateTime(
   }, [formData.dates, isEditing]);
 
   const changeTimeRange = (nextStart: string, nextEnd: string) => {
-    if (!isEditing || !nextStart || !nextEnd) return;
+    if (!isEditing || !nextStart || !nextEnd || nextStart === nextEnd) return;
 
     const nextDates = updateAllDatesTime(dates, {
       start: nextStart,
@@ -50,9 +53,8 @@ export function useScheduleDateTime(
   };
 
   const addDate = (date: string) => {
-    if (!start || !end) return;
-    const startDate = toISODatetime(date, start);
-    const endDate = toISODatetime(date, end);
+    if (!start || !end || start === end) return;
+    const { startDate, endDate } = buildScheduleDateRange(date, { start, end });
     if (
       dates.some(
         (item) => item.startDate === startDate && item.endDate === endDate,

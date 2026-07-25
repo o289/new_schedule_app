@@ -23,7 +23,7 @@ export default function CalendarMain({
     calendarRef,
     selectedDate,
     currentView,
-    setSelectedEvent,
+    setSelectedScheduleDateId,
     setSelectedSchedule,
     setAsideMode,
     handleDaySelect,
@@ -37,6 +37,7 @@ export default function CalendarMain({
           selectedDate={selectedDate}
           setDraftSchedule={setDraftSchedule}
           setSelectedSchedule={setSelectedSchedule}
+          setSelectedScheduleDateId={setSelectedScheduleDateId}
           {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
         />
       ) : (
@@ -48,7 +49,7 @@ export default function CalendarMain({
           onDateClick={(date) => handleDaySelect(date)}
           setDraftSchedule={setDraftSchedule}
           setAsideMode={setAsideMode}
-          setSelectedEvent={setSelectedEvent}
+          setSelectedScheduleDateId={setSelectedScheduleDateId}
           setSelectedSchedule={setSelectedSchedule}
           {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
         />

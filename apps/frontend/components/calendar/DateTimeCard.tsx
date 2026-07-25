@@ -4,11 +4,13 @@ import { useState } from "react";
 interface TimeGroupDate {
   id: string;
   date: string;
+  endDate: string;
   isPast: boolean;
 }
 interface TimeGroup {
   start: string;
   end: string;
+  crossesDate: boolean;
   dates: TimeGroupDate[];
 }
 
@@ -56,7 +58,10 @@ export function DateTimeCard({ timeGroup }: { timeGroup: TimeGroup }) {
 
         <div className="flex items-center gap-2 mb-1.5">
           <div className="w-12 text-sm text-gray-700">終了</div>
-          <span className="text-sm text-gray-900">{timeGroup.end}</span>
+          <span className="text-sm text-gray-900">
+            {timeGroup.crossesDate ? "翌日 " : ""}
+            {timeGroup.end}
+          </span>
         </div>
       </div>
 
@@ -82,7 +87,9 @@ export function DateTimeCard({ timeGroup }: { timeGroup: TimeGroup }) {
                         : "text-sm mb-1"
                     }
                   >
-                    {formatDate(d.date)}
+                    {timeGroup.crossesDate
+                      ? `${formatDate(d.date)} ${timeGroup.start} 〜 ${formatDate(d.endDate)} ${timeGroup.end}`
+                      : formatDate(d.date)}
                   </li>
                 ))}
                 {!isExpanded && rest > 0 && (

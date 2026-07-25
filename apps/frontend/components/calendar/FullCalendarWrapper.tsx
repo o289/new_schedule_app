@@ -25,7 +25,7 @@ type DateClickArg = Parameters<NonNullable<FullCalendarProps["dateClick"]>>[0];
 interface FullCalendarWrapperProps {
   events: EventInput[];
   selectedDate: Date;
-  setSelectedEvent: (event: EventClickArg["event"]) => void;
+  setSelectedScheduleDateId: (scheduleDateId: string) => void;
   setSelectedSchedule: (schedule: ScheduleResponse) => void;
   currentView: CalendarView;
   onDateClick: (date: Date) => void;
@@ -39,7 +39,7 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
     {
       events,
       selectedDate,
-      setSelectedEvent,
+      setSelectedScheduleDateId,
       setSelectedSchedule,
       currentView,
       onDateClick,
@@ -109,7 +109,7 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
         ScheduleResponse | undefined;
       if (!schedule) return;
 
-      setSelectedEvent(info.event);
+      setSelectedScheduleDateId(info.event.id);
       setSelectedSchedule(schedule);
       setDraftSchedule(toScheduleForm(schedule));
       setIsDrawerOpen?.(true);

@@ -1,7 +1,6 @@
 import { createContext, createRef, useContext, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import type FullCalendar from "@fullcalendar/react";
-import type { EventApi } from "@fullcalendar/core";
 import type { ScheduleResponse } from "../types/schedule";
 
 export type CalendarView = "day" | "week";
@@ -13,8 +12,8 @@ interface CalendarContextValue {
   setSelectedDate: (date: Date) => void;
   currentView: CalendarView;
   setCurrentView: (view: CalendarView) => void;
-  selectedEvent: EventApi | null;
-  setSelectedEvent: (event: EventApi | null) => void;
+  selectedScheduleDateId: string | null;
+  setSelectedScheduleDateId: (scheduleDateId: string | null) => void;
   selectedSchedule: ScheduleResponse | null;
   setSelectedSchedule: (schedule: ScheduleResponse | null) => void;
   asideMode: AsideMode;
@@ -32,7 +31,9 @@ const CalendarContext = createContext<CalendarContextValue | undefined>(
 export function CalendarProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [currentView, setCurrentView] = useState<CalendarView>("week");
-  const [selectedEvent, setSelectedEvent] = useState<EventApi | null>(null);
+  const [selectedScheduleDateId, setSelectedScheduleDateId] = useState<
+    string | null
+  >(null);
   const [selectedSchedule, setSelectedSchedule] =
     useState<ScheduleResponse | null>(null);
   const [asideMode, setAsideMode] = useState<AsideMode>(null);
@@ -98,8 +99,8 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         setSelectedDate,
         currentView,
         setCurrentView,
-        selectedEvent,
-        setSelectedEvent,
+        selectedScheduleDateId,
+        setSelectedScheduleDateId,
         selectedSchedule,
         setSelectedSchedule,
         asideMode,

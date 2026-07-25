@@ -9,6 +9,7 @@ interface TimePickerProps {
   value: string;
   mode: "start" | "end";
   constraintValue: string;
+  allowOvernight?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -32,11 +33,13 @@ export default function TimePicker({
   value,
   mode,
   constraintValue,
+  allowOvernight = false,
   onChange,
 }: TimePickerProps) {
   const { min, max } = getConstraints(constraintValue, mode);
 
   const options = TIME_OPTIONS.filter((time) => {
+    if (allowOvernight) return true;
     if (min && time < min) return false;
     if (max && time > max) return false;
     return true;

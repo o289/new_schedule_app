@@ -99,6 +99,23 @@ export function toISODatetime(isoDate: string, time: string): string {
   return `${isoDate}T${time}:00`;
 }
 
+/** YYYY-MM-DD形式の日付を、ローカル日付のまま指定日数だけ移動する。 */
+export function addDaysToISODate(isoDate: string, offset: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    throw new Error(`Invalid ISO date: ${isoDate}`);
+  }
+
+  return formatDate(new Date(year, month - 1, day + offset));
+}
+
 /** 時刻を除いたローカル日付を返す。 */
 export function toDateOnly(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());

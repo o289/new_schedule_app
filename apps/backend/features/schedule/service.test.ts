@@ -41,6 +41,26 @@ function createService(options?: {
 }
 
 describe("ScheduleService", () => {
+  it("日付を跨ぐ予定を作成できる", async () => {
+    const create = vi.fn().mockResolvedValue({ id: "schedule-id" });
+    const { service, repository } = createService({ create });
+    const input = {
+      title: "A",
+      categoryId: category.id,
+      dates: [
+        {
+          startDate: "2026-03-10T22:00:00",
+          endDate: "2026-03-11T01:00:00",
+        },
+      ],
+    };
+
+    await expect(service.createSchedule(user, input)).resolves.toEqual({
+      id: "schedule-id",
+    });
+    expect(repository.create).toHaveBeenCalledWith(input, user.id);
+  });
+
   it("ほかの予定と重なる日時は作成しない", async () => {
     const hasOverlappingDate = vi.fn().mockResolvedValue(true);
     const { service, repository } = createService({ hasOverlappingDate });

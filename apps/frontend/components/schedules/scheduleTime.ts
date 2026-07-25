@@ -1,5 +1,6 @@
 import type { ScheduleFormDate } from "../../types/schedule";
 import {
+  addDaysToISODate,
   getLocalDateTimeParts,
   toISODate,
   toISODatetime,
@@ -10,9 +11,67 @@ export interface TimeRange {
   end: string;
 }
 
+const TIME_PATTERN = /^\d{2}:\d{2}$/;
+
 function getTime(dateTime: string): string | null {
   const { time } = getLocalDateTimeParts(dateTime);
-  return /^\d{2}:\d{2}$/.test(time) ? time : null;
+  return TIME_PATTERN.test(time) ? time : null;
+}
+
+/** 選択日を開始日とし、終了時刻が早い場合だけ終了日を翌日にする。 */
+export function buildScheduleDateRange(
+  selectedDate: string,
+  range: TimeRange,
+): Pick<ScheduleFormDate, "startDate" | "endDate"> {
+  if (
+    !TIME_PATTERN.test(range.start) ||
+    !TIME_PATTERN.test(range.end) ||
+    range.start === range.end
+  ) {
+    throw new Error("Start and end time must be different");
+  }
+
+  const endDate =
+    range.end < range.start ? addDaysToISODate(selectedDate, 1) : selectedDate;
+
+  return {
+    startDate: toISODatetime(selectedDate, range.start),
+    endDate: toISODatetime(endDate, range.end),
+  };
+}
+
+export function crossesCalendarDate(
+  startDate: string,
+  endDate: string,
+): boolean {
+  return toISODate(startDate) !== toISODate(endDate);
+}
+
+function formatMonthDay(dateTime: string): string {
+  const [year = "", month = "", day = ""] = toISODate(dateTime).split("-");
+  if (!year || !month || !day) return "";
+  return `${Number(month)}月${Number(day)}日`;
+}
+
+/** 表示用の日時範囲を返す */
+export function formatScheduleDateRange(
+  startDate: string,
+  endDate: string,
+): { start: string; end: string } {
+  const start = getLocalDateTimeParts(startDate);
+  const end = getLocalDateTimeParts(endDate);
+
+  if (!crossesCalendarDate(startDate, endDate)) {
+    return {
+      start: start.time,
+      end: end.time,
+    };
+  }
+
+  return {
+    start: `${formatMonthDay(startDate)} ${start.time}`,
+    end: `${formatMonthDay(endDate)} ${end.time}`,
+  };
 }
 
 /** 日程配列で最も多い開始・終了時刻の組み合わせを返す。 */
@@ -48,7 +107,6 @@ export function updateAllDatesTime(
 ): ScheduleFormDate[] {
   return dates.map((date) => ({
     ...date,
-    startDate: toISODatetime(toISODate(date.startDate), range.start),
-    endDate: toISODatetime(toISODate(date.endDate), range.end),
+    ...buildScheduleDateRange(toISODate(date.startDate), range),
   }));
 }

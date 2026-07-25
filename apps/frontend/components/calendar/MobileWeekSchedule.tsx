@@ -10,6 +10,7 @@ interface MobileWeekScheduleProps {
   selectedDate: Date;
   setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
   setSelectedSchedule: (schedule: ScheduleResponse) => void;
+  setSelectedScheduleDateId: (scheduleDateId: string) => void;
   events: EventInput[];
   setIsDrawerOpen?: Dispatch<SetStateAction<boolean>>;
 }
@@ -18,12 +19,13 @@ export default function MobileWeekSchedule({
   selectedDate,
   setDraftSchedule,
   setSelectedSchedule,
+  setSelectedScheduleDateId,
   events,
   setIsDrawerOpen,
 }: MobileWeekScheduleProps) {
   const spanClass = `text-xl font-bold`;
 
-  const { handleDaySelect, setSelectedEvent, setAsideMode } = useCalendar();
+  const { handleDaySelect, setAsideMode } = useCalendar();
 
   const weekDays = getWeekDates(selectedDate);
   const toDate = (value: EventInput["start"]): Date | null => {
@@ -36,17 +38,41 @@ export default function MobileWeekSchedule({
     (a, b) =>
       (toDate(a.start)?.getTime() ?? 0) - (toDate(b.start)?.getTime() ?? 0),
   );
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   const eventsByDay = weekDays.map((day) => {
-    const dayEvents = sortedEvents.filter((event) => {
-      const eventDate = toDate(event.start);
+    const dayStart = new Date(day);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayEvents = sortedEvents.flatMap((event) => {
+      const eventStart = toDate(event.start);
+      const eventEnd = toDate(event.end);
+      if (
+        !eventStart ||
+        !eventEnd ||
+        eventStart >= dayEnd ||
+        eventEnd <= dayStart
+      ) {
+        return [];
+      }
 
-      if (!eventDate) return false;
+      const visibleStart = eventStart < dayStart ? dayStart : eventStart;
+      const visibleEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
+      const endLabel =
+        visibleEnd.getTime() === dayEnd.getTime()
+          ? "24:00"
+          : formatTime(visibleEnd);
 
-      return (
-        eventDate.getFullYear() === day.getFullYear() &&
-        eventDate.getMonth() === day.getMonth() &&
-        eventDate.getDate() === day.getDate()
-      );
+      return [
+        {
+          event,
+          timeText: `${formatTime(visibleStart)} - ${endLabel}`,
+        },
+      ];
     });
 
     return {
@@ -94,7 +120,7 @@ export default function MobileWeekSchedule({
         <div className="relative z-10 grid grid-cols-7 h-full">
           {eventsByDay.map(({ day, events }) => (
             <div key={day.toISOString()} className="flex flex-col gap-2">
-              {events.map((event) => {
+              {events.map(({ event, timeText }) => {
                 const schedule = event.extendedProps?.schedule as
                   ScheduleResponse | undefined;
                 if (!schedule) return null;
@@ -102,13 +128,13 @@ export default function MobileWeekSchedule({
 
                 return (
                   <div
-                    key={event.id}
+                    key={`${day.toISOString()}-${String(event.id)}`}
                     className="rounded-md border border-gray-200 bg-white shadow-sm"
                     style={{
                       borderLeft: `4px solid ${theme.border}`,
                     }}
                     onClick={() => {
-                      setSelectedEvent(null);
+                      setSelectedScheduleDateId(String(event.id));
                       setSelectedSchedule(schedule);
                       setDraftSchedule(toScheduleForm(schedule));
                       if (setIsDrawerOpen) {
@@ -118,10 +144,7 @@ export default function MobileWeekSchedule({
                     }}
                   >
                     <div className="text-[14px] font-semibold text-[#374151]">
-                      {toDate(event.start)?.toLocaleTimeString("ja-JP", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {timeText}
                     </div>
                     <div
                       className="text-sm font-bold break-words line-clamp-3"
