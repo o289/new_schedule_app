@@ -13,7 +13,6 @@ export type AsideMode = "create" | "edit" | "detail" | "category" | null;
 interface CalendarContextValue {
   calendarRef: RefObject<FullCalendar | null>;
   selectedDate: Date;
-  setSelectedDate: (date: Date) => void;
   desktopView: DesktopCalendarView;
   setDesktopView: (view: DesktopCalendarView) => void;
   mobileView: MobileCalendarView;
@@ -26,7 +25,6 @@ interface CalendarContextValue {
   setAsideMode: (mode: AsideMode) => void;
   handleDesktopWeekSelect: (date: Date) => void;
   handleMobileDaySelect: (date: Date) => void;
-  handleMobileMonthSelect: (date: Date) => void;
   handleNext: () => void;
   handlePrev: () => void;
 }
@@ -55,11 +53,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const handleMobileDaySelect = (date: Date) => {
     setSelectedDate(date);
     setMobileView("day");
-  };
-
-  const handleMobileMonthSelect = (date: Date) => {
-    setSelectedDate(date);
-    setMobileView("month");
   };
 
   const handlePrev = () => {
@@ -93,7 +86,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       value={{
         calendarRef,
         selectedDate,
-        setSelectedDate,
         desktopView,
         setDesktopView,
         mobileView,
@@ -106,7 +98,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         setAsideMode,
         handleDesktopWeekSelect,
         handleMobileDaySelect,
-        handleMobileMonthSelect,
         handleNext,
         handlePrev,
       }}

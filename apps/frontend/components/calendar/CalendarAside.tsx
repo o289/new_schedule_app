@@ -6,13 +6,11 @@ import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
-import MiniMonthNav from "./MiniMonthNav";
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { useCalendar } from "../../context/CalendarContext";
-import useIsMobile from "../../hooks/useIsMobile";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { CategoryResponse } from "../../types/schedule";
 import type { ScheduleForm } from "../../types/schedule";
@@ -41,18 +39,8 @@ export default function CalendarAside({
   setIsDrawerOpen,
   closeButton,
 }: CalendarAsideProps) {
-  const {
-    selectedDate,
-    setSelectedDate,
-    selectedScheduleDateId,
-    selectedSchedule,
-    asideMode,
-    setAsideMode,
-    handleDesktopWeekSelect,
-    handleMobileDaySelect,
-    handleMobileMonthSelect,
-  } = useCalendar();
-  const isMobile = useIsMobile(1024);
+  const { selectedScheduleDateId, selectedSchedule, asideMode, setAsideMode } =
+    useCalendar();
 
   const { user, handleLogout } = useAuth();
   const onLogout = () => {
@@ -136,28 +124,6 @@ export default function CalendarAside({
               <h2 className="text-[28px] font-bold text-[#111827]">
                 マイカレンダー
               </h2>
-            </div>
-
-            <div className="flex justify-center">
-              <MiniMonthNav
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                onDayClick={(date: Date) => {
-                  if (isMobile) {
-                    handleMobileDaySelect(date);
-                    return;
-                  }
-                  handleDesktopWeekSelect(date);
-                }}
-                onWeekClick={(date: Date) => {
-                  if (isMobile) {
-                    handleMobileMonthSelect(date);
-                    return;
-                  }
-                  handleDesktopWeekSelect(date);
-                }}
-                {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
-              />
             </div>
 
             <div className="flex flex-col gap-3">
