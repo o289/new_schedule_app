@@ -79,14 +79,14 @@ export default function ScheduleCalendarPage() {
   // =============================
 
   return (
-    <div className="h-full bg-[#f8f9fb]">
-      <CalendarHeader isMobile={isMobile} setIsDrawerOpen={setIsDrawerOpen} />
-
-      <CalendarMain
-        schedules={schedules}
-        setDraftSchedule={setDraftSchedule}
-        setIsDrawerOpen={setIsDrawerOpen}
-      />
+    <div className="flex h-full min-h-0 w-screen flex-col bg-[#f8f9fb]">
+      <div className="min-h-0 flex-1">
+        <CalendarMain
+          schedules={schedules}
+          setDraftSchedule={setDraftSchedule}
+          setIsDrawerOpen={setIsDrawerOpen}
+        />
+      </div>
 
       <Drawer
         anchor="left"

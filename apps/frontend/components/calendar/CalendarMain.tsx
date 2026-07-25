@@ -1,10 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
 import { useCalendarEvents } from "./useCalendarEvent";
 import { useCalendar } from "../../context/CalendarContext";
 import FullCalendarWrapper from "./FullCalendarWrapper";
 import useIsMobile from "../../hooks/useIsMobile";
-import MobileWeekSchedule from "./MobileWeekSchedule";
+import MobileMode from "./MobileMode";
 
 interface CalendarMainProps {
   schedules: ScheduleResponse[];
@@ -26,13 +27,20 @@ export default function CalendarMain({
     setSelectedScheduleDateId,
     setSelectedSchedule,
     setAsideMode,
+    setCurrentView,
     handleDaySelect,
   } = useCalendar();
 
   return (
-    <div className="md:mt-6 rounded-2xl border border-[#e5e7eb] bg-white shadow-sm overflow-hidden">
+    <div
+      className={
+        isMobile
+          ? "h-full min-h-0 w-full bg-white"
+          : "md:mt-6 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm"
+      }
+    >
       {isMobile && currentView === "week" ? (
-        <MobileWeekSchedule
+        <MobileMode
           events={events}
           selectedDate={selectedDate}
           setDraftSchedule={setDraftSchedule}
@@ -41,18 +49,32 @@ export default function CalendarMain({
           {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
         />
       ) : (
-        <FullCalendarWrapper
-          ref={calendarRef}
-          events={events}
-          selectedDate={selectedDate}
-          currentView={currentView}
-          onDateClick={(date) => handleDaySelect(date)}
-          setDraftSchedule={setDraftSchedule}
-          setAsideMode={setAsideMode}
-          setSelectedScheduleDateId={setSelectedScheduleDateId}
-          setSelectedSchedule={setSelectedSchedule}
-          {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
-        />
+        <div className={isMobile ? "flex h-full min-h-0 flex-col" : undefined}>
+          {isMobile && currentView === "day" && (
+            <div className="shrink-0 border-b border-[#e5e7eb] bg-white px-4 py-3">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-base font-bold text-[#111827]"
+                onClick={() => setCurrentView("week")}
+              >
+                <ChevronLeftIcon />
+                カレンダーへ戻る
+              </button>
+            </div>
+          )}
+          <FullCalendarWrapper
+            ref={calendarRef}
+            events={events}
+            selectedDate={selectedDate}
+            currentView={currentView}
+            onDateClick={(date) => handleDaySelect(date)}
+            setDraftSchedule={setDraftSchedule}
+            setAsideMode={setAsideMode}
+            setSelectedScheduleDateId={setSelectedScheduleDateId}
+            setSelectedSchedule={setSelectedSchedule}
+            {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
+          />
+        </div>
       )}
     </div>
   );
