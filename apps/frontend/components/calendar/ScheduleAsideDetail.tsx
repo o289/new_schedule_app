@@ -43,8 +43,6 @@ export default function ScheduleAsideDetail({
 
   if (!startDate || !endDate) return <>取得できなかった</>;
 
-  const { start, end } = formatScheduleDateRange(startDate, endDate);
-
   const otherDates = Array.isArray(schedule?.dates)
     ? schedule.dates.filter((date) => date.id !== selectedScheduleDate?.id)
     : [];
@@ -107,8 +105,9 @@ export default function ScheduleAsideDetail({
             <AccessTimeOutlinedIcon sx={{ color: iconColor, fontSize: 40 }} />
             <div>
               <div className="text-gray-500 text-sm">時間</div>
-              <div className="text-2xl">{start}</div>
-              <div className="text-2xl">{end}</div>
+              <div className="text-2xl">
+                {formatScheduleDateRange(startDate, endDate)}
+              </div>
             </div>
           </div>
 

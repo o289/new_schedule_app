@@ -53,25 +53,19 @@ function formatMonthDay(dateTime: string): string {
   return `${Number(month)}月${Number(day)}日`;
 }
 
-/** 表示用の日時範囲を返す */
+/** 同日は時刻だけ、跨日は開始日と終了日を含めて表示する。 */
 export function formatScheduleDateRange(
   startDate: string,
   endDate: string,
-): { start: string; end: string } {
+): string {
   const start = getLocalDateTimeParts(startDate);
   const end = getLocalDateTimeParts(endDate);
 
   if (!crossesCalendarDate(startDate, endDate)) {
-    return {
-      start: start.time,
-      end: end.time,
-    };
+    return `${start.time} - ${end.time}`;
   }
 
-  return {
-    start: `${formatMonthDay(startDate)} ${start.time}`,
-    end: `${formatMonthDay(endDate)} ${end.time}`,
-  };
+  return `${formatMonthDay(startDate)} ${start.time} 〜 ${formatMonthDay(endDate)} ${end.time}`;
 }
 
 /** 日程配列で最も多い開始・終了時刻の組み合わせを返す。 */
