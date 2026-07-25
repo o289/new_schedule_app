@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 
 import { isSameDate } from "../../utils/date";
@@ -20,12 +20,16 @@ export default function MiniMonthNav({
   onWeekClick,
   setIsDrawerOpen,
 }: MiniMonthNavProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(selectedDate);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
   const weeks = generateMonthGrid(year, month);
+
+  useEffect(() => {
+    setCurrentDate(selectedDate);
+  }, [selectedDate]);
 
   const handlePrev = () => {
     setCurrentDate(new Date(year, currentDate.getMonth() - 1, 1));

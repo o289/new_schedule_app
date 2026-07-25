@@ -1,25 +1,32 @@
-import { createContext, createRef, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import type FullCalendar from "@fullcalendar/react";
 import type { ScheduleResponse } from "../types/schedule";
+import {
+  moveDesktopCalendarDate,
+  type DesktopCalendarView,
+  type MobileCalendarView,
+} from "../components/calendar/calendarView";
 
-export type CalendarView = "day" | "week";
 export type AsideMode = "create" | "edit" | "detail" | "category" | null;
 
 interface CalendarContextValue {
   calendarRef: RefObject<FullCalendar | null>;
   selectedDate: Date;
   setSelectedDate: (date: Date) => void;
-  currentView: CalendarView;
-  setCurrentView: (view: CalendarView) => void;
+  desktopView: DesktopCalendarView;
+  setDesktopView: (view: DesktopCalendarView) => void;
+  mobileView: MobileCalendarView;
+  setMobileView: (view: MobileCalendarView) => void;
   selectedScheduleDateId: string | null;
   setSelectedScheduleDateId: (scheduleDateId: string | null) => void;
   selectedSchedule: ScheduleResponse | null;
   setSelectedSchedule: (schedule: ScheduleResponse | null) => void;
   asideMode: AsideMode;
   setAsideMode: (mode: AsideMode) => void;
-  handleDaySelect: (date: Date) => void;
-  handleWeekSelect: (date: Date) => void;
+  handleDesktopWeekSelect: (date: Date) => void;
+  handleMobileDaySelect: (date: Date) => void;
+  handleMobileMonthSelect: (date: Date) => void;
   handleNext: () => void;
   handlePrev: () => void;
 }
@@ -30,38 +37,36 @@ const CalendarContext = createContext<CalendarContextValue | undefined>(
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [currentView, setCurrentView] = useState<CalendarView>("week");
+  const [desktopView, setDesktopView] = useState<DesktopCalendarView>("month");
+  const [mobileView, setMobileView] = useState<MobileCalendarView>("month");
   const [selectedScheduleDateId, setSelectedScheduleDateId] = useState<
     string | null
   >(null);
   const [selectedSchedule, setSelectedSchedule] =
     useState<ScheduleResponse | null>(null);
   const [asideMode, setAsideMode] = useState<AsideMode>(null);
-  const calendarRef = createRef<FullCalendar>();
+  const calendarRef = useRef<FullCalendar | null>(null);
 
-  const handleDaySelect = (date: Date) => {
+  const handleDesktopWeekSelect = (date: Date) => {
     setSelectedDate(date);
-    setCurrentView("day");
+    setDesktopView("week");
   };
 
-  const handleWeekSelect = (date: Date) => {
+  const handleMobileDaySelect = (date: Date) => {
     setSelectedDate(date);
-    setCurrentView("week");
+    setMobileView("day");
+  };
+
+  const handleMobileMonthSelect = (date: Date) => {
+    setSelectedDate(date);
+    setMobileView("month");
   };
 
   const handlePrev = () => {
     const api = calendarRef.current?.getApi();
 
     if (!api) {
-      const prevDate = new Date(selectedDate);
-
-      if (currentView === "week") {
-        prevDate.setDate(prevDate.getDate() - 7);
-      } else {
-        prevDate.setDate(prevDate.getDate() - 1);
-      }
-
-      setSelectedDate(prevDate);
+      setSelectedDate(moveDesktopCalendarDate(selectedDate, desktopView, -1));
       return;
     }
 
@@ -74,15 +79,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     const api = calendarRef.current?.getApi();
 
     if (!api) {
-      const nextDate = new Date(selectedDate);
-
-      if (currentView === "week") {
-        nextDate.setDate(nextDate.getDate() + 7);
-      } else {
-        nextDate.setDate(nextDate.getDate() + 1);
-      }
-
-      setSelectedDate(nextDate);
+      setSelectedDate(moveDesktopCalendarDate(selectedDate, desktopView, 1));
       return;
     }
 
@@ -97,16 +94,19 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         calendarRef,
         selectedDate,
         setSelectedDate,
-        currentView,
-        setCurrentView,
+        desktopView,
+        setDesktopView,
+        mobileView,
+        setMobileView,
         selectedScheduleDateId,
         setSelectedScheduleDateId,
         selectedSchedule,
         setSelectedSchedule,
         asideMode,
         setAsideMode,
-        handleDaySelect,
-        handleWeekSelect,
+        handleDesktopWeekSelect,
+        handleMobileDaySelect,
+        handleMobileMonthSelect,
         handleNext,
         handlePrev,
       }}

@@ -64,7 +64,7 @@ export default function MobileMode({
   events,
   setIsDrawerOpen,
 }: MobileModeProps) {
-  const { handleDaySelect, setAsideMode } = useCalendar();
+  const { handleMobileDaySelect, setAsideMode } = useCalendar();
   const [displayMonth, setDisplayMonth] = useState(selectedDate);
   const months = [displayMonth];
 
@@ -177,7 +177,7 @@ export default function MobileMode({
             <button
               type="button"
               className="h-12 rounded-2xl bg-white px-4 text-base font-bold text-[#111827] shadow-md"
-              onClick={() => handleDaySelect(new Date())}
+              onClick={() => handleMobileDaySelect(new Date())}
             >
               今日
             </button>
@@ -259,7 +259,7 @@ export default function MobileMode({
                               ? dayColor
                               : "text-[#c4c8cf]"
                         }`}
-                        onClick={() => handleDaySelect(day)}
+                        onClick={() => handleMobileDaySelect(day)}
                       >
                         {day.getDate()}
                       </button>

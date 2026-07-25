@@ -12,6 +12,7 @@ import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { useCalendar } from "../../context/CalendarContext";
+import useIsMobile from "../../hooks/useIsMobile";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { CategoryResponse } from "../../types/schedule";
 import type { ScheduleForm } from "../../types/schedule";
@@ -47,9 +48,11 @@ export default function CalendarAside({
     selectedSchedule,
     asideMode,
     setAsideMode,
-    handleDaySelect,
-    handleWeekSelect,
+    handleDesktopWeekSelect,
+    handleMobileDaySelect,
+    handleMobileMonthSelect,
   } = useCalendar();
+  const isMobile = useIsMobile(1024);
 
   const { user, handleLogout } = useAuth();
   const onLogout = () => {
@@ -139,8 +142,20 @@ export default function CalendarAside({
               <MiniMonthNav
                 selectedDate={selectedDate}
                 setSelectedDate={setSelectedDate}
-                onDayClick={(date: Date) => handleDaySelect(date)}
-                onWeekClick={(date: Date) => handleWeekSelect(date)}
+                onDayClick={(date: Date) => {
+                  if (isMobile) {
+                    handleMobileDaySelect(date);
+                    return;
+                  }
+                  handleDesktopWeekSelect(date);
+                }}
+                onWeekClick={(date: Date) => {
+                  if (isMobile) {
+                    handleMobileMonthSelect(date);
+                    return;
+                  }
+                  handleDesktopWeekSelect(date);
+                }}
                 {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
               />
             </div>

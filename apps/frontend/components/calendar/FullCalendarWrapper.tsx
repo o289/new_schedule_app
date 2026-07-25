@@ -8,15 +8,16 @@ import type {
   EventInput,
   SlotLabelContentArg,
 } from "@fullcalendar/core";
+import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
 import jaLocale from "@fullcalendar/core/locales/ja";
-import type { AsideMode, CalendarView } from "../../context/CalendarContext";
+import type { AsideMode } from "../../context/CalendarContext";
 import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
-import useIsMobile from "../../hooks/useIsMobile";
 import EventCard from "./EventCard";
 import { toScheduleForm } from "../schedules/scheduleFormAdapter";
+import { toFullCalendarView, type FullCalendarView } from "./calendarView";
 import "./FullCalendarWrapper.css";
 
 type FullCalendarProps = ComponentProps<typeof FullCalendar>;
@@ -27,7 +28,7 @@ interface FullCalendarWrapperProps {
   selectedDate: Date;
   setSelectedScheduleDateId: (scheduleDateId: string) => void;
   setSelectedSchedule: (schedule: ScheduleResponse) => void;
-  currentView: CalendarView;
+  currentView: FullCalendarView;
   onDateClick: (date: Date) => void;
   setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
   setAsideMode: (mode: AsideMode) => void;
@@ -49,36 +50,36 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
     },
     ref,
   ) {
-    const isMobile = useIsMobile();
     const calendarRef = useRef<FullCalendar | null>(null);
     useImperativeHandle(ref, () => calendarRef.current as FullCalendar, []);
 
     useEffect(() => {
-      calendarRef.current?.getApi().changeView("timeGridWeek");
-    }, [isMobile]);
-
-    useEffect(() => {
       const calendarApi = calendarRef.current?.getApi();
       if (!calendarApi) return;
-      calendarApi.changeView(
-        currentView === "day" ? "timeGridDay" : "timeGridWeek",
-        selectedDate,
-      );
+      calendarApi.changeView(toFullCalendarView(currentView), selectedDate);
     }, [selectedDate, currentView]);
 
     const handleDateClick = (arg: DateClickArg) => onDateClick(arg.date);
-    const slotLabelContent = (arg: SlotLabelContentArg) =>
-      isMobile && arg.view.type === "timeGridWeek" ? null : arg.text;
+    const slotLabelContent = (arg: SlotLabelContentArg) => arg.text;
     const dayHeaderContent = (arg: DayHeaderContentArg) => {
       const date = arg.date;
       const day = date.getDate();
       const month = date.getMonth() + 1;
 
-      const isWeek = arg.view.type === "timeGridWeek";
-      const isMobileWeek = isMobile && isWeek;
+      if (arg.view.type === "dayGridMonth") {
+        const weekday = date.toLocaleDateString("ja-JP", {
+          weekday: "short",
+        });
+
+        return (
+          <div className="flex h-11 items-center justify-center">
+            <span className="text-sm font-semibold">{weekday}</span>
+          </div>
+        );
+      }
 
       const weekday = date.toLocaleDateString("ja-JP", {
-        weekday: isMobileWeek ? "short" : "long",
+        weekday: "long",
       });
 
       // 月跨ぎ判定
@@ -86,9 +87,7 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
       const isCrossMonth = month - 1 !== viewStartMonth;
 
       if (day === 1 && isCrossMonth) {
-        const dayCrossMonth = isMobileWeek
-          ? `${month}/${day}${weekday}`
-          : `${month}月${day}日/${weekday}`;
+        const dayCrossMonth = `${month}月${day}日/${weekday}`;
         return (
           <div className="flex h-[72px] items-center justify-center">
             <span className="text-lg font-semibold">{dayCrossMonth}</span>
@@ -115,15 +114,27 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
       setIsDrawerOpen?.(true);
       setAsideMode("detail");
     };
-    const eventContent = (arg: EventContentArg) => (
-      <EventCard event={arg.event} timeText={arg.timeText} />
-    );
+    const eventContent = (arg: EventContentArg) => {
+      const variant = arg.view.type === "dayGridMonth" ? "month" : "week";
+      return (
+        <EventCard
+          event={arg.event}
+          timeText={arg.timeText}
+          variant={variant}
+        />
+      );
+    };
 
     return (
       <FullCalendar
         ref={calendarRef}
-        plugins={[timeGridPlugin, interactionPlugin, luxonPlugin]}
-        initialView="timeGridWeek"
+        plugins={[
+          dayGridPlugin,
+          timeGridPlugin,
+          interactionPlugin,
+          luxonPlugin,
+        ]}
+        initialView={toFullCalendarView(currentView)}
         timeZone="Asia/Tokyo"
         locale={jaLocale}
         firstDay={0}
@@ -133,6 +144,9 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
         slotDuration="00:30:00"
         expandRows={false}
         allDaySlot={false}
+        dayMaxEvents={3}
+        moreLinkText={(count) => `他${count}件`}
+        nextDayThreshold="00:00:00"
         slotLabelContent={slotLabelContent}
         dayHeaderContent={dayHeaderContent}
         height="auto"

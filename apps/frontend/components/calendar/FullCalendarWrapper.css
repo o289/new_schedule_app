@@ -50,6 +50,42 @@
   border: none !important;
 }
 
+/* 月表示 */
+
+.fc .fc-daygrid-day-frame {
+  min-height: 7.5rem;
+}
+
+.fc .fc-daygrid-day-number {
+  padding: 0.5rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+  background: #eff6ff;
+}
+
+.fc .fc-daygrid-day.fc-day-other .fc-daygrid-day-number {
+  color: #9ca3af;
+}
+
+.fc .fc-daygrid-event-harness {
+  margin: 0 0.25rem 0.2rem;
+}
+
+.fc .fc-daygrid-event {
+  margin: 0;
+  white-space: normal;
+}
+
+.fc .fc-daygrid-more-link {
+  margin: 0 0.5rem;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 /* 枠線 */
 
 .fc .fc-timegrid-slot-minor {
@@ -57,11 +93,13 @@
 }
 
 /* 日曜日 */
-.fc-day-sun .fc-col-header-cell-cushion {
+.fc-day-sun .fc-col-header-cell-cushion,
+.fc-day-sun .fc-daygrid-day-number {
   color: red;
 }
 
 /* 土曜日 */
-.fc-day-sat .fc-col-header-cell-cushion {
+.fc-day-sat .fc-col-header-cell-cushion,
+.fc-day-sat .fc-daygrid-day-number {
   color: blue;
 }

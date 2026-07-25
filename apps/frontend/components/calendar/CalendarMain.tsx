@@ -25,12 +25,14 @@ export default function CalendarMain({
   const {
     calendarRef,
     selectedDate,
-    currentView,
+    desktopView,
+    mobileView,
     setSelectedScheduleDateId,
     setSelectedSchedule,
     setAsideMode,
-    setCurrentView,
-    handleDaySelect,
+    setMobileView,
+    handleDesktopWeekSelect,
+    handleMobileDaySelect,
   } = useCalendar();
 
   return (
@@ -41,7 +43,7 @@ export default function CalendarMain({
           : "md:mt-6 overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-sm"
       }
     >
-      {isMobile && currentView === "week" ? (
+      {isMobile && mobileView === "month" ? (
         <MobileMode
           events={events}
           selectedDate={selectedDate}
@@ -53,12 +55,12 @@ export default function CalendarMain({
         />
       ) : (
         <div className={isMobile ? "flex h-full min-h-0 flex-col" : undefined}>
-          {isMobile && currentView === "day" && (
+          {isMobile && mobileView === "day" && (
             <div className="shrink-0 border-b border-[#e5e7eb] bg-white px-4 py-3">
               <button
                 type="button"
                 className="flex items-center gap-1 text-base font-bold text-[#111827]"
-                onClick={() => setCurrentView("week")}
+                onClick={() => setMobileView("month")}
               >
                 <ChevronLeftIcon />
                 カレンダーへ戻る
@@ -69,8 +71,15 @@ export default function CalendarMain({
             ref={calendarRef}
             events={events}
             selectedDate={selectedDate}
-            currentView={currentView}
-            onDateClick={(date) => handleDaySelect(date)}
+            currentView={isMobile ? "day" : desktopView}
+            onDateClick={(date) => {
+              if (isMobile) {
+                handleMobileDaySelect(date);
+                return;
+              }
+
+              handleDesktopWeekSelect(date);
+            }}
             setDraftSchedule={setDraftSchedule}
             setAsideMode={setAsideMode}
             setSelectedScheduleDateId={setSelectedScheduleDateId}
