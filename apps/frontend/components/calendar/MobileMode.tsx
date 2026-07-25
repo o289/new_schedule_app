@@ -14,6 +14,7 @@ import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 
 interface MobileModeProps {
   selectedDate: Date;
+  resetDraft: () => void;
   setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
   setSelectedSchedule: (schedule: ScheduleResponse) => void;
   setSelectedScheduleDateId: (scheduleDateId: string) => void;
@@ -56,6 +57,7 @@ function getMonthDates(month: Date): Date[] {
 
 export default function MobileMode({
   selectedDate,
+  resetDraft,
   setDraftSchedule,
   setSelectedSchedule,
   setSelectedScheduleDateId,
@@ -154,6 +156,7 @@ export default function MobileMode({
               aria-label="予定を追加"
               className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#111827] shadow-md"
               onClick={() => {
+                resetDraft();
                 setAsideMode("create");
                 setIsDrawerOpen?.(true);
               }}

@@ -67,6 +67,7 @@ export default function ScheduleCalendarPage() {
           <CalendarHeader isMobile={isMobile} />
           <CalendarMain
             schedules={schedules}
+            resetDraft={resetDraft}
             setDraftSchedule={setDraftSchedule}
           />
         </div>
@@ -83,6 +84,7 @@ export default function ScheduleCalendarPage() {
       <div className="min-h-0 flex-1">
         <CalendarMain
           schedules={schedules}
+          resetDraft={resetDraft}
           setDraftSchedule={setDraftSchedule}
           setIsDrawerOpen={setIsDrawerOpen}
         />

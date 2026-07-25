@@ -9,12 +9,14 @@ import MobileMode from "./MobileMode";
 
 interface CalendarMainProps {
   schedules: ScheduleResponse[];
+  resetDraft: () => void;
   setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
   setIsDrawerOpen?: Dispatch<SetStateAction<boolean>>;
 }
 
 export default function CalendarMain({
   schedules,
+  resetDraft,
   setDraftSchedule,
   setIsDrawerOpen,
 }: CalendarMainProps) {
@@ -43,6 +45,7 @@ export default function CalendarMain({
         <MobileMode
           events={events}
           selectedDate={selectedDate}
+          resetDraft={resetDraft}
           setDraftSchedule={setDraftSchedule}
           setSelectedSchedule={setSelectedSchedule}
           setSelectedScheduleDateId={setSelectedScheduleDateId}
