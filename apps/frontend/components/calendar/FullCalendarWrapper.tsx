@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import type { ComponentProps, Dispatch, SetStateAction } from "react";
+import type { ComponentProps } from "react";
 import FullCalendar from "@fullcalendar/react";
 import type {
   DayHeaderContentArg,
@@ -13,10 +13,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
 import jaLocale from "@fullcalendar/core/locales/ja";
-import type { AsideMode } from "../../context/CalendarContext";
-import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import type { ScheduleResponse } from "../../types/schedule";
 import EventCard from "./EventCard";
-import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 import { toFullCalendarView, type FullCalendarView } from "./calendarView";
 import "./FullCalendarWrapper.css";
 
@@ -26,28 +24,14 @@ type DateClickArg = Parameters<NonNullable<FullCalendarProps["dateClick"]>>[0];
 interface FullCalendarWrapperProps {
   events: EventInput[];
   selectedDate: Date;
-  setSelectedScheduleDateId: (scheduleDateId: string) => void;
-  setSelectedSchedule: (schedule: ScheduleResponse) => void;
   currentView: FullCalendarView;
   onDateClick: (date: Date) => void;
-  setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
-  setAsideMode: (mode: AsideMode) => void;
-  setIsDrawerOpen?: Dispatch<SetStateAction<boolean>>;
+  onScheduleOpen: (schedule: ScheduleResponse, scheduleDateId: string) => void;
 }
 
 const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
   function FullCalendarWrapper(
-    {
-      events,
-      selectedDate,
-      setSelectedScheduleDateId,
-      setSelectedSchedule,
-      currentView,
-      onDateClick,
-      setDraftSchedule,
-      setAsideMode,
-      setIsDrawerOpen,
-    },
+    { events, selectedDate, currentView, onDateClick, onScheduleOpen },
     ref,
   ) {
     const calendarRef = useRef<FullCalendar | null>(null);
@@ -108,11 +92,7 @@ const FullCalendarWrapper = forwardRef<FullCalendar, FullCalendarWrapperProps>(
         ScheduleResponse | undefined;
       if (!schedule) return;
 
-      setSelectedScheduleDateId(info.event.id);
-      setSelectedSchedule(schedule);
-      setDraftSchedule(toScheduleForm(schedule));
-      setIsDrawerOpen?.(true);
-      setAsideMode("detail");
+      onScheduleOpen(schedule, info.event.id);
     };
     const eventContent = (arg: EventContentArg) => {
       const variant = arg.view.type === "dayGridMonth" ? "month" : "week";

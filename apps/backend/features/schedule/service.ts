@@ -9,6 +9,7 @@ import {
   ConflictError,
   NotFoundError,
 } from "../../core/api-error";
+import { hasDatabaseErrorCode } from "../../core/database-error";
 import type { User } from "../user/repository";
 import { CategoryRepository } from "../category/repository";
 import {
@@ -16,24 +17,6 @@ import {
   type Schedule,
   type ScheduleDate,
 } from "./repository";
-
-function hasPostgresErrorCode(error: unknown, code: string): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  if ("code" in error && error.code === code) {
-    return true;
-  }
-
-  return (
-    "cause" in error &&
-    typeof error.cause === "object" &&
-    error.cause !== null &&
-    "code" in error.cause &&
-    error.cause.code === code
-  );
-}
 
 export class ScheduleService {
   private readonly repository: ScheduleRepository;
@@ -123,7 +106,7 @@ export class ScheduleService {
   }
 
   private rethrowScheduleTimeOverlap(error: unknown): never {
-    if (hasPostgresErrorCode(error, "23P01")) {
+    if (hasDatabaseErrorCode(error, "23P01")) {
       throw new ConflictError("SCHEDULE_TIME_OVERLAP");
     }
 

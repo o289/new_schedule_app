@@ -6,6 +6,7 @@ import { useCalendar } from "../../context/CalendarContext";
 import FullCalendarWrapper from "./FullCalendarWrapper";
 import useIsMobile from "../../hooks/useIsMobile";
 import MobileMode from "./MobileMode";
+import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 
 interface CalendarMainProps {
   schedules: ScheduleResponse[];
@@ -35,6 +36,17 @@ export default function CalendarMain({
     handleMobileDaySelect,
   } = useCalendar();
 
+  const openScheduleDetail = (
+    schedule: ScheduleResponse,
+    scheduleDateId: string,
+  ) => {
+    setSelectedScheduleDateId(scheduleDateId);
+    setSelectedSchedule(schedule);
+    setDraftSchedule(toScheduleForm(schedule));
+    setIsDrawerOpen?.(true);
+    setAsideMode("detail");
+  };
+
   return (
     <div
       className={
@@ -48,9 +60,7 @@ export default function CalendarMain({
           events={events}
           selectedDate={selectedDate}
           resetDraft={resetDraft}
-          setDraftSchedule={setDraftSchedule}
-          setSelectedSchedule={setSelectedSchedule}
-          setSelectedScheduleDateId={setSelectedScheduleDateId}
+          onScheduleOpen={openScheduleDetail}
           {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
         />
       ) : (
@@ -80,11 +90,7 @@ export default function CalendarMain({
 
               handleDesktopWeekSelect(date);
             }}
-            setDraftSchedule={setDraftSchedule}
-            setAsideMode={setAsideMode}
-            setSelectedScheduleDateId={setSelectedScheduleDateId}
-            setSelectedSchedule={setSelectedSchedule}
-            {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
+            onScheduleOpen={openScheduleDetail}
           />
         </div>
       )}

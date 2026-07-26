@@ -3,26 +3,9 @@ import type {
   CategoryUpdate,
 } from "../../../../packages/schemas/category";
 import { BadRequestError, NotFoundError } from "../../core/api-error";
+import { hasDatabaseErrorCode } from "../../core/database-error";
 import type { User } from "../user/repository";
 import { CategoryRepository, type Category } from "./repository";
-
-function isForeignKeyViolation(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  if ("code" in error && error.code === "23503") {
-    return true;
-  }
-
-  return (
-    "cause" in error &&
-    typeof error.cause === "object" &&
-    error.cause !== null &&
-    "code" in error.cause &&
-    error.cause.code === "23503"
-  );
-}
 
 export class CategoryService {
   private readonly repository: CategoryRepository;
@@ -69,7 +52,7 @@ export class CategoryService {
         throw new NotFoundError("NOT_FOUND_CATEGORY");
       }
     } catch (error) {
-      if (isForeignKeyViolation(error)) {
+      if (hasDatabaseErrorCode(error, "23503")) {
         throw new BadRequestError("CATEGORY_HAS_SCHEDULES");
       }
 

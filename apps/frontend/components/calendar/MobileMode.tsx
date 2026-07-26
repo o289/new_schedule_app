@@ -7,18 +7,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import { useCalendar } from "../../context/CalendarContext";
-import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import type { ScheduleResponse } from "../../types/schedule";
 import { addDays, formatDate, isToday, toDateOnly } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 
 interface MobileModeProps {
   selectedDate: Date;
   resetDraft: () => void;
-  setDraftSchedule: Dispatch<SetStateAction<ScheduleForm>>;
-  setSelectedSchedule: (schedule: ScheduleResponse) => void;
-  setSelectedScheduleDateId: (scheduleDateId: string) => void;
   events: EventInput[];
+  onScheduleOpen: (schedule: ScheduleResponse, scheduleDateId: string) => void;
   setIsDrawerOpen?: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -58,10 +55,8 @@ function getMonthDates(month: Date): Date[] {
 export default function MobileMode({
   selectedDate,
   resetDraft,
-  setDraftSchedule,
-  setSelectedSchedule,
-  setSelectedScheduleDateId,
   events,
+  onScheduleOpen,
   setIsDrawerOpen,
 }: MobileModeProps) {
   const { handleMobileDaySelect, setAsideMode } = useCalendar();
@@ -130,11 +125,7 @@ export default function MobileMode({
       ScheduleResponse | undefined;
     if (!schedule || !event.id) return;
 
-    setSelectedScheduleDateId(String(event.id));
-    setSelectedSchedule(schedule);
-    setDraftSchedule(toScheduleForm(schedule));
-    setIsDrawerOpen?.(true);
-    setAsideMode("detail");
+    onScheduleOpen(schedule, String(event.id));
   };
 
   return (
@@ -168,8 +159,8 @@ export default function MobileMode({
               aria-label="カテゴリーを管理"
               className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#111827] shadow-md"
               onClick={() => {
-                setIsDrawerOpen?.(true);
                 setAsideMode("category");
+                setIsDrawerOpen?.(true);
               }}
             >
               <LocalOfferOutlinedIcon />
