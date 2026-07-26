@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, ne } from "drizzle-orm";
 
 import type {
   ScheduleCreate,
@@ -72,6 +72,31 @@ export class ScheduleRepository extends BaseRepository {
     });
 
     return result as Schedule[];
+  }
+
+  async hasOverlappingDate(
+    userId: string,
+    startDate: string,
+    endDate: string,
+    excludedScheduleId?: string,
+  ): Promise<boolean> {
+    const [overlap] = await this.database
+      .select({ id: scheduleDates.id })
+      .from(scheduleDates)
+      .innerJoin(schedules, eq(scheduleDates.scheduleId, schedules.id))
+      .where(
+        and(
+          eq(schedules.userId, userId),
+          lt(scheduleDates.startDate, endDate),
+          gt(scheduleDates.endDate, startDate),
+          excludedScheduleId === undefined
+            ? undefined
+            : ne(schedules.id, excludedScheduleId),
+        ),
+      )
+      .limit(1);
+
+    return overlap !== undefined;
   }
 
   async update(

@@ -1,14 +1,13 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { apiFetch } from "../../hooks/client";
 import useLoading from "../../hooks/useLoading";
 import { useAlert } from "../../context/AlertContext";
 import { useScheduleForm } from "./useScheduleForm";
 import type { ScheduleResponse } from "../../types/schedule";
 
 export function useSchedule(id: string | null = null) {
-  const { accessToken, refreshToken, handleRefresh, clearSession } = useAuth();
+  const { authFetch } = useAuth();
   const { showAlert } = useAlert();
 
   const [schedule, setSchedule] = useState<ScheduleResponse | null>(null);
@@ -26,11 +25,9 @@ export function useSchedule(id: string | null = null) {
   const fetchSchedules = async () => {
     startFetching();
     try {
-      const res = await apiFetch<ScheduleResponse[]>(
-        base_url,
-        { method: "GET" },
-        { accessToken, refreshToken, handleRefresh, clearSession },
-      );
+      const res = await authFetch<ScheduleResponse[]>(base_url, {
+        method: "GET",
+      });
       setSchedules(res);
     } finally {
       stopFetching();
@@ -41,11 +38,9 @@ export function useSchedule(id: string | null = null) {
   const fetchSchedule = async () => {
     startFetching();
     try {
-      const res = await apiFetch<ScheduleResponse>(
-        `${base_url}/${id}`,
-        { method: "GET" },
-        { accessToken, refreshToken, handleRefresh, clearSession },
-      );
+      const res = await authFetch<ScheduleResponse>(`${base_url}/${id}`, {
+        method: "GET",
+      });
       setSchedule(res);
     } finally {
       stopFetching();
@@ -56,11 +51,10 @@ export function useSchedule(id: string | null = null) {
   const handleScheduleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    await apiFetch(
-      base_url,
-      { method: "POST", body: JSON.stringify(draftSchedule) },
-      { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-    );
+    await authFetch(base_url, {
+      method: "POST",
+      body: JSON.stringify(draftSchedule),
+    });
 
     resetDraft();
     await fetchSchedules();
@@ -80,14 +74,10 @@ export function useSchedule(id: string | null = null) {
       })),
     };
 
-    await apiFetch(
-      `${base_url}/${draftSchedule.id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      },
-      { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-    );
+    await authFetch(`${base_url}/${draftSchedule.id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
 
     await fetchSchedules();
     showAlert("UPDATE_SUCCESS");
@@ -95,11 +85,7 @@ export function useSchedule(id: string | null = null) {
 
   // --- 削除 ---
   const handleScheduleDelete = async () => {
-    await apiFetch(
-      `${base_url}/${draftSchedule.id}`,
-      { method: "DELETE" },
-      { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-    );
+    await authFetch(`${base_url}/${draftSchedule.id}`, { method: "DELETE" });
     await fetchSchedules();
     showAlert("DELETE_SUCCESS");
   };

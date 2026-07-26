@@ -14,6 +14,7 @@ import CloseIcon from "@mui/icons-material/Close";
 
 import TimePicker from "../../components/commonPicker/TimePicker";
 import type { ScheduleFormDate } from "../../types/schedule";
+import { buildScheduleDateRange } from "./scheduleTime";
 
 interface EditableDate {
   id?: string;
@@ -76,6 +77,7 @@ export default function ScheduleDatesModal({
       ),
     );
   };
+  const hasInvalidTime = internalDates.some((date) => date.start === date.end);
 
   return (
     <Dialog
@@ -105,6 +107,7 @@ export default function ScheduleDatesModal({
                 mode="start"
                 value={date.start}
                 constraintValue={date.end}
+                allowOvernight
                 onChange={(value) =>
                   handleTimeChange(date.localId, "start", value)
                 }
@@ -117,11 +120,22 @@ export default function ScheduleDatesModal({
                 mode="end"
                 value={date.end}
                 constraintValue={date.start}
+                allowOvernight
                 onChange={(value) =>
                   handleTimeChange(date.localId, "end", value)
                 }
               />
             </div>
+            {date.start === date.end && (
+              <p className="m-3 text-sm text-red-600">
+                開始時刻と終了時刻は異なる時刻を選択してください。
+              </p>
+            )}
+            {date.end < date.start && (
+              <p className="m-3 text-sm text-[#4a90e2]">
+                終了時刻は翌日として保存されます。
+              </p>
+            )}
           </div>
         ))}
       </DialogContent>
@@ -131,12 +145,12 @@ export default function ScheduleDatesModal({
           type="button"
           variant="contained"
           startIcon={<CloseIcon />}
+          disabled={hasInvalidTime}
           onClick={() => {
             if (onChange) {
               const merged = internalDates.map(({ id, date, start, end }) => ({
                 ...(id !== undefined && { id }),
-                startDate: toISODatetime(date, start),
-                endDate: toISODatetime(date, end),
+                ...buildScheduleDateRange(date, { start, end }),
               }));
               onChange(merged);
             }

@@ -39,19 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { showAlert } = useAlert();
 
   const refreshPromiseRef = useRef<Promise<string | false> | null>(null);
-  const authFetch = <T,>(
-    url: string,
-    options: RequestInit = {},
-    fetchOptions = {},
-  ) => {
-    return apiFetch<T>(url, options, {
-      accessToken,
-      refreshToken,
-      showAlert,
-      clearSession,
-      ...fetchOptions,
-    });
-  };
 
   // セッションをクリアにする
   const clearSession = () => {
@@ -119,6 +106,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return refreshPromiseRef.current;
   };
+
+  const authFetch = <T,>(
+    url: string,
+    options: RequestInit = {},
+    fetchOptions: { silentCodes?: string[] } = {},
+  ) =>
+    apiFetch<T>(
+      url,
+      options,
+      {
+        accessToken,
+        refreshToken,
+        handleRefresh,
+        showAlert,
+        clearSession,
+      },
+      fetchOptions,
+    );
 
   // 初期化: localStorageから復元
   useEffect(() => {

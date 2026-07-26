@@ -6,7 +6,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
-import MiniMonthNav from "./MiniMonthNav";
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
@@ -40,16 +39,8 @@ export default function CalendarAside({
   setIsDrawerOpen,
   closeButton,
 }: CalendarAsideProps) {
-  const {
-    selectedDate,
-    setSelectedDate,
-    selectedEvent,
-    selectedSchedule,
-    asideMode,
-    setAsideMode,
-    handleDaySelect,
-    handleWeekSelect,
-  } = useCalendar();
+  const { selectedScheduleDateId, selectedSchedule, asideMode, setAsideMode } =
+    useCalendar();
 
   const { user, handleLogout } = useAuth();
   const onLogout = () => {
@@ -95,7 +86,7 @@ export default function CalendarAside({
             schedule={selectedSchedule}
             handleScheduleDelete={handleScheduleDelete}
             setAsideMode={setAsideMode}
-            selectedEvent={selectedEvent}
+            selectedScheduleDateId={selectedScheduleDateId}
             {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
           />
         );
@@ -133,16 +124,6 @@ export default function CalendarAside({
               <h2 className="text-[28px] font-bold text-[#111827]">
                 マイカレンダー
               </h2>
-            </div>
-
-            <div className="flex justify-center">
-              <MiniMonthNav
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                onDayClick={(date: Date) => handleDaySelect(date)}
-                onWeekClick={(date: Date) => handleWeekSelect(date)}
-                {...(setIsDrawerOpen ? { setIsDrawerOpen } : {})}
-              />
             </div>
 
             <div className="flex flex-col gap-3">

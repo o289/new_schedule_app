@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, getLocalDateTimeParts, toISODatetime } from "./date";
+import {
+  addDaysToISODate,
+  formatDateTime,
+  getLocalDateTimeParts,
+  toISODatetime,
+} from "./date";
 
 describe("日本時間の日時文字列", () => {
   it("入力時刻をタイムゾーンなしISO文字列へ変換する", () => {
@@ -13,5 +18,10 @@ describe("日本時間の日時文字列", () => {
       date: "2026-07-22",
       time: "10:00",
     });
+  });
+
+  it("UTC変換せず日付だけを翌日に進める", () => {
+    expect(addDaysToISODate("2026-07-31", 1)).toBe("2026-08-01");
+    expect(addDaysToISODate("2026-12-31", 1)).toBe("2027-01-01");
   });
 });

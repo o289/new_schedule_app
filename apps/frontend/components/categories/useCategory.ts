@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import type { ChangeEvent } from "react";
-import { apiFetch } from "../../hooks/client";
 import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
 import useLoading from "../../hooks/useLoading";
@@ -20,7 +19,7 @@ type CategoryForm = CategoryCreate;
 
 export function useCategory() {
   const { showAlert } = useAlert();
-  const { accessToken, refreshToken, handleRefresh, clearSession } = useAuth();
+  const { authFetch } = useAuth();
   const { isFetching, startFetching, stopFetching } = useLoading();
 
   // 一覧
@@ -43,11 +42,7 @@ export function useCategory() {
     startFetching();
 
     try {
-      const res = await apiFetch<Category[]>(
-        BASE_URL,
-        { method: "GET" },
-        { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-      );
+      const res = await authFetch<Category[]>(BASE_URL, { method: "GET" });
 
       setCategories(res);
     } finally {
@@ -78,27 +73,19 @@ export function useCategory() {
     if (editingId) {
       // 更新
 
-      await apiFetch(
-        `${BASE_URL}/${editingId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(form),
-        },
-        { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-      );
+      await authFetch(`${BASE_URL}/${editingId}`, {
+        method: "PUT",
+        body: JSON.stringify(form),
+      });
 
       showAlert("UPDATE_SUCCESS");
     } else {
       // 作成
 
-      await apiFetch(
-        BASE_URL,
-        {
-          method: "POST",
-          body: JSON.stringify(form),
-        },
-        { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-      );
+      await authFetch(BASE_URL, {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
 
       showAlert("CREATE_SUCCESS");
     }
@@ -143,11 +130,7 @@ export function useCategory() {
   const handleDelete = async (category: Category) => {
     setEditingId(category.id);
 
-    await apiFetch(
-      `${BASE_URL}/${category.id}`,
-      { method: "DELETE" },
-      { accessToken, refreshToken, handleRefresh, clearSession, showAlert },
-    );
+    await authFetch(`${BASE_URL}/${category.id}`, { method: "DELETE" });
 
     // 即時UI反映
     // setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));

@@ -41,6 +41,8 @@ export default function ScheduleAsideForm({
   // フォーム
   const { dates, start, setStart, end, setEnd, addDate, removeDate } =
     useScheduleDateTime(draftSchedule, onChange, mode === "edit");
+  const hasSameStartAndEnd = start !== "" && start === end;
+  const crossesMidnight = start !== "" && end !== "" && end < start;
 
   const [showDatesModal, setShowDatesModal] = useState(false);
 
@@ -51,13 +53,19 @@ export default function ScheduleAsideForm({
       draftSchedule.title &&
       draftSchedule.title.trim() !== "" &&
       dates.length > 0 &&
-      draftSchedule.categoryId
+      draftSchedule.categoryId &&
+      !hasSameStartAndEnd
     ) {
       setDisabled(false);
     } else {
       setDisabled(true);
     }
-  }, [draftSchedule.title, dates, draftSchedule.categoryId]);
+  }, [
+    draftSchedule.title,
+    dates,
+    draftSchedule.categoryId,
+    hasSameStartAndEnd,
+  ]);
 
   // 日付ロジック一覧
   const today = new Date();
@@ -199,6 +207,7 @@ export default function ScheduleAsideForm({
               mode="start"
               value={start}
               constraintValue={end}
+              allowOvernight
               onChange={setStart}
             />
 
@@ -208,12 +217,23 @@ export default function ScheduleAsideForm({
               mode="end"
               value={end}
               constraintValue={start}
+              allowOvernight
               onChange={setEnd}
             />
           </div>
+          {hasSameStartAndEnd && (
+            <p className="mt-2 text-sm text-red-600">
+              開始時刻と終了時刻は異なる時刻を選択してください。
+            </p>
+          )}
+          {crossesMidnight && (
+            <p className="mt-2 text-sm text-[#4a90e2]">
+              終了時刻は選択日の翌日として登録されます。
+            </p>
+          )}
         </div>
 
-        {start && end && (
+        {start && end && !hasSameStartAndEnd && (
           <>
             <div className="mb-6">
               <div className="mb-2 text-left text-[18px] font-bold text-[#222]">

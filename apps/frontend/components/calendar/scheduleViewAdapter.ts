@@ -2,6 +2,7 @@
 
 import type { ScheduleDateResponse } from "../../types/schedule";
 import { getLocalDateTimeParts } from "../../utils/date";
+import { crossesCalendarDate } from "../schedules/scheduleTime";
 
 function getTodayISODate() {
   const now = new Date();
@@ -27,7 +28,13 @@ export function buildTimeGroupsFromDates(
     {
       start: string;
       end: string;
-      dates: { id: string; date: string; isPast: boolean }[];
+      crossesDate: boolean;
+      dates: {
+        id: string;
+        date: string;
+        endDate: string;
+        isPast: boolean;
+      }[];
     }
   >();
 
@@ -40,12 +47,14 @@ export function buildTimeGroupsFromDates(
     // hide の場合のみここで除外
     if (pastPolicy === "hide" && isPast) return;
 
-    const key = `${start.time}-${end.time}`;
+    const crossesDate = crossesCalendarDate(d.startDate, d.endDate);
+    const key = `${start.time}-${end.time}-${crossesDate ? "next" : "same"}`;
 
     if (!map.has(key)) {
       map.set(key, {
         start: start.time,
         end: end.time,
+        crossesDate,
         dates: [],
       });
     }
@@ -53,6 +62,7 @@ export function buildTimeGroupsFromDates(
     map.get(key)!.dates.push({
       id: d.id,
       date: start.date,
+      endDate: end.date,
       isPast, // show / gray / collapse 用
     });
   });

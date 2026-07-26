@@ -5,7 +5,6 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import LocalOfferOutlinedIcon from "@mui/icons-material/LocalOfferOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import type { EventApi } from "@fullcalendar/core";
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
@@ -15,12 +14,13 @@ import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { buildTimeGroupsFromDates } from "./scheduleViewAdapter";
 import { DateTimeCard } from "./DateTimeCard";
 import ConfirmDialog from "../ConfirmDialog";
+import { formatScheduleDateRange } from "../schedules/scheduleTime";
 
 interface Props {
   schedule: ScheduleResponse;
   handleScheduleDelete: () => Promise<void>;
   setAsideMode: (mode: AsideMode) => void;
-  selectedEvent: EventApi | null;
+  selectedScheduleDateId: string | null;
   setIsDrawerOpen?: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -28,7 +28,7 @@ export default function ScheduleAsideDetail({
   schedule,
   handleScheduleDelete,
   setAsideMode,
-  selectedEvent,
+  selectedScheduleDateId,
   setIsDrawerOpen,
 }: Props) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -36,21 +36,15 @@ export default function ScheduleAsideDetail({
   const theme = getCategoryTheme(schedule.category?.color);
   const iconColor = theme.border;
   const selectedScheduleDate =
-    schedule.dates.find((date) => date.id === selectedEvent?.id) ??
+    schedule.dates.find((date) => date.id === selectedScheduleDateId) ??
     schedule.dates[0];
   const startDate = selectedScheduleDate?.startDate;
   const endDate = selectedScheduleDate?.endDate;
 
   if (!startDate || !endDate) return <>取得できなかった</>;
 
-  const selectedDateStr = startDate ? formatDateTime(startDate, "date") : null;
-
   const otherDates = Array.isArray(schedule?.dates)
-    ? schedule.dates.filter((d) => {
-        if (!selectedDateStr) return true;
-        const dStr = formatDateTime(d.startDate, "date");
-        return dStr !== selectedDateStr;
-      })
+    ? schedule.dates.filter((date) => date.id !== selectedScheduleDate?.id)
     : [];
 
   const confirmDelete = async () => {
@@ -112,8 +106,7 @@ export default function ScheduleAsideDetail({
             <div>
               <div className="text-gray-500 text-sm">時間</div>
               <div className="text-2xl">
-                {formatDateTime(startDate, "time")} -{" "}
-                {formatDateTime(endDate, "time")}
+                {formatScheduleDateRange(startDate, endDate)}
               </div>
             </div>
           </div>
@@ -150,7 +143,7 @@ export default function ScheduleAsideDetail({
 
             {buildTimeGroupsFromDates(otherDates, "gray").map((timeGroup) => (
               <DateTimeCard
-                key={`${timeGroup.start}-${timeGroup.end}`}
+                key={`${timeGroup.start}-${timeGroup.end}-${timeGroup.crossesDate}`}
                 timeGroup={timeGroup}
               />
             ))}

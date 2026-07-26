@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BadRequestError, NotFoundError } from "../../core/api-error";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../../core/api-error";
 
 const mocks = vi.hoisted(() => ({
   createSchedule: vi.fn(),
@@ -133,6 +137,30 @@ describe("schedule router", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ code: "INVALID_TIME" });
+  });
+
+  it("POST /schedules は時間が重なると409にする", async () => {
+    mocks.createSchedule.mockRejectedValue(
+      new ConflictError("SCHEDULE_TIME_OVERLAP"),
+    );
+    const response = await request("/schedules", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "meeting",
+        categoryId: category.id,
+        dates: [
+          {
+            startDate: "2025-01-01T10:00:00",
+            endDate: "2025-01-01T11:00:00",
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      code: "SCHEDULE_TIME_OVERLAP",
+    });
   });
 
   it("PUT /schedules/:id は存在しないスケジュールを404にする", async () => {
