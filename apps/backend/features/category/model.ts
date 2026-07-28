@@ -35,6 +35,12 @@ export const categories = pgTable(
     }).notNull(),
 
     color: categoryColorEnum("color").notNull().default("gray"),
+
+    icon: varchar("icon", {
+      length: 30,
+    })
+      .notNull()
+      .default("tag"),
   },
   (table) => [
     unique("categories_id_user_id_unique").on(table.id, table.userId),

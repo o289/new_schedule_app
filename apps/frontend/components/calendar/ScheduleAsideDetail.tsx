@@ -3,7 +3,6 @@ import { Delete as DeleteIcon } from "@mui/icons-material";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
-import LocalOfferOutlinedIcon from "@mui/icons-material/LocalOfferOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
@@ -11,6 +10,7 @@ import type { AsideMode } from "../../context/CalendarContext";
 import type { ScheduleResponse } from "../../types/schedule";
 import { formatDateTime } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { getCategoryIcon } from "../../constants/categoryIcons";
 import { buildTimeGroupsFromDates } from "./scheduleViewAdapter";
 import { DateTimeCard } from "./DateTimeCard";
 import ConfirmDialog from "../ConfirmDialog";
@@ -35,6 +35,7 @@ export default function ScheduleAsideDetail({
   const [isDeleting, setIsDeleting] = useState(false);
   const theme = getCategoryTheme(schedule.category?.color);
   const iconColor = theme.border;
+  const Icon = getCategoryIcon(schedule.category?.icon);
   const selectedScheduleDate =
     schedule.dates.find((date) => date.id === selectedScheduleDateId) ??
     schedule.dates[0];
@@ -112,7 +113,7 @@ export default function ScheduleAsideDetail({
           </div>
 
           <div className="flex items-center gap-4 mb-6">
-            <LocalOfferOutlinedIcon sx={{ color: iconColor, fontSize: 40 }} />
+            <Icon aria-hidden="true" sx={{ color: iconColor, fontSize: 40 }} />
             <div>
               <div className="text-gray-500 text-sm mb-2">カテゴリー</div>
               <Chip

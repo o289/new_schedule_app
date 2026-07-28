@@ -17,6 +17,7 @@ import SendIcon from "@mui/icons-material/Send";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { getCategoryIcon } from "../../constants/categoryIcons";
 import type { FormEvent } from "react";
 import type { CategoryResponse, ScheduleForm } from "../../types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
@@ -152,16 +153,13 @@ export default function ScheduleAsideForm({
                 if (!category) return "選択してください";
 
                 const theme = getCategoryTheme(category.color);
+                const Icon = getCategoryIcon(category.icon);
 
                 return (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Box
-                      sx={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        backgroundColor: theme.border,
-                      }}
+                    <Icon
+                      aria-hidden="true"
+                      sx={{ color: theme.border, fontSize: 20 }}
                     />
                     {category.name}
                   </Box>
@@ -174,17 +172,14 @@ export default function ScheduleAsideForm({
 
               {categories.map((cat) => {
                 const theme = getCategoryTheme(cat.color);
+                const Icon = getCategoryIcon(cat.icon);
 
                 return (
                   <MenuItem key={cat.id} value={cat.id}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Box
-                        sx={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          backgroundColor: theme.border,
-                        }}
+                      <Icon
+                        aria-hidden="true"
+                        sx={{ color: theme.border, fontSize: 20 }}
                       />
                       {cat.name}
                     </Box>

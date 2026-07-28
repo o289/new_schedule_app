@@ -8,6 +8,7 @@ import useLoading from "../../hooks/useLoading";
 import type {
   CategoryColor,
   CategoryCreate,
+  CategoryIcon,
   CategoryResponse,
 } from "../../../../packages/schemas/category";
 
@@ -29,6 +30,7 @@ export function useCategory() {
   const [form, setForm] = useState<CategoryForm>({
     name: "",
     color: "gray",
+    icon: "tag",
   });
 
   // 編集対象
@@ -59,10 +61,19 @@ export function useCategory() {
   ) => {
     const { name, value } = e.target;
 
-    setForm((prev) => ({
-      ...prev,
-      [name as keyof CategoryForm]: value as CategoryColor,
-    }));
+    if (name === "color") {
+      setForm((prev) => ({ ...prev, color: value as CategoryColor }));
+      return;
+    }
+
+    if (name === "icon") {
+      setForm((prev) => ({ ...prev, icon: value as CategoryIcon }));
+      return;
+    }
+
+    if (name === "name") {
+      setForm((prev) => ({ ...prev, name: value }));
+    }
   };
 
   // ========================
@@ -91,7 +102,7 @@ export function useCategory() {
     }
 
     // フォームリセット
-    setForm({ name: "", color: "gray" });
+    setForm({ name: "", color: "gray", icon: "tag" });
     setEditingId(null);
 
     fetchCategories();
@@ -107,6 +118,7 @@ export function useCategory() {
     setForm({
       name: category.name,
       color: category.color,
+      icon: category.icon,
     });
   };
 
@@ -120,6 +132,7 @@ export function useCategory() {
     setForm({
       name: "",
       color: "gray",
+      icon: "tag",
     });
   };
 

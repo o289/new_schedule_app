@@ -2,6 +2,7 @@ import { renderCategories } from "./categoryUI";
 import CategoryCard from "./CategoryCard";
 import ConfirmDialog from "../ConfirmDialog";
 import { CATEGORY_COLORS } from "../../constants/categoryColors";
+import { CATEGORY_ICONS, getCategoryIcon } from "../../constants/categoryIcons";
 
 import { Button } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
@@ -12,6 +13,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
 import type {
   CategoryColor,
+  CategoryIcon,
   CategoryResponse,
 } from "../../../../packages/schemas/category";
 
@@ -20,6 +22,7 @@ type Category = CategoryResponse;
 interface CategoryForm {
   name: string;
   color: CategoryColor;
+  icon: CategoryIcon;
 }
 
 export default function CategoryPanel({
@@ -48,6 +51,7 @@ export default function CategoryPanel({
   onCancelEdit: () => void;
 }) {
   const visibleCategories = renderCategories(categories, expanded);
+  const SelectedIcon = getCategoryIcon(formData.icon);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -115,6 +119,30 @@ export default function CategoryPanel({
                 </option>
               ))}
             </select>
+
+            <label
+              className="mb-1 text-sm font-semibold text-[#374151]"
+              htmlFor="category-icon"
+            >
+              アイコン
+            </label>
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#ccc] px-3">
+              <SelectedIcon aria-hidden="true" className="text-[#4a90e2]" />
+              <select
+                id="category-icon"
+                className="w-full bg-transparent py-3 text-[16px] leading-[1.4] outline-none"
+                name="icon"
+                value={formData.icon}
+                onChange={onChange}
+                required
+              >
+                {CATEGORY_ICONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <Button
               className="!mt-[10px] !w-full"
