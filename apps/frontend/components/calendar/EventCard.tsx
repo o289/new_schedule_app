@@ -51,34 +51,6 @@ export default function EventCard({
     );
   }
 
-  if (variant === "month") {
-    return (
-      <div
-        className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[#e5e7eb] bg-white px-1.5 py-0.5 shadow-sm"
-        style={{
-          borderLeft: `3px solid ${theme.border}`,
-        }}
-      >
-        {timeText && (
-          <span className="shrink-0 text-[11px] font-semibold text-[#4b5563]">
-            {timeText}
-          </span>
-        )}
-        <span
-          aria-hidden="true"
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{ backgroundColor: theme.border }}
-        />
-        <span
-          className="truncate text-[11px] font-bold"
-          style={{ color: theme.border }}
-        >
-          {event.title}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div
       className="h-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-sm"
