@@ -52,6 +52,7 @@ const category = {
   userId: user.id,
   name: "仕事",
   color: "red" as const,
+  icon: "work" as const,
 };
 
 function request(path: string, options: RequestInit = {}) {
@@ -76,7 +77,7 @@ describe("category router", () => {
 
     const response = await request("/categories", {
       method: "POST",
-      body: JSON.stringify({ name: "仕事", color: "red" }),
+      body: JSON.stringify({ name: "仕事", color: "red", icon: "work" }),
     });
 
     expect(response.status).toBe(201);
@@ -84,6 +85,7 @@ describe("category router", () => {
     expect(mocks.createCategory).toHaveBeenCalledWith(user, {
       name: "仕事",
       color: "red",
+      icon: "work",
     });
   });
 
@@ -92,6 +94,7 @@ describe("category router", () => {
       ...category,
       name: "プライベート",
       color: "gray",
+      icon: "tag",
     });
 
     const response = await request("/categories", {
@@ -103,24 +106,26 @@ describe("category router", () => {
     expect(mocks.createCategory).toHaveBeenCalledWith(user, {
       name: "プライベート",
       color: "gray",
+      icon: "tag",
     });
   });
 
-  it.each([{ color: "blue" }, { name: "不正", color: "black" }])(
-    "POST /categories は不正な入力を422にする",
-    async (body) => {
-      const response = await request("/categories", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+  it.each([
+    { color: "blue" },
+    { name: "不正", color: "black" },
+    { name: "不正", icon: "unknown" },
+  ])("POST /categories は不正な入力を422にする", async (body) => {
+    const response = await request("/categories", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
 
-      expect(response.status).toBe(422);
-      await expect(response.json()).resolves.toEqual({
-        code: "VALIDATION_ERROR",
-      });
-      expect(mocks.createCategory).not.toHaveBeenCalled();
-    },
-  );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+    });
+    expect(mocks.createCategory).not.toHaveBeenCalled();
+  });
 
   it("GET /categories はログインユーザーの一覧を返す", async () => {
     mocks.listCategories.mockResolvedValue([category]);
@@ -137,11 +142,16 @@ describe("category router", () => {
       ...category,
       name: "更新後",
       color: "green",
+      icon: "meeting",
     });
 
     const response = await request(`/categories/${category.id}`, {
       method: "PUT",
-      body: JSON.stringify({ name: "更新後", color: "green" }),
+      body: JSON.stringify({
+        name: "更新後",
+        color: "green",
+        icon: "meeting",
+      }),
     });
 
     expect(response.status).toBe(200);
@@ -149,6 +159,7 @@ describe("category router", () => {
       ...category,
       name: "更新後",
       color: "green",
+      icon: "meeting",
     });
   });
 

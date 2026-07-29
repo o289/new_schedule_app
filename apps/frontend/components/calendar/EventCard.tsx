@@ -1,5 +1,7 @@
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { getCategoryIcon } from "../../constants/categoryIcons";
 import type { EventApi } from "@fullcalendar/core";
+import type { CategoryIcon } from "../../../../packages/schemas/category";
 
 interface EventCardProps {
   event: EventApi;
@@ -13,9 +15,13 @@ export default function EventCard({
   variant,
 }: EventCardProps) {
   const schedule = event.extendedProps.schedule as {
-    category?: { color?: Parameters<typeof getCategoryTheme>[0] };
+    category?: {
+      color?: Parameters<typeof getCategoryTheme>[0];
+      icon?: CategoryIcon;
+    };
   };
   const theme = getCategoryTheme(schedule.category?.color);
+  const Icon = getCategoryIcon(schedule.category?.icon);
 
   if (variant === "month") {
     return (
@@ -30,10 +36,10 @@ export default function EventCard({
             {timeText}
           </span>
         )}
-        <span
+        <Icon
           aria-hidden="true"
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{ backgroundColor: theme.border }}
+          className="shrink-0"
+          sx={{ color: theme.border, fontSize: 14 }}
         />
         <span
           className="truncate text-[11px] font-bold"

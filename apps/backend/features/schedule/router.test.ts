@@ -52,6 +52,7 @@ const category = {
   userId: user.id,
   name: "仕事",
   color: "red" as const,
+  icon: "work" as const,
 };
 const schedule = {
   id: "33333333-3333-4333-8333-333333333333",
@@ -109,6 +110,11 @@ describe("schedule router", () => {
     expect(mocks.createSchedule).toHaveBeenCalledWith(user, body);
     await expect(response.json()).resolves.toMatchObject({
       id: schedule.id,
+      category: {
+        name: "仕事",
+        color: "red",
+        icon: "work",
+      },
       dates: [
         {
           id: schedule.dates[0]!.id,

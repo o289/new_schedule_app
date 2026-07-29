@@ -182,6 +182,36 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     expect(me.status).toBe(200);
     await expect(me.json()).resolves.toEqual({ email });
 
+    // 実DBでカテゴリーを作成・取得する。select対象の列とDBスキーマが
+    // ずれた場合（例: icon列のマイグレーション未適用）はここで検出する。
+    const categoryCreate = await app.request("/categories", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokens.data.access_token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "統合テスト用カテゴリー",
+        color: "blue",
+        icon: "tag",
+      }),
+    });
+    expect(categoryCreate.status).toBe(201);
+    const category = await categoryCreate.json();
+    expect(category).toMatchObject({
+      name: "統合テスト用カテゴリー",
+      color: "blue",
+      icon: "tag",
+    });
+
+    const categories = await app.request("/categories", {
+      headers: { Authorization: `Bearer ${tokens.data.access_token}` },
+    });
+    expect(categories.status).toBe(200);
+    await expect(categories.json()).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: category.id })]),
+    );
+
     const refresh = await post(app, "/auth/refresh", {
       refresh_token: tokens.data.refresh_token,
     });

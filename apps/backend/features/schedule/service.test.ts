@@ -12,6 +12,7 @@ const category = {
   userId: user.id,
   name: "仕事",
   color: "red" as const,
+  icon: "work" as const,
 };
 
 function createService(options?: {

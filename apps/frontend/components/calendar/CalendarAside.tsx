@@ -10,6 +10,7 @@ import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { getCategoryIcon } from "../../constants/categoryIcons";
 import { useCalendar } from "../../context/CalendarContext";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { CategoryResponse } from "../../types/schedule";
@@ -157,14 +158,15 @@ export default function CalendarAside({
 
                 {categories.map((category: CategoryResponse) => {
                   const theme = getCategoryTheme(category.color);
+                  const Icon = getCategoryIcon(category.icon);
                   return (
                     <div
                       key={category.id}
                       className="flex items-center gap-3 border-b border-[#f3f4f6] px-4 py-4 last:border-b-0"
                     >
-                      <div
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: theme.border }}
+                      <Icon
+                        aria-hidden="true"
+                        sx={{ color: theme.border, fontSize: 20 }}
                       />
 
                       <span className="text-[15px] text-[#374151]">

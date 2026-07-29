@@ -1,4 +1,5 @@
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { getCategoryIcon } from "../../constants/categoryIcons";
 import type { CategoryResponse } from "../../types/schedule";
 
 export default function CategoryCard({
@@ -11,13 +12,17 @@ export default function CategoryCard({
   onDelete: () => void;
 }) {
   const theme = getCategoryTheme(category.color);
+  const Icon = getCategoryIcon(category.icon);
 
   return (
     <div
       className="flex justify-between rounded-xl text-lg px-5 py-5 font-semibold text-white shadow-[0_6px_14px_rgba(0,0,0,0.12),0_2px_4px_rgba(0,0,0,0.08)]"
       style={{ background: theme.border }}
     >
-      <span>{category.name}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <Icon aria-hidden="true" />
+        <span className="truncate">{category.name}</span>
+      </span>
 
       <div>
         <span
