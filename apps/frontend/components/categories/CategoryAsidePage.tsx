@@ -1,26 +1,37 @@
 import { useState } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
 
-import { useCategory } from "./useCategory";
+import type { useCategory } from "./useCategory";
 
 import CategoryPanel from "./CategoryPanel";
 
 export default function CategoryAsidePage({
   setAsideMode,
+  category,
 }: {
   setAsideMode: (mode: AsideMode) => void;
+  category: Pick<
+    ReturnType<typeof useCategory>,
+    | "categories"
+    | "form"
+    | "editingId"
+    | "handleChange"
+    | "handleSubmit"
+    | "handleEditClick"
+    | "handleCancelEdit"
+    | "handleDelete"
+  >;
 }) {
   const {
     categories,
     form,
-    // isFetching,
     editingId,
     handleChange,
     handleSubmit,
     handleEditClick,
     handleCancelEdit,
     handleDelete,
-  } = useCategory();
+  } = category;
 
   const [expanded, setExpanded] = useState(false);
 
