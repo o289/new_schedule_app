@@ -8,7 +8,12 @@ import type { Dispatch, SetStateAction } from "react";
 
 import { useCalendar } from "../../context/CalendarContext";
 import type { ScheduleResponse } from "../../types/schedule";
-import { addDays, formatDate, isToday, toDateOnly } from "../../utils/date";
+import {
+  addDays,
+  formatDate,
+  toDateOnly,
+} from "../../../../packages/utils/local-datetime";
+import { isToday } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 
 interface MobileModeProps {

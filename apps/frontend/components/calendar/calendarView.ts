@@ -1,4 +1,5 @@
-import { addDays, getWeekDates } from "../../utils/date";
+import { addDays } from "../../../../packages/utils/local-datetime";
+import { getWeekDates } from "../../utils/date";
 
 export type DesktopCalendarView = "month" | "week";
 export type MobileCalendarView = "month" | "day";
