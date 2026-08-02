@@ -26,3 +26,9 @@ pnpm test
 - `node --version` がv22.23.1以外なら、作業を続けずNode.jsのバージョンを切り替える。
 - Codexや自動実行環境では、対話ターミナルと異なるNode.jsが選ばれることがある。コマンド実行前に毎回確認する。
 - TypeScript 7はネイティブ実行ファイルを使うため、非対応Node.js環境では `Unknown system error -8` が発生する場合がある。
+
+## コーディングルール
+
+- pnpmは`package.json`の`packageManager`に指定されたバージョンを必ず使用する。
+- TypeScriptでは`any`を使用しない。
+- コメントは必要最小限にする。
