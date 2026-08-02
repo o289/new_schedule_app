@@ -2,6 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 
+import type { ApiErrorResponse } from "../../packages/contracts/api-error";
 import { ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
 import { categoryRouter } from "./features/category/router";
@@ -61,9 +62,11 @@ if (process.env.NODE_ENV === "production") {
 
 app.onError((error, context) => {
   if (error instanceof ApiError) {
-    return context.json({ code: error.code }, error.status);
+    const response: ApiErrorResponse = { code: error.code };
+    return context.json(response, error.status);
   }
 
   console.error(error);
-  return context.json({ code: "INTERNAL_SERVER_ERROR" }, 500);
+  const response: ApiErrorResponse = { code: "INTERNAL_SERVER_ERROR" };
+  return context.json(response, 500);
 });

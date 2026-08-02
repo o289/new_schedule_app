@@ -4,6 +4,7 @@ import { apiFetch } from "../hooks/client";
 import { useAlert } from "./AlertContext";
 import type { UserResponse } from "../../../packages/schemas/user";
 import type { TokenResponse } from "../../../packages/schemas/auth";
+import type { ApiErrorCode } from "../../../packages/contracts/api-error";
 
 interface AuthContextValue {
   user: UserResponse | null;
@@ -19,7 +20,7 @@ interface AuthContextValue {
   authFetch: <T>(
     url: string,
     options?: RequestInit,
-    fetchOptions?: { silentCodes?: string[] },
+    fetchOptions?: { silentCodes?: ApiErrorCode[] },
   ) => Promise<T>;
 }
 
@@ -105,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authFetch = <T,>(
     url: string,
     options: RequestInit = {},
-    fetchOptions: { silentCodes?: string[] } = {},
+    fetchOptions: { silentCodes?: ApiErrorCode[] } = {},
   ) =>
     apiFetch<T>(
       url,
