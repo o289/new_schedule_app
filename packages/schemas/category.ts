@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * カテゴリーカラー
  */
-export const categoryColorSchema = z.enum([
+export const categoryColorValues = [
   "gray",
   "red",
   "blue",
@@ -14,7 +14,9 @@ export const categoryColorSchema = z.enum([
   "pink",
   "teal",
   "brown",
-]);
+] as const;
+
+export const categoryColorSchema = z.enum(categoryColorValues);
 
 /**
  * カテゴリーアイコン

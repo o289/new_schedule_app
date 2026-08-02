@@ -2,6 +2,7 @@ import type {
   CategoryCreate,
   CategoryUpdate,
 } from "../../../../packages/schemas/category";
+import { sortCategories } from "../../../../packages/utils/category-sort";
 import { BadRequestError, NotFoundError } from "../../core/api-error";
 import { hasDatabaseErrorCode } from "../../core/database-error";
 import type { User } from "../user/repository";
@@ -15,7 +16,9 @@ export class CategoryService {
   }
 
   async listCategories(user: User): Promise<Category[]> {
-    return this.repository.getByUser(user.id);
+    const categories = await this.repository.getByUser(user.id);
+
+    return sortCategories(categories);
   }
 
   async createCategory(user: User, input: CategoryCreate): Promise<Category> {

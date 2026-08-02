@@ -1,19 +1,27 @@
-import type { CategoryColor } from "../../../packages/schemas/category";
+import {
+  categoryColorValues,
+  type CategoryColor,
+} from "../../../packages/schemas/category";
 
 type CategoryColorOption = {
   value: CategoryColor;
   label: string;
 };
 
-export const CATEGORY_COLORS = [
-  { value: "gray", label: "グレー" },
-  { value: "red", label: "赤" },
-  { value: "blue", label: "青" },
-  { value: "green", label: "緑" },
-  { value: "yellow", label: "黄" },
-  { value: "purple", label: "紫" },
-  { value: "orange", label: "橙" },
-  { value: "pink", label: "ピンク" },
-  { value: "teal", label: "青緑" },
-  { value: "brown", label: "茶" },
-] as const satisfies readonly CategoryColorOption[];
+const categoryColorLabels = {
+  gray: "グレー",
+  red: "赤",
+  blue: "青",
+  green: "緑",
+  yellow: "黄",
+  purple: "紫",
+  orange: "橙",
+  pink: "ピンク",
+  teal: "青緑",
+  brown: "茶",
+} satisfies Record<CategoryColor, string>;
+
+export const CATEGORY_COLORS = categoryColorValues.map((value) => ({
+  value,
+  label: categoryColorLabels[value],
+})) satisfies readonly CategoryColorOption[];
