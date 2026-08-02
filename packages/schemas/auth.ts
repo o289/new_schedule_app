@@ -6,12 +6,9 @@ import type {
 } from "@simplewebauthn/server";
 import { z } from "zod";
 
-import { userEmailSchema } from "../../../../packages/schemas/user";
+import { userEmailSchema } from "./user";
 
-export const dataResponseSchema = z.object({
-  data: z.unknown(),
-});
-
+/** Passkey登録optionsを取得するリクエスト。 */
 export const passkeyRegisterOptionsRequestSchema = z.object({
   email: userEmailSchema,
 });
@@ -39,6 +36,7 @@ const registrationCredentialShape = z.object({
   }),
 });
 
+/** ブラウザがPasskey登録の検証APIへ送るcredential。 */
 export const passkeyRegisterVerifyRequestSchema =
   z.custom<RegistrationResponseJSON>(
     (value) => registrationCredentialShape.safeParse(value).success,
@@ -55,6 +53,7 @@ export const passkeyRegisterVerifyResponseSchema = z.object({
   data: z.null(),
 });
 
+/** Passkeyログインoptionsを取得するリクエスト。 */
 export const passkeyLoginOptionsRequestSchema = z.object({
   email: userEmailSchema,
 });
@@ -69,6 +68,7 @@ const authenticationCredentialShape = z.object({
   }),
 });
 
+/** ブラウザがPasskeyログインの検証APIへ送るcredential。 */
 export const passkeyLoginVerifyRequestSchema =
   z.custom<AuthenticationResponseJSON>(
     (value) => authenticationCredentialShape.safeParse(value).success,
@@ -81,6 +81,7 @@ export const passkeyLoginOptionsResponseSchema = z.object({
   }),
 });
 
+/** ログイン検証・refresh APIが返すトークン。 */
 export const tokenResponseSchema = z.object({
   data: z.object({
     access_token: z.string().min(1),
@@ -88,7 +89,16 @@ export const tokenResponseSchema = z.object({
   }),
 });
 
-export type DataResponse = z.infer<typeof dataResponseSchema>;
+/** Passkeyログイン検証APIはトークンを返す。 */
+export const passkeyLoginVerifyResponseSchema = tokenResponseSchema;
+
+/** refresh/logout APIへ送るリクエスト。 */
+export const refreshTokenRequestSchema = z.object({
+  refresh_token: z.string().min(1),
+});
+
+export const logoutRequestSchema = refreshTokenRequestSchema;
+
 export type PasskeyRegisterOptionsRequest = z.infer<
   typeof passkeyRegisterOptionsRequestSchema
 >;
@@ -110,4 +120,9 @@ export type PasskeyLoginVerifyRequest = z.infer<
 export type PasskeyLoginOptionsResponse = z.infer<
   typeof passkeyLoginOptionsResponseSchema
 >;
+export type PasskeyLoginVerifyResponse = z.infer<
+  typeof passkeyLoginVerifyResponseSchema
+>;
 export type TokenResponse = z.infer<typeof tokenResponseSchema>;
+export type RefreshTokenRequest = z.infer<typeof refreshTokenRequestSchema>;
+export type LogoutRequest = z.infer<typeof logoutRequestSchema>;

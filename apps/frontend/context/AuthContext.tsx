@@ -3,12 +3,7 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { apiFetch } from "../hooks/client";
 import { useAlert } from "./AlertContext";
 import type { UserResponse } from "../../../packages/schemas/user";
-
-interface RefreshResponse {
-  data?: {
-    access_token?: string;
-  };
-}
+import type { TokenResponse } from "../../../packages/schemas/auth";
 
 interface AuthContextValue {
   user: UserResponse | null;
@@ -79,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     refreshPromiseRef.current = (async () => {
       try {
-        const res = await apiFetch<RefreshResponse>(
+        const res = await apiFetch<TokenResponse>(
           "/auth/refresh",
           {
             method: "POST",

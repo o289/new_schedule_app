@@ -1,28 +1,18 @@
 import { base64urlToUint8Array } from "./base64url";
+import type {
+  PasskeyLoginOptionsResponse,
+  PasskeyRegisterOptionsResponse,
+} from "../../../../packages/schemas/auth";
 
 type BackendCredentialDescriptor = Omit<PublicKeyCredentialDescriptor, "id"> & {
   id: string;
 };
 
-export interface RegistrationOptions {
-  challenge: string;
-  user: Omit<PublicKeyCredentialUserEntity, "id"> & { id: string };
-  pub_key_cred_params?: PublicKeyCredentialParameters[];
-  exclude_credentials?: BackendCredentialDescriptor[];
-  authenticator_selection?: Record<string, unknown>;
-  hints?: unknown;
-  extensions?: unknown;
-  [key: string]: unknown;
-}
+export type RegistrationOptions =
+  PasskeyRegisterOptionsResponse["data"]["publicKey"];
 
-export interface AuthenticationOptions {
-  challenge: string;
-  allow_credentials?: BackendCredentialDescriptor[];
-  user_verification?: UserVerificationRequirement;
-  hints?: unknown;
-  extensions?: unknown;
-  [key: string]: unknown;
-}
+export type AuthenticationOptions =
+  PasskeyLoginOptionsResponse["data"]["publicKey"];
 
 /**
  * WebAuthn Registration (navigator.credentials.create)

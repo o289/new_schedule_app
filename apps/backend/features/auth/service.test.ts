@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PasskeyLoginVerifyRequest,
   PasskeyRegisterVerifyRequest,
-} from "./schema";
+} from "../../../../packages/schemas/auth";
 
 const mocks = vi.hoisted(() => ({
   user: {

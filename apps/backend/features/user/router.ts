@@ -1,21 +1,19 @@
 import { Hono, type Context } from "hono";
-import { z } from "zod";
 
+import { refreshTokenRequestSchema } from "../../../../packages/schemas/auth";
 import { BadRequestError } from "../../core/api-error";
 import { requireCurrentUser } from "../../core/current-user";
+import { parseJsonBody } from "../../core/request";
 import { AuthService } from "../auth/service";
 
-const refreshTokenRequestSchema = z.object({
-  refresh_token: z.string().min(1),
-});
-
 async function readRefreshToken(context: Context): Promise<string> {
-  try {
-    const payload = refreshTokenRequestSchema.parse(await context.req.json());
-    return payload.refresh_token;
-  } catch {
-    throw new BadRequestError("INVALID_REQUEST");
-  }
+  const payload = await parseJsonBody(
+    context,
+    refreshTokenRequestSchema,
+    () => new BadRequestError("INVALID_REQUEST"),
+  );
+
+  return payload.refresh_token;
 }
 
 export const userRouter = new Hono().basePath("/auth");
