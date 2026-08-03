@@ -8,7 +8,12 @@ import type { Dispatch, SetStateAction } from "react";
 
 import { useCalendar } from "../../context/CalendarContext";
 import type { ScheduleResponse } from "../../types/schedule";
-import { addDays, formatDate, isToday, toDateOnly } from "../../utils/date";
+import {
+  addDays,
+  formatDate,
+  toDateOnly,
+} from "../../../../packages/utils/local-datetime";
+import { isToday } from "../../utils/date";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 
 interface MobileModeProps {
@@ -270,6 +275,7 @@ export default function MobileMode({
                               type="button"
                               className="overflow-hidden rounded-md border border-[#e5e7eb] bg-white text-left shadow-sm"
                               style={{
+                                opacity: schedule.isTentative ? 0.5 : 1,
                                 borderLeft: `3px solid ${theme.border}`,
                               }}
                               onClick={() => openScheduleDetail(event)}
@@ -303,6 +309,7 @@ export default function MobileMode({
                                 type="button"
                                 className="w-full truncate rounded-full px-1.5 py-0.5 text-left text-[10px] font-bold"
                                 style={{
+                                  opacity: schedule.isTentative ? 0.5 : 1,
                                   backgroundColor: theme.bg,
                                   color: theme.text,
                                 }}

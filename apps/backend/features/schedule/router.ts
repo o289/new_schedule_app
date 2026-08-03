@@ -17,6 +17,7 @@ function serializeSchedule(schedule: Schedule) {
     title: schedule.title,
     ...(schedule.note !== null && { note: schedule.note }),
     categoryId: schedule.categoryId,
+    isTentative: schedule.isTentative,
     category: schedule.category,
     dates: schedule.dates.map((date) => ({
       id: date.id,

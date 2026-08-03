@@ -2,6 +2,7 @@ import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { getCategoryIcon } from "../../constants/categoryIcons";
 import type { EventApi } from "@fullcalendar/core";
 import type { CategoryIcon } from "../../../../packages/schemas/category";
+import type { ScheduleResponse } from "../../types/schedule";
 
 interface EventCardProps {
   event: EventApi;
@@ -14,20 +15,24 @@ export default function EventCard({
   timeText,
   variant,
 }: EventCardProps) {
-  const schedule = event.extendedProps.schedule as {
-    category?: {
-      color?: Parameters<typeof getCategoryTheme>[0];
-      icon?: CategoryIcon;
-    };
-  };
-  const theme = getCategoryTheme(schedule.category?.color);
-  const Icon = getCategoryIcon(schedule.category?.icon);
+  const schedule = event.extendedProps.schedule as
+    | (Pick<ScheduleResponse, "isTentative"> & {
+        category?: {
+          color?: Parameters<typeof getCategoryTheme>[0];
+          icon?: CategoryIcon;
+        };
+      })
+    | undefined;
+  const theme = getCategoryTheme(schedule?.category?.color);
+  const Icon = getCategoryIcon(schedule?.category?.icon);
+  const opacity = schedule?.isTentative ? 0.5 : 1;
 
   if (variant === "month") {
     return (
       <div
         className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-[#e5e7eb] bg-white px-1.5 py-0.5 shadow-sm"
         style={{
+          opacity,
           borderLeft: `3px solid ${theme.border}`,
         }}
       >
@@ -55,6 +60,7 @@ export default function EventCard({
     <div
       className="h-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-sm"
       style={{
+        opacity,
         borderLeft: `4px solid ${theme.border}`,
       }}
     >

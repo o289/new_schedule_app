@@ -60,6 +60,7 @@ const schedule = {
   title: "meeting",
   note: null,
   categoryId: category.id,
+  isTentative: false,
   category,
   dates: [
     {
@@ -107,9 +108,13 @@ describe("schedule router", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(mocks.createSchedule).toHaveBeenCalledWith(user, body);
+    expect(mocks.createSchedule).toHaveBeenCalledWith(user, {
+      ...body,
+      isTentative: false,
+    });
     await expect(response.json()).resolves.toMatchObject({
       id: schedule.id,
+      isTentative: false,
       category: {
         name: "仕事",
         color: "red",
@@ -122,6 +127,60 @@ describe("schedule router", () => {
           endDate: "2025-01-01T11:00:00",
         },
       ],
+    });
+  });
+
+  it("POST /schedules は仮押さえを作成し、状態を返す", async () => {
+    mocks.createSchedule.mockResolvedValue({ ...schedule, isTentative: true });
+    const body = {
+      title: "tentative meeting",
+      categoryId: category.id,
+      isTentative: true,
+      dates: [
+        {
+          startDate: "2025-01-02T10:00:00",
+          endDate: "2025-01-02T11:00:00",
+        },
+      ],
+    };
+
+    const response = await request("/schedules", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.createSchedule).toHaveBeenCalledWith(user, body);
+    await expect(response.json()).resolves.toMatchObject({
+      id: schedule.id,
+      isTentative: true,
+    });
+  });
+
+  it("GET /schedules は仮押さえ状態を含めて返す", async () => {
+    mocks.listSchedules.mockResolvedValue([{ ...schedule, isTentative: true }]);
+
+    const response = await request("/schedules");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject([
+      { id: schedule.id, isTentative: true },
+    ]);
+  });
+
+  it("PUT /schedules/:id は仮押さえ状態だけを更新できる", async () => {
+    mocks.updateSchedule.mockResolvedValue({ ...schedule, isTentative: true });
+    const response = await request(`/schedules/${schedule.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ isTentative: true }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateSchedule).toHaveBeenCalledWith(user, schedule.id, {
+      isTentative: true,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      isTentative: true,
     });
   });
 

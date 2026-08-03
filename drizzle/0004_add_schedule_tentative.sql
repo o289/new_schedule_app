@@ -1,0 +1,1 @@
+ALTER TABLE "schedules" ADD COLUMN "is_tentative" boolean DEFAULT false NOT NULL;

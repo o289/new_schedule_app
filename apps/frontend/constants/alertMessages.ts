@@ -1,7 +1,4 @@
-// ALERT_MESSAGES.ts
-// CRUD 自前アラート機能用メッセージ定義
-// 許可フィールド: type, message のみ
-// それ以外の情報を追加してはならない（README.curd.md 参照）
+import type { ApiErrorCode } from "../../../packages/contracts/api-error";
 
 export type AlertType = "success" | "warning" | "error";
 
@@ -9,6 +6,8 @@ export interface AlertMessage {
   type: AlertType;
   message: string;
 }
+
+type SuccessAlertCode = "CREATE_SUCCESS" | "UPDATE_SUCCESS" | "DELETE_SUCCESS";
 
 export const ALERT_MESSAGES = {
   // =========================
@@ -79,6 +78,42 @@ export const ALERT_MESSAGES = {
     type: "warning",
     message: "認証に失敗しました。再度ログインをしてください",
   },
+  ALREADY_LOGGED_OUT: {
+    type: "warning",
+    message: "すでにログアウトされています",
+  },
+  AUTH_INVALID_CHALLENGE: {
+    type: "warning",
+    message: "パスキーの操作をやり直してください",
+  },
+  PASSKEY_ALREADY_REGISTERED: {
+    type: "warning",
+    message: "このパスキーはすでに登録されています",
+  },
+  PASSKEY_VERIFICATION_FAILED: {
+    type: "warning",
+    message: "パスキーの確認に失敗しました。もう一度お試しください",
+  },
+  PASSKEY_NOT_FOUND: {
+    type: "warning",
+    message: "このメールアドレスにはパスキーが登録されていません",
+  },
+  USER_NOT_FOUND: {
+    type: "warning",
+    message: "ユーザーが見つかりませんでした",
+  },
+  INVALID_REQUEST: {
+    type: "warning",
+    message: "リクエストの内容を確認してください",
+  },
+  INVALID_RESPONSE: {
+    type: "error",
+    message: "サーバーから正しい応答を受け取れませんでした",
+  },
+  HTTP_ERROR: {
+    type: "warning",
+    message: "認証に失敗しました。再度ログインをしてください",
+  },
 
   // =========================
   // Error（想定外エラー）
@@ -88,6 +123,11 @@ export const ALERT_MESSAGES = {
     message:
       "サーバーエラーが発生しました。ご迷惑をおかけして大変申し訳ございませんでした",
   },
-} satisfies Record<string, AlertMessage>;
+  INTERNAL_SERVER_ERROR: {
+    type: "error",
+    message:
+      "サーバーエラーが発生しました。ご迷惑をおかけして大変申し訳ございませんでした",
+  },
+} satisfies Record<ApiErrorCode | SuccessAlertCode, AlertMessage>;
 
-export type AlertCode = keyof typeof ALERT_MESSAGES;
+export type AlertCode = ApiErrorCode | SuccessAlertCode;

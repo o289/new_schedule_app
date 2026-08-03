@@ -37,15 +37,21 @@ export const scheduleCreateSchema = scheduleBaseSchema.extend({
 
   categoryId: z.uuid(),
 
+  isTentative: z.boolean().default(false),
+
   dates: z.array(scheduleDateCreateSchema).min(1),
 });
 
 export const scheduleUpdateSchema = scheduleBaseSchema.extend({
+  isTentative: z.boolean().optional(),
+
   dates: z.array(scheduleDateUpdateSchema).min(1).optional(),
 });
 
 export const scheduleResponseSchema = scheduleBaseSchema.extend({
   id: z.uuid(),
+
+  isTentative: z.boolean(),
 
   dates: z.array(scheduleDateResponseSchema),
 

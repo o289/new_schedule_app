@@ -11,7 +11,7 @@ import { Drawer, CircularProgress } from "@mui/material";
 import CalendarHeader from "../../components/calendar/CalendarHeader";
 
 export default function ScheduleCalendarPage() {
-  const { categories } = useCategory();
+  const category = useCategory();
 
   const {
     schedules,
@@ -55,7 +55,8 @@ export default function ScheduleCalendarPage() {
           <CalendarAside
             draftSchedule={draftSchedule}
             resetForm={resetDraft}
-            categories={categories}
+            categories={category.categories}
+            category={category}
             handleChange={handleChange}
             handleScheduleCreate={handleScheduleCreate}
             handleScheduleUpdate={handleScheduleUpdate}
@@ -103,7 +104,8 @@ export default function ScheduleCalendarPage() {
         <CalendarAside
           draftSchedule={draftSchedule}
           resetForm={resetDraft}
-          categories={categories}
+          categories={category.categories}
+          category={category}
           handleChange={handleChange}
           handleScheduleCreate={handleScheduleCreate}
           handleScheduleUpdate={handleScheduleUpdate}

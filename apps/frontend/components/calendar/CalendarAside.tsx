@@ -16,9 +16,23 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { CategoryResponse } from "../../types/schedule";
 import type { ScheduleForm } from "../../types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
+import type { useCategory } from "../categories/useCategory";
+
+type CategoryController = Pick<
+  ReturnType<typeof useCategory>,
+  | "categories"
+  | "form"
+  | "editingId"
+  | "handleChange"
+  | "handleSubmit"
+  | "handleEditClick"
+  | "handleCancelEdit"
+  | "handleDelete"
+>;
 
 interface CalendarAsideProps {
   categories: CategoryResponse[];
+  category: CategoryController;
   draftSchedule: ScheduleForm;
   resetForm: () => void;
   handleScheduleCreate: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -31,6 +45,7 @@ interface CalendarAsideProps {
 
 export default function CalendarAside({
   categories,
+  category,
   draftSchedule,
   resetForm,
   handleScheduleCreate,
@@ -92,7 +107,9 @@ export default function CalendarAside({
           />
         );
       case "category":
-        return <CategoryAsidePage setAsideMode={setAsideMode} />;
+        return (
+          <CategoryAsidePage setAsideMode={setAsideMode} category={category} />
+        );
       default:
         return (
           <>

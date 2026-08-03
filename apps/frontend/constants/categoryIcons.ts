@@ -35,7 +35,10 @@ import TrainOutlinedIcon from "@mui/icons-material/TrainOutlined";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import type { SvgIconComponent } from "@mui/icons-material";
 
-import type { CategoryIcon } from "../../../packages/schemas/category";
+import {
+  categoryIconValues,
+  type CategoryIcon,
+} from "../../../packages/schemas/category";
 
 export const CATEGORY_ICON_COMPONENTS = {
   tag: LocalOfferOutlinedIcon,
@@ -75,43 +78,48 @@ export const CATEGORY_ICON_COMPONENTS = {
   other: MoreHorizOutlinedIcon,
 } satisfies Record<CategoryIcon, SvgIconComponent>;
 
-export const CATEGORY_ICONS = [
-  { value: "tag", label: "タグ" },
-  { value: "car", label: "車" },
-  { value: "bicycle", label: "自転車" },
-  { value: "bus", label: "バス" },
-  { value: "train", label: "電車" },
-  { value: "flight", label: "飛行機" },
-  { value: "work", label: "仕事" },
-  { value: "school", label: "学校" },
-  { value: "study", label: "勉強" },
-  { value: "home", label: "自宅" },
-  { value: "family", label: "家族" },
-  { value: "friends", label: "友人" },
-  { value: "event", label: "イベント" },
-  { value: "meeting", label: "会議・面談" },
-  { value: "birthday", label: "誕生日" },
-  { value: "health", label: "健康" },
-  { value: "medical", label: "病院" },
-  { value: "fitness", label: "トレーニング" },
-  { value: "sports", label: "スポーツ" },
-  { value: "food", label: "食事" },
-  { value: "cafe", label: "カフェ" },
-  { value: "shopping", label: "買い物" },
-  { value: "money", label: "支払い" },
-  { value: "bank", label: "銀行" },
-  { value: "music", label: "音楽" },
-  { value: "movie", label: "映画" },
-  { value: "game", label: "ゲーム" },
-  { value: "book", label: "読書" },
-  { value: "pet", label: "ペット" },
-  { value: "beauty", label: "美容" },
-  { value: "phone", label: "電話" },
-  { value: "computer", label: "パソコン" },
-  { value: "outdoors", label: "屋外" },
-  { value: "travel", label: "旅行" },
-  { value: "other", label: "その他" },
-] as const satisfies readonly {
+const categoryIconLabels = {
+  tag: "タグ",
+  car: "車",
+  bicycle: "自転車",
+  bus: "バス",
+  train: "電車",
+  flight: "飛行機",
+  work: "仕事",
+  school: "学校",
+  study: "勉強",
+  home: "自宅",
+  family: "家族",
+  friends: "友人",
+  event: "イベント",
+  meeting: "会議・面談",
+  birthday: "誕生日",
+  health: "健康",
+  medical: "病院",
+  fitness: "トレーニング",
+  sports: "スポーツ",
+  food: "食事",
+  cafe: "カフェ",
+  shopping: "買い物",
+  money: "支払い",
+  bank: "銀行",
+  music: "音楽",
+  movie: "映画",
+  game: "ゲーム",
+  book: "読書",
+  pet: "ペット",
+  beauty: "美容",
+  phone: "電話",
+  computer: "パソコン",
+  outdoors: "屋外",
+  travel: "旅行",
+  other: "その他",
+} satisfies Record<CategoryIcon, string>;
+
+export const CATEGORY_ICONS = categoryIconValues.map((value) => ({
+  value,
+  label: categoryIconLabels[value],
+})) satisfies readonly {
   value: CategoryIcon;
   label: string;
 }[];

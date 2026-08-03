@@ -8,8 +8,10 @@ import {
   Button,
   Box,
   FormControl,
+  FormControlLabel,
   MenuItem,
   Select,
+  Switch,
   TextField,
   InputAdornment,
 } from "@mui/material";
@@ -188,6 +190,26 @@ export default function ScheduleAsideForm({
               })}
             </Select>
           </FormControl>
+        </div>
+
+        <div className="mb-6">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={draftSchedule.isTentative}
+                onChange={(event) =>
+                  onChange({
+                    target: {
+                      name: "isTentative",
+                      value: event.target.checked,
+                    },
+                  })
+                }
+                inputProps={{ "aria-label": "仮押さえとして登録" }}
+              />
+            }
+            label={draftSchedule.isTentative ? "仮押さえ" : "本登録"}
+          />
         </div>
 
         <div className="md-6">

@@ -3,12 +3,8 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { apiFetch } from "../hooks/client";
 import { useAlert } from "./AlertContext";
 import type { UserResponse } from "../../../packages/schemas/user";
-
-interface RefreshResponse {
-  data?: {
-    access_token?: string;
-  };
-}
+import type { TokenResponse } from "../../../packages/schemas/auth";
+import type { ApiErrorCode } from "../../../packages/contracts/api-error";
 
 interface AuthContextValue {
   user: UserResponse | null;
@@ -24,7 +20,7 @@ interface AuthContextValue {
   authFetch: <T>(
     url: string,
     options?: RequestInit,
-    fetchOptions?: { silentCodes?: string[] },
+    fetchOptions?: { silentCodes?: ApiErrorCode[] },
   ) => Promise<T>;
 }
 
@@ -79,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     refreshPromiseRef.current = (async () => {
       try {
-        const res = await apiFetch<RefreshResponse>(
+        const res = await apiFetch<TokenResponse>(
           "/auth/refresh",
           {
             method: "POST",
@@ -110,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authFetch = <T,>(
     url: string,
     options: RequestInit = {},
-    fetchOptions: { silentCodes?: string[] } = {},
+    fetchOptions: { silentCodes?: ApiErrorCode[] } = {},
   ) =>
     apiFetch<T>(
       url,

@@ -31,7 +31,7 @@ import type {
   PasskeyRegisterVerifyRequest,
   PasskeyRegisterVerifyResponse,
   TokenResponse,
-} from "./schema";
+} from "../../../../packages/schemas/auth";
 
 const challengeLifetimeMilliseconds = 5 * 60 * 1000;
 

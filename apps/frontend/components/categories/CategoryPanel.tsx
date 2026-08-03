@@ -89,9 +89,9 @@ export default function CategoryPanel({
         <div className="mb-6 rounded-[14px] bg-white p-5 shadow-[0_6px_16px_rgba(0,0,0,0.08)]">
           <form
             className="flex flex-col"
-            onSubmit={(e: FormEvent<HTMLFormElement>) => {
+            onSubmit={async (e: FormEvent<HTMLFormElement>) => {
               e.preventDefault();
-              onSubmit();
+              await onSubmit();
             }}
           >
             <h3 className="mb-4">

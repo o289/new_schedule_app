@@ -1,3 +1,8 @@
+import {
+  isApiErrorCode,
+  type ApiErrorCode,
+} from "../../../packages/contracts/api-error";
+
 // 本番・ステージングでは同一オリジンの application が API も配信する。
 // 開発時だけ .env.dev の VITE_API_URL で別ポートの Hono を指定する。
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -6,22 +11,25 @@ interface AuthOptions {
   accessToken?: string | null;
   refreshToken?: string | null;
   handleRefresh?: () => Promise<string | false>;
-  showAlert?: (code: string) => void;
+  showAlert?: (code: ApiErrorCode) => void;
   clearSession?: () => void;
 }
 
 interface FetchConfig {
-  silentCodes?: string[];
+  silentCodes?: ApiErrorCode[];
 }
 
-const INVALID_RESPONSE_CODE = "INVALID_RESPONSE";
+const INVALID_RESPONSE_CODE: ApiErrorCode = "INVALID_RESPONSE";
 
-function getErrorCode(data: unknown, fallback = "SERVER_ERROR"): string {
+function getErrorCode(
+  data: unknown,
+  fallback: ApiErrorCode = "SERVER_ERROR",
+): ApiErrorCode {
   if (
     typeof data === "object" &&
     data !== null &&
     "code" in data &&
-    typeof data.code === "string"
+    isApiErrorCode(data.code)
   ) {
     return data.code;
   }
@@ -56,7 +64,7 @@ export async function apiFetch<T = unknown>(
   let accessToken: string | null | undefined;
   let refreshToken: string | null | undefined;
   let handleRefresh: (() => Promise<string | false>) | undefined;
-  let showAlert: ((code: string) => void) | undefined;
+  let showAlert: ((code: ApiErrorCode) => void) | undefined;
   let clearSession: (() => void) | undefined;
 
   if (auth) {

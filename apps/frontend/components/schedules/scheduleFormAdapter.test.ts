@@ -7,6 +7,7 @@ const schedule: ScheduleResponse = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "授業",
   categoryId: "22222222-2222-4222-8222-222222222222",
+  isTentative: true,
   category: { name: "学校", color: "red", icon: "school" },
   dates: [
     {
@@ -26,6 +27,7 @@ describe("toScheduleForm", () => {
       title: "授業",
       note: "",
       categoryId: schedule.categoryId,
+      isTentative: true,
       dates: schedule.dates,
     });
     expect(form.dates).not.toBe(schedule.dates);

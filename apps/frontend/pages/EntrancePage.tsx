@@ -2,6 +2,11 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { UserResponse } from "../../../packages/schemas/user";
+import type {
+  PasskeyLoginOptionsResponse,
+  PasskeyRegisterOptionsResponse,
+  TokenResponse,
+} from "../../../packages/schemas/auth";
 
 import { Button, TextField } from "@mui/material";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
@@ -13,10 +18,6 @@ import entranceCalendarHero from "../assets/entrance-calendar-hero.png";
 import {
   startRegistration,
   startAuthentication,
-} from "../utils/webauthn/webauthn";
-import type {
-  AuthenticationOptions,
-  RegistrationOptions,
 } from "../utils/webauthn/webauthn";
 import {
   formatRegistrationCredential,
@@ -31,9 +32,7 @@ export default function EntrancePage() {
   const navigate = useNavigate();
 
   const executeLoginFlow = async (email: string) => {
-    const loginOptionsRes = await apiFetch<{
-      data: { publicKey: AuthenticationOptions };
-    }>(
+    const loginOptionsRes = await apiFetch<PasskeyLoginOptionsResponse>(
       "/auth/passkey/login/options",
       {
         method: "POST",
@@ -51,12 +50,13 @@ export default function EntrancePage() {
       authenticationCredential,
     );
 
-    const verifyRes = await apiFetch<{
-      data: { access_token: string; refresh_token: string };
-    }>("/auth/passkey/login/verify", {
-      method: "POST",
-      body: JSON.stringify(formattedAuthentication),
-    });
+    const verifyRes = await apiFetch<TokenResponse>(
+      "/auth/passkey/login/verify",
+      {
+        method: "POST",
+        body: JSON.stringify(formattedAuthentication),
+      },
+    );
 
     const { access_token, refresh_token } = verifyRes.data;
 
@@ -102,12 +102,13 @@ export default function EntrancePage() {
       }
 
       // 2. If no passkey found, proceed with registration
-      const registerOptionsRes = await apiFetch<{
-        data: { publicKey: RegistrationOptions };
-      }>("/auth/passkey/register/options", {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      });
+      const registerOptionsRes = await apiFetch<PasskeyRegisterOptionsResponse>(
+        "/auth/passkey/register/options",
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+      );
 
       const registerPublicKey = registerOptionsRes.data.publicKey;
 

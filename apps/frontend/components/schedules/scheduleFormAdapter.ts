@@ -7,6 +7,7 @@ export function toScheduleForm(schedule: ScheduleResponse): ScheduleForm {
     title: schedule.title ?? "",
     note: schedule.note ?? "",
     categoryId: schedule.categoryId ?? "",
+    isTentative: schedule.isTentative,
     dates: schedule.dates.map((date) => ({ ...date })),
   };
 }

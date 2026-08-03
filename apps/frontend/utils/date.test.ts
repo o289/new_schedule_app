@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDaysToISODate,
-  formatDateTime,
+  formatDate,
   getLocalDateTimeParts,
+  isSameDate,
   toISODatetime,
-} from "./date";
+} from "../../../packages/utils/local-datetime";
+import { formatDateTime } from "./date";
 
 describe("日本時間の日時文字列", () => {
   it("入力時刻をタイムゾーンなしISO文字列へ変換する", () => {
@@ -23,5 +25,13 @@ describe("日本時間の日時文字列", () => {
   it("UTC変換せず日付だけを翌日に進める", () => {
     expect(addDaysToISODate("2026-07-31", 1)).toBe("2026-08-01");
     expect(addDaysToISODate("2026-12-31", 1)).toBe("2027-01-01");
+  });
+
+  it("Dateをローカル日付としてYYYY-MM-DDへ整形し、同日判定する", () => {
+    const morning = new Date(2026, 6, 22, 9, 0);
+    const evening = new Date(2026, 6, 22, 21, 0);
+
+    expect(formatDate(morning)).toBe("2026-07-22");
+    expect(isSameDate(morning, evening)).toBe(true);
   });
 });

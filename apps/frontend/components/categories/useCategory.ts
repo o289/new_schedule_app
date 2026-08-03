@@ -105,7 +105,8 @@ export function useCategory() {
     setForm({ name: "", color: "gray", icon: "tag" });
     setEditingId(null);
 
-    fetchCategories();
+    // 親画面と共有しているカテゴリー一覧を、API取得完了後に更新する。
+    await fetchCategories();
   };
 
   // ========================
@@ -147,7 +148,7 @@ export function useCategory() {
 
     // 即時UI反映
     // setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
-    fetchCategories();
+    await fetchCategories();
     showAlert("DELETE_SUCCESS");
   };
 

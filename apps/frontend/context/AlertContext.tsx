@@ -1,7 +1,6 @@
 // src/context/AlertContext.jsx
 import { createContext, useCallback, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { ALERT_MESSAGES } from "../constants/alertMessages";
 import type { AlertCode } from "../constants/alertMessages";
 import AlertToast from "../components/AlertToast";
 
@@ -13,7 +12,7 @@ interface AlertState {
 
 interface AlertContextValue {
   alertState: AlertState;
-  showAlert: (code: string) => void;
+  showAlert: (code: AlertCode) => void;
   hideAlert: () => void;
 }
 
@@ -30,16 +29,12 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
    * alert を表示する
    * @param {string} code - backend から返ってきた code
    */
-  const showAlert = useCallback((code: string) => {
+  const showAlert = useCallback((code: AlertCode) => {
     if (!code) return;
-
-    // 定義されていない code は SERVER_ERROR 扱い
-    const resolvedCode: AlertCode =
-      code in ALERT_MESSAGES ? (code as AlertCode) : "SERVER_ERROR";
 
     setAlertState({
       open: true,
-      code: resolvedCode,
+      code,
     });
   }, []);
 
