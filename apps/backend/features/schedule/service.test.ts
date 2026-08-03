@@ -48,6 +48,7 @@ describe("ScheduleService", () => {
     const input = {
       title: "A",
       categoryId: category.id,
+      isTentative: false,
       dates: [
         {
           startDate: "2026-03-10T22:00:00",
@@ -70,6 +71,7 @@ describe("ScheduleService", () => {
       service.createSchedule(user, {
         title: "A",
         categoryId: category.id,
+        isTentative: false,
         dates: [
           {
             startDate: "2026-03-12T15:00:00",
@@ -98,6 +100,7 @@ describe("ScheduleService", () => {
       service.createSchedule(user, {
         title: "A",
         categoryId: category.id,
+        isTentative: false,
         dates: [
           {
             startDate: "2026-03-12T14:00:00",
@@ -122,6 +125,7 @@ describe("ScheduleService", () => {
     const input = {
       title: "A",
       categoryId: category.id,
+      isTentative: false,
       dates: [
         {
           startDate: "2026-03-12T14:00:00",
@@ -190,6 +194,7 @@ describe("ScheduleService", () => {
       service.createSchedule(user, {
         title: "A",
         categoryId: category.id,
+        isTentative: false,
         dates: [
           {
             startDate: "2026-03-12T15:00:00",
@@ -201,5 +206,29 @@ describe("ScheduleService", () => {
       code: "SCHEDULE_TIME_OVERLAP",
       status: 409,
     });
+  });
+
+  it("仮押さえも本登録と同じ時間重複ルールに従う", async () => {
+    const hasOverlappingDate = vi.fn().mockResolvedValue(true);
+    const { service, repository } = createService({ hasOverlappingDate });
+
+    await expect(
+      service.createSchedule(user, {
+        title: "仮押さえ",
+        categoryId: category.id,
+        isTentative: true,
+        dates: [
+          {
+            startDate: "2026-03-12T15:00:00",
+            endDate: "2026-03-12T16:00:00",
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: "SCHEDULE_TIME_OVERLAP",
+      status: 409,
+    });
+
+    expect(repository.create).not.toHaveBeenCalled();
   });
 });

@@ -29,6 +29,13 @@
       "when": 1785211956000,
       "tag": "0003_add_category_icon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785721237461,
+      "tag": "0004_add_schedule_tentative",
+      "breakpoints": true
     }
   ]
 }

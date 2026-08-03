@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
+  boolean,
   uuid,
   varchar,
   text,
@@ -25,6 +26,8 @@ export const schedules = pgTable(
     note: text("note"),
 
     categoryId: uuid("category_id").notNull(),
+
+    isTentative: boolean("is_tentative").notNull().default(false),
 
     userId: uuid("user_id")
       .notNull()

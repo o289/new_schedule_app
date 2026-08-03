@@ -5,7 +5,7 @@ import { toScheduleForm } from "./scheduleFormAdapter";
 export type ScheduleChangeEvent = {
   target: {
     name: string;
-    value: string | ScheduleForm["dates"];
+    value: string | boolean | ScheduleForm["dates"];
   };
 };
 
@@ -20,6 +20,7 @@ const initialSchedule: ScheduleForm = {
   note: "",
   dates: [],
   categoryId: "",
+  isTentative: false,
 };
 
 export function useScheduleForm() {

@@ -33,6 +33,7 @@ export class ScheduleRepository extends BaseRepository {
           title: input.title,
           note: input.note,
           categoryId: input.categoryId,
+          isTentative: input.isTentative,
           userId,
         })
         .returning({ id: schedules.id });

@@ -275,6 +275,7 @@ export default function MobileMode({
                               type="button"
                               className="overflow-hidden rounded-md border border-[#e5e7eb] bg-white text-left shadow-sm"
                               style={{
+                                opacity: schedule.isTentative ? 0.5 : 1,
                                 borderLeft: `3px solid ${theme.border}`,
                               }}
                               onClick={() => openScheduleDetail(event)}
@@ -308,6 +309,7 @@ export default function MobileMode({
                                 type="button"
                                 className="w-full truncate rounded-full px-1.5 py-0.5 text-left text-[10px] font-bold"
                                 style={{
+                                  opacity: schedule.isTentative ? 0.5 : 1,
                                   backgroundColor: theme.bg,
                                   color: theme.text,
                                 }}

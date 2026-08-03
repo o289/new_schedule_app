@@ -4,6 +4,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PendingOutlinedIcon from "@mui/icons-material/PendingOutlined";
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { AsideMode } from "../../context/CalendarContext";
@@ -85,9 +86,24 @@ export default function ScheduleAsideDetail({
       </Button>
       <div className="p-4">
         <div className="bg-white rounded-3xl shadow-md p-6 mb-6">
-          <h1 className="text-4xl font-bold mb-6 break-words">
-            {schedule.title}
-          </h1>
+          <div className="mb-6 flex flex-wrap items-start gap-3">
+            <h1 className="text-4xl font-bold break-words">{schedule.title}</h1>
+            {schedule.isTentative && (
+              <Chip
+                icon={<PendingOutlinedIcon />}
+                label="仮押さえ・未確定"
+                aria-label="仮押さえ・未確定の予定"
+                sx={{
+                  mt: 1,
+                  backgroundColor: theme.bg,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.border,
+                  fontWeight: 700,
+                  "& .MuiChip-icon": { color: theme.border },
+                }}
+              />
+            )}
+          </div>
           <Divider className="!mb-6" />
 
           <div className="flex items-center gap-4 mb-6">
