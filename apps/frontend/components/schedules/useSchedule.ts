@@ -1,101 +1,102 @@
-import { useState } from "react";
 import type { FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
-import useLoading from "../../hooks/useLoading";
 import { useAlert } from "../../context/AlertContext";
+import { scheduleKeys } from "../../lib/queryKeys";
 import { useScheduleForm } from "./useScheduleForm";
 import type { ScheduleResponse } from "../../types/schedule";
 
-export function useSchedule(id: string | null = null) {
+export function useSchedule() {
   const { authFetch } = useAuth();
   const { showAlert } = useAlert();
-
-  const [schedule, setSchedule] = useState<ScheduleResponse | null>(null);
-  const [schedules, setSchedules] = useState<ScheduleResponse[]>([]);
+  const queryClient = useQueryClient();
 
   const { draftSchedule, setDraftSchedule, resetDraft, handleChange } =
     useScheduleForm();
-  const { isFetching, startFetching, stopFetching } = useLoading();
 
-  const base_url = "/schedules";
+  const baseUrl = "/schedules";
 
-  // --- API処理 ---
+  const schedulesQuery = useQuery({
+    queryKey: scheduleKeys.lists(),
+    queryFn: ({ signal }) =>
+      authFetch<ScheduleResponse[]>(baseUrl, { method: "GET", signal }),
+  });
 
-  // 一覧
-  const fetchSchedules = async () => {
-    startFetching();
-    try {
-      const res = await authFetch<ScheduleResponse[]>(base_url, {
-        method: "GET",
-      });
-      setSchedules(res);
-    } finally {
-      stopFetching();
-    }
-  };
+  const createSchedule = useMutation({
+    mutationFn: () =>
+      authFetch<ScheduleResponse>(baseUrl, {
+        method: "POST",
+        body: JSON.stringify(draftSchedule),
+      }),
+  });
 
-  // 詳細
-  const fetchSchedule = async () => {
-    startFetching();
-    try {
-      const res = await authFetch<ScheduleResponse>(`${base_url}/${id}`, {
-        method: "GET",
-      });
-      setSchedule(res);
-    } finally {
-      stopFetching();
-    }
-  };
+  const updateSchedule = useMutation({
+    mutationFn: (payload: {
+      id: string | undefined;
+      schedule: typeof draftSchedule;
+    }) =>
+      authFetch<ScheduleResponse>(`${baseUrl}/${payload.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload.schedule),
+      }),
+  });
 
-  // 作成
-  const handleScheduleCreate = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const deleteSchedule = useMutation({
+    mutationFn: (scheduleId: string | undefined) =>
+      authFetch<void>(`${baseUrl}/${scheduleId}`, { method: "DELETE" }),
+  });
 
-    await authFetch(base_url, {
-      method: "POST",
-      body: JSON.stringify(draftSchedule),
-    });
+  const schedules = schedulesQuery.data ?? [];
+
+  const fetchSchedules = () =>
+    queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+
+  const handleScheduleCreate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    await createSchedule.mutateAsync();
+    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
 
     resetDraft();
-    await fetchSchedules();
     showAlert("CREATE_SUCCESS");
   };
 
-  // --- 更新 ---
-  const handleScheduleUpdate = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleScheduleUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
     const payload = {
       ...draftSchedule,
-      dates: draftSchedule.dates.map((d) => ({
-        ...(d.id !== undefined && { id: d.id }),
-        startDate: d.startDate,
-        endDate: d.endDate,
+      dates: draftSchedule.dates.map((date) => ({
+        ...(date.id !== undefined && { id: date.id }),
+        startDate: date.startDate,
+        endDate: date.endDate,
       })),
     };
 
-    await authFetch(`${base_url}/${draftSchedule.id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
+    await updateSchedule.mutateAsync({
+      id: draftSchedule.id,
+      schedule: payload,
     });
-
-    await fetchSchedules();
+    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
     showAlert("UPDATE_SUCCESS");
   };
 
-  // --- 削除 ---
   const handleScheduleDelete = async () => {
-    await authFetch(`${base_url}/${draftSchedule.id}`, { method: "DELETE" });
-    await fetchSchedules();
+    const scheduleId = draftSchedule.id;
+
+    await deleteSchedule.mutateAsync(scheduleId);
+    if (scheduleId) {
+      queryClient.removeQueries({ queryKey: scheduleKeys.detail(scheduleId) });
+    }
+    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
     showAlert("DELETE_SUCCESS");
   };
 
   return {
-    schedule,
     schedules,
-    isFetching,
+    isFetching: schedulesQuery.isFetching,
+    isPending: schedulesQuery.isPending,
     fetchSchedules,
-    fetchSchedule,
     draftSchedule,
     setDraftSchedule,
     resetDraft,

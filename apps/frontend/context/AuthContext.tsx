@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { apiFetch } from "../hooks/client";
+import { queryClient } from "../lib/queryClient";
 import { useAlert } from "./AlertContext";
 import type { UserResponse } from "../../../packages/schemas/user";
 import type { TokenResponse } from "../../../packages/schemas/auth";
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // セッションをクリアにする
   const clearSession = () => {
+    queryClient.clear();
     setUser(null);
     setAccessToken(null);
     setRefreshToken(null);

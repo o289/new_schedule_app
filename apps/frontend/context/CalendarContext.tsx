@@ -1,7 +1,6 @@
 import { createContext, useContext, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import type FullCalendar from "@fullcalendar/react";
-import type { ScheduleResponse } from "../types/schedule";
 import {
   moveDesktopCalendarDate,
   type DesktopCalendarView,
@@ -19,8 +18,8 @@ interface CalendarContextValue {
   setMobileView: (view: MobileCalendarView) => void;
   selectedScheduleDateId: string | null;
   setSelectedScheduleDateId: (scheduleDateId: string | null) => void;
-  selectedSchedule: ScheduleResponse | null;
-  setSelectedSchedule: (schedule: ScheduleResponse | null) => void;
+  selectedScheduleId: string | null;
+  setSelectedScheduleId: (scheduleId: string | null) => void;
   asideMode: AsideMode;
   setAsideMode: (mode: AsideMode) => void;
   handleDesktopWeekSelect: (date: Date) => void;
@@ -40,8 +39,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const [selectedScheduleDateId, setSelectedScheduleDateId] = useState<
     string | null
   >(null);
-  const [selectedSchedule, setSelectedSchedule] =
-    useState<ScheduleResponse | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(
+    null,
+  );
   const [asideMode, setAsideMode] = useState<AsideMode>(null);
   const calendarRef = useRef<FullCalendar | null>(null);
 
@@ -92,8 +92,8 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         setMobileView,
         selectedScheduleDateId,
         setSelectedScheduleDateId,
-        selectedSchedule,
-        setSelectedSchedule,
+        selectedScheduleId,
+        setSelectedScheduleId,
         asideMode,
         setAsideMode,
         handleDesktopWeekSelect,

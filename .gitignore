@@ -34,4 +34,3 @@ npm-debug.log*
 # local-only files
 mock.html
 docs/*
-!docs/本番環境構成.md

@@ -29,7 +29,7 @@ export default function CalendarMain({
     desktopView,
     mobileView,
     setSelectedScheduleDateId,
-    setSelectedSchedule,
+    setSelectedScheduleId,
     setAsideMode,
     setMobileView,
     handleDesktopWeekSelect,
@@ -41,7 +41,7 @@ export default function CalendarMain({
     scheduleDateId: string,
   ) => {
     setSelectedScheduleDateId(scheduleDateId);
-    setSelectedSchedule(schedule);
+    setSelectedScheduleId(schedule.id);
     setDraftSchedule(toScheduleForm(schedule));
     setIsDrawerOpen?.(true);
     setAsideMode("detail");

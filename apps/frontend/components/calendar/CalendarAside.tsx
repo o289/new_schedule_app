@@ -13,8 +13,11 @@ import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { getCategoryIcon } from "../../constants/categoryIcons";
 import { useCalendar } from "../../context/CalendarContext";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import type { CategoryResponse } from "../../types/schedule";
-import type { ScheduleForm } from "../../types/schedule";
+import type {
+  CategoryResponse,
+  ScheduleForm,
+  ScheduleResponse,
+} from "../../types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
 import type { useCategory } from "../categories/useCategory";
 
@@ -32,6 +35,7 @@ type CategoryController = Pick<
 
 interface CalendarAsideProps {
   categories: CategoryResponse[];
+  schedules: ScheduleResponse[];
   category: CategoryController;
   draftSchedule: ScheduleForm;
   resetForm: () => void;
@@ -45,6 +49,7 @@ interface CalendarAsideProps {
 
 export default function CalendarAside({
   categories,
+  schedules,
   category,
   draftSchedule,
   resetForm,
@@ -55,8 +60,14 @@ export default function CalendarAside({
   setIsDrawerOpen,
   closeButton,
 }: CalendarAsideProps) {
-  const { selectedScheduleDateId, selectedSchedule, asideMode, setAsideMode } =
-    useCalendar();
+  const {
+    selectedScheduleDateId,
+    selectedScheduleId,
+    asideMode,
+    setAsideMode,
+  } = useCalendar();
+  const selectedSchedule =
+    schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null;
 
   const { user, handleLogout } = useAuth();
   const onLogout = () => {

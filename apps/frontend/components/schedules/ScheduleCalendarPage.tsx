@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useCategory } from "../categories/useCategory";
 import { useSchedule } from "../schedules/useSchedule";
 
@@ -15,11 +15,10 @@ export default function ScheduleCalendarPage() {
 
   const {
     schedules,
-    isFetching,
+    isPending,
     handleScheduleCreate,
     handleScheduleUpdate,
     handleScheduleDelete,
-    fetchSchedules,
     draftSchedule,
     setDraftSchedule,
     resetDraft,
@@ -32,11 +31,7 @@ export default function ScheduleCalendarPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const isMobile = useIsMobile(1024);
 
-  useEffect(() => {
-    fetchSchedules(); // ← マウント時に必ず実行
-  }, []);
-
-  if (isFetching || !schedules) {
+  if (isPending) {
     return (
       <div className="flex justify-center items-center">
         <CircularProgress aria-label="Loading…" />
@@ -56,6 +51,7 @@ export default function ScheduleCalendarPage() {
             draftSchedule={draftSchedule}
             resetForm={resetDraft}
             categories={category.categories}
+            schedules={schedules}
             category={category}
             handleChange={handleChange}
             handleScheduleCreate={handleScheduleCreate}
@@ -105,6 +101,7 @@ export default function ScheduleCalendarPage() {
           draftSchedule={draftSchedule}
           resetForm={resetDraft}
           categories={category.categories}
+          schedules={schedules}
           category={category}
           handleChange={handleChange}
           handleScheduleCreate={handleScheduleCreate}
