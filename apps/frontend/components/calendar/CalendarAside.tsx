@@ -1,6 +1,5 @@
-import { useAuth } from "../../context/AuthContext";
-
 import { Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { Add as AddIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -12,6 +11,7 @@ import CategoryAsidePage from "../categories/CategoryAsidePage";
 import { getCategoryTheme } from "../../utils/getCategoryTheme";
 import { getCategoryIcon } from "../../constants/categoryIcons";
 import { useCalendar } from "../../context/CalendarContext";
+import { useSession } from "../../hooks/useSession";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type {
   CategoryResponse,
@@ -69,10 +69,12 @@ export default function CalendarAside({
   const selectedSchedule =
     schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null;
 
-  const { user, handleLogout } = useAuth();
-  const onLogout = () => {
+  const { user, logout } = useSession();
+  const navigate = useNavigate();
+  const onLogout = async () => {
     if (!window.confirm("ログアウトしますか？")) return;
-    handleLogout();
+    await logout();
+    navigate("/", { replace: true });
   };
 
   function renderAsideContent() {

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
+import { categoryApi } from "../../lib/api";
+import { getApiErrorCode } from "../../lib/apiError";
 import { categoryKeys, scheduleKeys } from "../../lib/queryKeys";
 import type {
   CategoryColor,
@@ -11,29 +12,22 @@ import type {
   CategoryResponse,
 } from "../../../../packages/schemas/category";
 
-const BASE_URL = "/categories";
-
 type Category = CategoryResponse;
 
 type CategoryForm = CategoryCreate;
 
 export function useCategory() {
   const { showAlert } = useAlert();
-  const { authFetch } = useAuth();
   const queryClient = useQueryClient();
 
   const categoriesQuery = useQuery({
     queryKey: categoryKeys.lists(),
-    queryFn: ({ signal }) =>
-      authFetch<Category[]>(BASE_URL, { method: "GET", signal }),
+    queryFn: ({ signal }) => categoryApi.list(signal),
   });
 
   const createCategory = useMutation({
-    mutationFn: (category: CategoryForm) =>
-      authFetch<Category>(BASE_URL, {
-        method: "POST",
-        body: JSON.stringify(category),
-      }),
+    mutationFn: categoryApi.create,
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const updateCategory = useMutation({
@@ -43,19 +37,22 @@ export function useCategory() {
     }: {
       id: Category["id"];
       category: CategoryForm;
-    }) =>
-      authFetch<Category>(`${BASE_URL}/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(category),
-      }),
+    }) => categoryApi.update(id, category),
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const deleteCategory = useMutation({
-    mutationFn: (id: Category["id"]) =>
-      authFetch<void>(`${BASE_URL}/${id}`, { method: "DELETE" }),
+    mutationFn: categoryApi.remove,
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const categories = categoriesQuery.data ?? [];
+
+  useEffect(() => {
+    if (categoriesQuery.error) {
+      showAlert(getApiErrorCode(categoriesQuery.error));
+    }
+  }, [categoriesQuery.error, showAlert]);
 
   // フォーム（新規・編集共通）
   const [form, setForm] = useState<CategoryForm>({

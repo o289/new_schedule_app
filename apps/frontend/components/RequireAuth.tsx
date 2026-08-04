@@ -1,11 +1,11 @@
-import { useAuth } from "../context/AuthContext";
 import { Navigate, Outlet } from "react-router-dom";
 import { CircularProgress } from "@mui/material";
+import { useSession } from "../hooks/useSession";
 
 export default function RequireAuth() {
-  const { user, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useSession();
 
-  if (isLoading && !user) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center">
         <CircularProgress aria-label="処理中" className="w-64" />
@@ -13,7 +13,7 @@ export default function RequireAuth() {
     );
   }
 
-  if (!user && !isLoading) {
+  if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 

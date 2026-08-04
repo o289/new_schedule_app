@@ -44,6 +44,8 @@ function logPasskeyAuth(
   event: string,
   details: Record<string, unknown>,
 ): void {
+  if (process.env.NODE_ENV === "test") return;
+
   console[level](
     JSON.stringify({
       scope: "passkey-auth",

@@ -1,52 +1,49 @@
+import { useEffect } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../context/AuthContext";
 import { useAlert } from "../../context/AlertContext";
+import { scheduleApi } from "../../lib/api";
+import { getApiErrorCode } from "../../lib/apiError";
 import { scheduleKeys } from "../../lib/queryKeys";
 import { useScheduleForm } from "./useScheduleForm";
-import type { ScheduleResponse } from "../../types/schedule";
 
 export function useSchedule() {
-  const { authFetch } = useAuth();
   const { showAlert } = useAlert();
   const queryClient = useQueryClient();
 
   const { draftSchedule, setDraftSchedule, resetDraft, handleChange } =
     useScheduleForm();
 
-  const baseUrl = "/schedules";
-
   const schedulesQuery = useQuery({
     queryKey: scheduleKeys.lists(),
-    queryFn: ({ signal }) =>
-      authFetch<ScheduleResponse[]>(baseUrl, { method: "GET", signal }),
+    queryFn: ({ signal }) => scheduleApi.list(signal),
   });
 
   const createSchedule = useMutation({
-    mutationFn: () =>
-      authFetch<ScheduleResponse>(baseUrl, {
-        method: "POST",
-        body: JSON.stringify(draftSchedule),
-      }),
+    mutationFn: () => scheduleApi.create(draftSchedule),
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const updateSchedule = useMutation({
     mutationFn: (payload: {
       id: string | undefined;
       schedule: typeof draftSchedule;
-    }) =>
-      authFetch<ScheduleResponse>(`${baseUrl}/${payload.id}`, {
-        method: "PUT",
-        body: JSON.stringify(payload.schedule),
-      }),
+    }) => scheduleApi.update(payload.id, payload.schedule),
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const deleteSchedule = useMutation({
-    mutationFn: (scheduleId: string | undefined) =>
-      authFetch<void>(`${baseUrl}/${scheduleId}`, { method: "DELETE" }),
+    mutationFn: scheduleApi.remove,
+    onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const schedules = schedulesQuery.data ?? [];
+
+  useEffect(() => {
+    if (schedulesQuery.error) {
+      showAlert(getApiErrorCode(schedulesQuery.error));
+    }
+  }, [schedulesQuery.error, showAlert]);
 
   const fetchSchedules = () =>
     queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });

@@ -1,19 +1,13 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import type { UserResponse } from "../../../packages/schemas/user";
-import type {
-  PasskeyLoginOptionsResponse,
-  PasskeyRegisterOptionsResponse,
-  TokenResponse,
-} from "../../../packages/schemas/auth";
 
 import { Button, TextField } from "@mui/material";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 
-import { apiFetch } from "../hooks/client";
 import entranceCalendarHero from "../assets/entrance-calendar-hero.png";
 import {
   startRegistration,
@@ -23,24 +17,20 @@ import {
   formatRegistrationCredential,
   formatAuthenticationCredential,
 } from "../utils/webauthn/credentialFormatter";
-import { useAuth } from "../context/AuthContext";
+import { authApi } from "../lib/api";
+import { getApiErrorCode, ApiClientError } from "../lib/apiError";
+import { authKeys } from "../lib/queryKeys";
+import { saveTokens } from "../lib/sessionManager";
+import { useAlert } from "../context/AlertContext";
 
 export default function EntrancePage() {
   const [email, setEmail] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { setAccessToken, setRefreshToken, setUser } = useAuth();
+  const { showAlert } = useAlert();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const executeLoginFlow = async (email: string) => {
-    const loginOptionsRes = await apiFetch<PasskeyLoginOptionsResponse>(
-      "/auth/passkey/login/options",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      },
-      null,
-      { silentCodes: ["PASSKEY_NOT_FOUND"] },
-    );
+    const loginOptionsRes = await authApi.loginOptions(email);
 
     const loginPublicKey = loginOptionsRes.data.publicKey;
 
@@ -50,86 +40,50 @@ export default function EntrancePage() {
       authenticationCredential,
     );
 
-    const verifyRes = await apiFetch<TokenResponse>(
-      "/auth/passkey/login/verify",
-      {
-        method: "POST",
-        body: JSON.stringify(formattedAuthentication),
-      },
-    );
+    const verifyRes = await authApi.loginVerify(formattedAuthentication);
 
     const { access_token, refresh_token } = verifyRes.data;
 
-    setAccessToken(access_token);
-    setRefreshToken(refresh_token);
-    localStorage.setItem("accessToken", access_token);
-    localStorage.setItem("refreshToken", refresh_token);
+    queryClient.clear();
+    saveTokens({ accessToken: access_token, refreshToken: refresh_token });
 
-    const meRes = await apiFetch<UserResponse>(
-      "/auth/me",
-      { method: "GET" },
-      {
-        accessToken: access_token,
-        refreshToken: refresh_token,
-      },
-    );
-
-    setUser(meRes);
-    navigate("/dashboard");
+    const user = await authApi.me();
+    queryClient.setQueryData(authKeys.me(), user);
   };
+
+  const loginMutation = useMutation({
+    mutationFn: async (email: string) => {
+      try {
+        await executeLoginFlow(email);
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof ApiClientError) ||
+          error.code !== "PASSKEY_NOT_FOUND"
+        ) {
+          throw error;
+        }
+      }
+
+      const registerOptionsRes = await authApi.registerOptions(email);
+      const registrationCredential = await startRegistration(
+        registerOptionsRes.data.publicKey,
+      );
+      await authApi.registerVerify(
+        formatRegistrationCredential(registrationCredential),
+      );
+      await executeLoginFlow(email);
+    },
+    onSuccess: () => navigate("/dashboard"),
+    onError: (error) => showAlert(getApiErrorCode(error)),
+  });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!email) return;
 
-    setIsSubmitting(true);
-
-    try {
-      // 1. Try login first
-      try {
-        await executeLoginFlow(email);
-        return;
-      } catch (loginError: unknown) {
-        if (
-          typeof loginError !== "object" ||
-          loginError === null ||
-          !("code" in loginError) ||
-          loginError.code !== "PASSKEY_NOT_FOUND"
-        ) {
-          throw loginError;
-        }
-      }
-
-      // 2. If no passkey found, proceed with registration
-      const registerOptionsRes = await apiFetch<PasskeyRegisterOptionsResponse>(
-        "/auth/passkey/register/options",
-        {
-          method: "POST",
-          body: JSON.stringify({ email }),
-        },
-      );
-
-      const registerPublicKey = registerOptionsRes.data.publicKey;
-
-      const registrationCredential = await startRegistration(registerPublicKey);
-
-      const formattedRegistration = formatRegistrationCredential(
-        registrationCredential,
-      );
-
-      await apiFetch("/auth/passkey/register/verify", {
-        method: "POST",
-        body: JSON.stringify(formattedRegistration),
-      });
-
-      // After successful registration, login
-      await executeLoginFlow(email);
-    } catch (error: unknown) {
-      throw error;
-    } finally {
-      setIsSubmitting(false);
-    }
+    await loginMutation.mutateAsync(email);
   };
 
   return (
@@ -205,7 +159,7 @@ export default function EntrancePage() {
               <Button
                 fullWidth
                 type="submit"
-                disabled={isSubmitting}
+                disabled={loginMutation.isPending}
                 variant="contained"
                 endIcon={<ArrowForwardRoundedIcon />}
                 sx={{
@@ -219,7 +173,9 @@ export default function EntrancePage() {
                   boxShadow: "0 10px 24px rgba(74, 144, 226, 0.28)",
                 }}
               >
-                {isSubmitting ? "確認しています…" : "アプリの利用を開始"}
+                {loginMutation.isPending
+                  ? "確認しています…"
+                  : "アプリの利用を開始"}
               </Button>
 
               <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-[#7b8491]">
