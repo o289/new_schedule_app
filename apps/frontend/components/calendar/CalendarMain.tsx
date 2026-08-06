@@ -1,10 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import type { ScheduleForm, ScheduleResponse } from "#frontend/types/schedule";
 import { useCalendarEvents } from "./useCalendarEvent";
-import { useCalendar } from "../../context/CalendarContext";
+import { useCalendar } from "#frontend/context/CalendarContext";
 import FullCalendarWrapper from "./FullCalendarWrapper";
-import useIsMobile from "../../hooks/useIsMobile";
+import useIsMobile from "#frontend/hooks/useIsMobile";
 import MobileMode from "./MobileMode";
 import { toScheduleForm } from "../schedules/scheduleFormAdapter";
 

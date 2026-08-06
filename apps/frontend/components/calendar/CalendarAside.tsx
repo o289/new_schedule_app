@@ -8,16 +8,16 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
-import { useCalendar } from "../../context/CalendarContext";
-import { useSession } from "../../hooks/useSession";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
+import { useCalendar } from "#frontend/context/CalendarContext";
+import { useSession } from "#frontend/hooks/useSession";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type {
   CategoryResponse,
   ScheduleForm,
   ScheduleResponse,
-} from "../../types/schedule";
+} from "#frontend/types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
 import type { useCategory } from "../categories/useCategory";
 

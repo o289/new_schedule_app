@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useCategory } from "../categories/useCategory";
 import { useSchedule } from "../schedules/useSchedule";
 
-import useIsMobile from "../../hooks/useIsMobile";
+import useIsMobile from "#frontend/hooks/useIsMobile";
 
-import CalendarMain from "../../components/calendar/CalendarMain";
-import CalendarAside from "../../components/calendar/CalendarAside";
+import CalendarMain from "#frontend/components/calendar/CalendarMain";
+import CalendarAside from "#frontend/components/calendar/CalendarAside";
 
 import { Drawer, CircularProgress } from "@mui/material";
-import CalendarHeader from "../../components/calendar/CalendarHeader";
+import CalendarHeader from "#frontend/components/calendar/CalendarHeader";
 
 export default function ScheduleCalendarPage() {
   const category = useCategory();

@@ -1,4 +1,4 @@
-import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import type { ScheduleForm, ScheduleResponse } from "#frontend/types/schedule";
 
 /** APIレスポンスを編集フォーム用の独立した値へ変換する。 */
 export function toScheduleForm(schedule: ScheduleResponse): ScheduleForm {

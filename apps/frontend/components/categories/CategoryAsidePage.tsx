@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AsideMode } from "../../context/CalendarContext";
+import type { AsideMode } from "#frontend/context/CalendarContext";
 
 import type { useCategory } from "./useCategory";
 

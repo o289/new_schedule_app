@@ -4,7 +4,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 
-import { useCalendar } from "../../context/CalendarContext";
+import { useCalendar } from "#frontend/context/CalendarContext";
 import type { Dispatch, SetStateAction } from "react";
 import {
   formatDesktopCalendarTitle,

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAlert } from "../../context/AlertContext";
-import { scheduleApi } from "../../lib/api";
-import { getApiErrorCode } from "../../lib/apiError";
-import { scheduleKeys } from "../../lib/queryKeys";
+import { useAlert } from "#frontend/context/AlertContext";
+import { scheduleApi } from "#frontend/lib/api";
+import { getApiErrorCode } from "#frontend/lib/apiError";
+import { scheduleKeys } from "#frontend/lib/queryKeys";
 import { useScheduleForm } from "./useScheduleForm";
 
 export function useSchedule() {

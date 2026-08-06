@@ -6,11 +6,11 @@ import type { EventInput } from "@fullcalendar/core";
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
-import { useCalendar } from "../../context/CalendarContext";
-import type { ScheduleResponse } from "../../types/schedule";
+import { useCalendar } from "#frontend/context/CalendarContext";
+import type { ScheduleResponse } from "#frontend/types/schedule";
 import { addDays, formatDate, toDateOnly } from "#utils/local-datetime";
-import { isToday } from "../../utils/date";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
+import { isToday } from "#frontend/utils/date";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
 
 interface MobileModeProps {
   selectedDate: Date;

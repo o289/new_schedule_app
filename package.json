@@ -7,8 +7,11 @@
     "node": ">=22.13 <23"
   },
   "imports": {
-    "#backend/*": "./apps/backend/*",
-    "#frontend/*": "./apps/frontend/*",
+    "#backend/*": "./apps/backend/*.ts",
+    "#frontend/components/*": "./apps/frontend/components/*.tsx",
+    "#frontend/context/*": "./apps/frontend/context/*.tsx",
+    "#frontend/pages/*": "./apps/frontend/pages/*.tsx",
+    "#frontend/*": "./apps/frontend/*.ts",
     "#config/*": "./packages/config/*",
     "#contracts/*": "./packages/contracts/*.ts",
     "#schemas/*": "./packages/schemas/*.ts",

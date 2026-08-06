@@ -1,6 +1,6 @@
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
-import type { CategoryResponse } from "../../types/schedule";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
+import type { CategoryResponse } from "#frontend/types/schedule";
 
 export default function CategoryCard({
   category,

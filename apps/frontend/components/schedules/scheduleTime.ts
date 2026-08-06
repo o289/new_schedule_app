@@ -1,4 +1,4 @@
-import type { ScheduleFormDate } from "../../types/schedule";
+import type { ScheduleFormDate } from "#frontend/types/schedule";
 import {
   addDaysToISODate,
   getLocalDateTimeParts,

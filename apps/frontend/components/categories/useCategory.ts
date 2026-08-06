@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAlert } from "../../context/AlertContext";
-import { categoryApi } from "../../lib/api";
-import { getApiErrorCode } from "../../lib/apiError";
-import { categoryKeys, scheduleKeys } from "../../lib/queryKeys";
+import { useAlert } from "#frontend/context/AlertContext";
+import { categoryApi } from "#frontend/lib/api";
+import { getApiErrorCode } from "#frontend/lib/apiError";
+import { categoryKeys, scheduleKeys } from "#frontend/lib/queryKeys";
 import type {
   CategoryColor,
   CategoryCreate,

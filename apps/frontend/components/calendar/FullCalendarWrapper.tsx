@@ -13,7 +13,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import luxonPlugin from "@fullcalendar/luxon3";
 import jaLocale from "@fullcalendar/core/locales/ja";
-import type { ScheduleResponse } from "../../types/schedule";
+import type { ScheduleResponse } from "#frontend/types/schedule";
 import EventCard from "./EventCard";
 import { toFullCalendarView, type FullCalendarView } from "./calendarView";
 import "./FullCalendarWrapper.css";

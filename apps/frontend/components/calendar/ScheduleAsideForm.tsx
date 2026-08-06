@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { generateMonthGrid, shiftMonth } from "../../utils/monthGrid";
+import { generateMonthGrid, shiftMonth } from "#frontend/utils/monthGrid";
 import TimePicker from "../commonPicker/TimePicker";
 import ScheduleDatesModal from "../schedules/DatesModal";
 import { useScheduleDateTime } from "../schedules/handleDateTime";
@@ -18,10 +18,10 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import type { FormEvent } from "react";
-import type { CategoryResponse, ScheduleForm } from "../../types/schedule";
+import type { CategoryResponse, ScheduleForm } from "#frontend/types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
 
 interface ScheduleAsideFormProps {

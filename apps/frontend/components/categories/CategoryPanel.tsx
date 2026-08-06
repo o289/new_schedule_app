@@ -1,8 +1,11 @@
 import { renderCategories } from "./categoryUI";
 import CategoryCard from "./CategoryCard";
 import ConfirmDialog from "../ConfirmDialog";
-import { CATEGORY_COLORS } from "../../constants/categoryColors";
-import { CATEGORY_ICONS, getCategoryIcon } from "../../constants/categoryIcons";
+import { CATEGORY_COLORS } from "#frontend/constants/categoryColors";
+import {
+  CATEGORY_ICONS,
+  getCategoryIcon,
+} from "#frontend/constants/categoryIcons";
 
 import { Button } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
@@ -10,7 +13,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import type { AsideMode } from "../../context/CalendarContext";
+import type { AsideMode } from "#frontend/context/CalendarContext";
 import type {
   CategoryColor,
   CategoryIcon,
