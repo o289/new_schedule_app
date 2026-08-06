@@ -9,16 +9,16 @@ import {
   BadRequestError,
   ConflictError,
   UnauthorizedError,
-} from "../../core/api-error";
-import { createAccessToken, createRefreshToken } from "../../core/security";
+} from "#backend/core/api-error";
+import { createAccessToken, createRefreshToken } from "#backend/core/security";
 import {
   createAuthenticationOptions,
   createRegistrationOptions,
   verifyAuthentication,
   verifyRegistration,
-} from "../../core/webauthn";
-import { db } from "../../database/client";
-import type { Database } from "../../database/repository";
+} from "#backend/core/webauthn";
+import { db } from "#backend/database/client";
+import type { Database } from "#backend/database/repository";
 import { ChallengeRepository } from "../challenge/repository";
 import { PasskeyRepository } from "../passkey/repository";
 import { UserRepository } from "../user/repository";

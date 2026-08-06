@@ -5,9 +5,9 @@ import {
   categoryResponseSchema,
   categoryUpdateSchema,
 } from "#schemas/category";
-import { ValidationError } from "../../core/api-error";
-import { requireCurrentUser } from "../../core/current-user";
-import { parseJsonBody, parseUuidParam } from "../../core/request";
+import { ValidationError } from "#backend/core/api-error";
+import { requireCurrentUser } from "#backend/core/current-user";
+import { parseJsonBody, parseUuidParam } from "#backend/core/request";
 import { CategoryService } from "./service";
 
 export const categoryRouter = new Hono().basePath("/categories");

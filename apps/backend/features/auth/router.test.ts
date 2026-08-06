@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BadRequestError } from "../../core/api-error";
+import { BadRequestError } from "#backend/core/api-error";
 
 const serviceMocks = vi.hoisted(() => ({
   registerOptions: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock("../../core/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
-import { app } from "../../app";
+import { app } from "#backend/app";
 
 const registrationCredential = {
   id: "credential-id",

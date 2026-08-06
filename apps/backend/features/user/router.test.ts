@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UnauthorizedError } from "../../core/api-error";
+import { UnauthorizedError } from "#backend/core/api-error";
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock("./repository", () => ({
   },
 }));
 
-import { app } from "../../app";
+import { app } from "#backend/app";
 
 async function post(path: string, body: unknown) {
   return app.request(path, {

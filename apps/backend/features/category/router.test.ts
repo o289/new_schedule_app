@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NotFoundError } from "../../core/api-error";
+import { NotFoundError } from "#backend/core/api-error";
 
 const mocks = vi.hoisted(() => ({
   listCategories: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock("../../core/current-user", () => ({
   requireCurrentUser: mocks.requireCurrentUser,
 }));
 
-import { app } from "../../app";
+import { app } from "#backend/app";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",

@@ -4,7 +4,7 @@ import {
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from "../../core/api-error";
+} from "#backend/core/api-error";
 
 const mocks = vi.hoisted(() => ({
   createSchedule: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("../../core/current-user", () => ({
   requireCurrentUser: mocks.requireCurrentUser,
 }));
 
-import { app } from "../../app";
+import { app } from "#backend/app";
 
 const user = {
   id: "11111111-1111-4111-8111-111111111111",

@@ -1,9 +1,9 @@
 import { Hono, type Context } from "hono";
 
 import { refreshTokenRequestSchema } from "#schemas/auth";
-import { BadRequestError } from "../../core/api-error";
-import { requireCurrentUser } from "../../core/current-user";
-import { parseJsonBody } from "../../core/request";
+import { BadRequestError } from "#backend/core/api-error";
+import { requireCurrentUser } from "#backend/core/current-user";
+import { parseJsonBody } from "#backend/core/request";
 import { AuthService } from "../auth/service";
 
 async function readRefreshToken(context: Context): Promise<string> {
