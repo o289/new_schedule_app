@@ -7,7 +7,7 @@ import {
   passkeyLoginVerifyRequestSchema,
   passkeyRegisterOptionsRequestSchema,
   passkeyRegisterVerifyRequestSchema,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 import { AuthService } from "./service";
 
 export const authRouter = new Hono().basePath("/auth/passkey");

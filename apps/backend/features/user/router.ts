@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 
-import { refreshTokenRequestSchema } from "../../../../packages/schemas/auth";
+import { refreshTokenRequestSchema } from "#schemas/auth";
 import { BadRequestError } from "../../core/api-error";
 import { requireCurrentUser } from "../../core/current-user";
 import { parseJsonBody } from "../../core/request";

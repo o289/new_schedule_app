@@ -1,10 +1,10 @@
-import type { CategoryResponse } from "../../../packages/schemas/category";
+import type { CategoryResponse } from "#schemas/category";
 import type {
   ScheduleCreate,
   ScheduleDateCreate,
   ScheduleDateResponse,
   ScheduleResponse,
-} from "../../../packages/schemas/schedule";
+} from "#schemas/schedule";
 
 export type {
   CategoryResponse,

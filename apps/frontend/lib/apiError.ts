@@ -1,4 +1,4 @@
-import type { ApiErrorCode } from "../../../packages/contracts/api-error";
+import type { ApiErrorCode } from "#contracts/api-error";
 
 export class ApiClientError extends Error {
   constructor(

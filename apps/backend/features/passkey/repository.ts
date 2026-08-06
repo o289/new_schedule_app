@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import type { PasskeyCreate } from "../../../../packages/schemas/passkey";
+import type { PasskeyCreate } from "#schemas/passkey";
 import { BaseRepository } from "../../database/repository";
 import { passkeys } from "./model";
 

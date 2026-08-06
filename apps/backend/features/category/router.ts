@@ -4,7 +4,7 @@ import {
   categoryCreateSchema,
   categoryResponseSchema,
   categoryUpdateSchema,
-} from "../../../../packages/schemas/category";
+} from "#schemas/category";
 import { ValidationError } from "../../core/api-error";
 import { requireCurrentUser } from "../../core/current-user";
 import { parseJsonBody, parseUuidParam } from "../../core/request";

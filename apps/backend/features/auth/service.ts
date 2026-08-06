@@ -2,8 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 
 import type { Base64URLString } from "@simplewebauthn/server";
 
-import type { ChallengeCreate } from "../../../../packages/schemas/challenge";
-import type { PasskeyCreate } from "../../../../packages/schemas/passkey";
+import type { ChallengeCreate } from "#schemas/challenge";
+import type { PasskeyCreate } from "#schemas/passkey";
 import {
   ApiError,
   BadRequestError,
@@ -31,7 +31,7 @@ import type {
   PasskeyRegisterVerifyRequest,
   PasskeyRegisterVerifyResponse,
   TokenResponse,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 
 const challengeLifetimeMilliseconds = 5 * 60 * 1000;
 

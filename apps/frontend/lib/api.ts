@@ -1,13 +1,10 @@
-import type {
-  CategoryCreate,
-  CategoryResponse,
-} from "../../../packages/schemas/category";
+import type { CategoryCreate, CategoryResponse } from "#schemas/category";
 import type {
   PasskeyLoginOptionsResponse,
   PasskeyRegisterOptionsResponse,
   TokenResponse,
-} from "../../../packages/schemas/auth";
-import type { UserResponse } from "../../../packages/schemas/user";
+} from "#schemas/auth";
+import type { UserResponse } from "#schemas/user";
 import type { ScheduleForm, ScheduleResponse } from "../types/schedule";
 import { apiClient } from "./apiClient";
 

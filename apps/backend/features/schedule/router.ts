@@ -4,7 +4,7 @@ import {
   scheduleCreateSchema,
   scheduleResponseSchema,
   scheduleUpdateSchema,
-} from "../../../../packages/schemas/schedule";
+} from "#schemas/schedule";
 import { ValidationError } from "../../core/api-error";
 import { requireCurrentUser } from "../../core/current-user";
 import { parseJsonBody, parseUuidParam } from "../../core/request";

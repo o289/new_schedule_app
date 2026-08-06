@@ -1,7 +1,4 @@
-import {
-  isApiErrorCode,
-  type ApiErrorCode,
-} from "../../../packages/contracts/api-error";
+import { isApiErrorCode, type ApiErrorCode } from "#contracts/api-error";
 import { ApiClientError } from "./apiError";
 import {
   clearSession,

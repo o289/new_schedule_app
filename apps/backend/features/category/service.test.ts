@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { sortCategories } from "../../../../packages/utils/category-sort";
+import { sortCategories } from "#utils/category-sort";
 import { CategoryService } from "./service";
 import { CategoryRepository } from "./repository";
 

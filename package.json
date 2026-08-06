@@ -7,10 +7,12 @@
     "node": ">=22.13 <23"
   },
   "imports": {
+    "#backend/*": "./apps/backend/*",
+    "#frontend/*": "./apps/frontend/*",
     "#config/*": "./packages/config/*",
-    "#contracts/*": "./packages/contracts/*",
-    "#schemas/*": "./packages/schemas/*",
-    "#utils/*": "./packages/utils/*"
+    "#contracts/*": "./packages/contracts/*.ts",
+    "#schemas/*": "./packages/schemas/*.ts",
+    "#utils/*": "./packages/utils/*.ts"
   },
   "scripts": {
     "dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\"",

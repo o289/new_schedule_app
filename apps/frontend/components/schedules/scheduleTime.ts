@@ -4,7 +4,7 @@ import {
   getLocalDateTimeParts,
   toISODate,
   toISODatetime,
-} from "../../../../packages/utils/local-datetime";
+} from "#utils/local-datetime";
 
 export interface TimeRange {
   start: string;

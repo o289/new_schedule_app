@@ -2,7 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 
-import type { ApiErrorResponse } from "../../packages/contracts/api-error";
+import type { ApiErrorResponse } from "#contracts/api-error";
 import { ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
 import { categoryRouter } from "./features/category/router";

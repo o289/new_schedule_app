@@ -1,8 +1,5 @@
-import type {
-  CategoryCreate,
-  CategoryUpdate,
-} from "../../../../packages/schemas/category";
-import { sortCategories } from "../../../../packages/utils/category-sort";
+import type { CategoryCreate, CategoryUpdate } from "#schemas/category";
+import { sortCategories } from "#utils/category-sort";
 import { BadRequestError, NotFoundError } from "../../core/api-error";
 import { hasDatabaseErrorCode } from "../../core/database-error";
 import type { User } from "../user/repository";

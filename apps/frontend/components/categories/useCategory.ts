@@ -10,7 +10,7 @@ import type {
   CategoryCreate,
   CategoryIcon,
   CategoryResponse,
-} from "../../../../packages/schemas/category";
+} from "#schemas/category";
 
 type Category = CategoryResponse;
 

@@ -3,7 +3,7 @@ import type {
   ScheduleDateCreate,
   ScheduleDateUpdate,
   ScheduleUpdate,
-} from "../../../../packages/schemas/schedule";
+} from "#schemas/schedule";
 import {
   BadRequestError,
   ConflictError,
