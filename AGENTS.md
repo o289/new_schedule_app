@@ -32,3 +32,13 @@ pnpm test
 - pnpmは`package.json`の`packageManager`に指定されたバージョンを必ず使用する。
 - TypeScriptでは`any`を使用しない。
 - コメントは必要最小限にする。
+
+## importルール
+
+- OS上の絶対パス（`/Users/...`など）はimportに使用しない。
+- `apps`から`packages`を参照する場合は、`#schemas/*`、`#contracts/*`、`#utils/*`を使用する。
+- frontend内で別featureまたは共通層を参照する場合は、`#frontend/*`を使用する。
+- backend内で別featureまたは共通層を参照する場合は、`#backend/*`を使用する。
+- 同一feature内の隣接ファイルは、`./`または`../`の相対importを維持する。
+- `packages`から`apps`をimportしない。frontendから`#backend/*`、backendから`#frontend/*`をimportしない。
+- alias定義は`package.json#imports`を唯一の定義場所とし、`tsconfig`の`paths`やVite/Vitestの個別aliasを追加しない。
