@@ -32,6 +32,13 @@
     "test:frontend": "vitest run --project frontend",
     "test:backend": "vitest run --project backend",
     "test:integration": "vitest run --project backend apps/backend/index.test.ts",
+    "e2e:db:up": "docker compose -f compose.e2e.yml up -d --wait",
+    "e2e:db:down": "docker compose -f compose.e2e.yml down -v",
+    "e2e:backend": "tsx e2e/start-backend.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "drizzle-kit generate",
@@ -65,6 +72,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.2",
     "@types/luxon": "^3.7.2",
     "@types/node": "22.20.1",

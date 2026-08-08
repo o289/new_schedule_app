@@ -1,0 +1,19 @@
+services:
+  postgresql-e2e:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_e2e_test
+    ports:
+      - "5444:5432"
+    volumes:
+      - e2e_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app_e2e_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  e2e_postgres_data:

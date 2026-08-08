@@ -25,6 +25,10 @@ postgres_data/
 npm-debug.log*
 .cache/
 .vite/
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
 
 # editor / OS
 .DS_Store
