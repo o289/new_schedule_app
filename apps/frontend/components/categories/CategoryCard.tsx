@@ -24,20 +24,24 @@ export default function CategoryCard({
         <span className="truncate">{category.name}</span>
       </span>
 
-      <div>
-        <span
-          className="ml-[15px] cursor-pointer opacity-85 hover:opacity-100"
+      <div className="flex items-center">
+        <button
+          type="button"
+          aria-label={`${category.name}を編集`}
+          className="ml-[15px] cursor-pointer border-0 bg-transparent p-0 opacity-85 hover:opacity-100"
           onClick={onEdit}
         >
           ✏️
-        </span>
+        </button>
 
-        <span
-          className="ml-[15px] cursor-pointer opacity-85 hover:opacity-100"
+        <button
+          type="button"
+          aria-label={`${category.name}を削除`}
+          className="ml-[15px] cursor-pointer border-0 bg-transparent p-0 opacity-85 hover:opacity-100"
           onClick={onDelete}
         >
           🗑️
-        </span>
+        </button>
       </div>
     </div>
   );

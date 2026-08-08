@@ -179,6 +179,7 @@ export default function CalendarAside({
 
                   <button
                     type="button"
+                    aria-label="カテゴリーを管理"
                     onClick={() => setAsideMode("category")}
                     className="text-sm font-medium text-[#6b7280] hover:text-[#111827]"
                   >

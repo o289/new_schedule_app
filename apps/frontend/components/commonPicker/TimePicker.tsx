@@ -51,6 +51,7 @@ export default function TimePicker({
 
       <FormControl fullWidth>
         <Select
+          aria-label={`${label}時刻`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           startAdornment={

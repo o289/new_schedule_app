@@ -102,6 +102,7 @@ export default function CategoryPanel({
             </h3>
 
             <input
+              aria-label="カテゴリ名"
               className="mb-3 w-full rounded-lg border border-[#ccc] p-3 text-[16px] leading-[1.4]"
               name="name"
               value={formData.name}
@@ -110,6 +111,7 @@ export default function CategoryPanel({
               required
             />
             <select
+              aria-label="カテゴリの色"
               className="mb-3 w-full rounded-lg border border-[#ccc] p-3 text-[16px] leading-[1.4]"
               name="color"
               value={formData.color}
@@ -133,6 +135,7 @@ export default function CategoryPanel({
               <SelectedIcon aria-hidden="true" className="text-[#4a90e2]" />
               <select
                 id="category-icon"
+                aria-label="カテゴリのアイコン"
                 className="w-full bg-transparent py-3 text-[16px] leading-[1.4] outline-none"
                 name="icon"
                 value={formData.icon}
