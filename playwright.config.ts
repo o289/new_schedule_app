@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import { getE2EEnvironment } from "./e2e/environment";
+import { authStatePath } from "./e2e/fixtures/auth";
 
 const environment = getE2EEnvironment();
 
@@ -24,32 +25,41 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "html",
   use: {
-    baseURL: "http://localhost:3001",
+    baseURL: environment.webauthnOrigin,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "off",
   },
   projects: [
     {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+      testIgnore: /auth\.setup\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+      },
     },
   ],
   webServer: [
     {
       name: "backend",
       command: "pnpm e2e:backend",
-      url: "http://localhost:8000/ping",
-      reuseExistingServer: !process.env.CI,
-      env: backendEnvironment,
+      url: `${environment.apiUrl}/ping`,
+      reuseExistingServer: false,
+      env: { ...backendEnvironment, PORT: "8100" },
     },
     {
       name: "frontend",
-      command: "pnpm dev:frontend -- --port 3001",
-      url: "http://localhost:3001",
-      reuseExistingServer: !process.env.CI,
+      command: "pnpm exec vite --config vite.config.ts --port 3101",
+      url: environment.webauthnOrigin,
+      reuseExistingServer: false,
       env: {
-        VITE_API_URL: "http://localhost:8000",
+        VITE_API_URL: environment.apiUrl,
       },
     },
   ],

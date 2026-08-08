@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { getE2EEnvironment } from "./environment";
+
+const environment = getE2EEnvironment();
+
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("EntrancePageとBackendへ到達でき、未認証のdashboardは保護される", async ({
   page,
 }) => {
@@ -13,7 +19,7 @@ test("EntrancePageとBackendへ到達でき、未認証のdashboardは保護さ�
     }
   });
 
-  const pingResponse = await page.request.get("http://localhost:8000/ping");
+  const pingResponse = await page.request.get(`${environment.apiUrl}/ping`);
   await expect(pingResponse).toBeOK();
   await expect(pingResponse.json()).resolves.toEqual({ message: "pong" });
 

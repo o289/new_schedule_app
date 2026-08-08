@@ -28,7 +28,12 @@ const setStaticCacheHeader = (path: string, context: Context) => {
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3001", "http://127.0.0.1:3001"],
+    origin: [
+      "http://localhost:3001",
+      "http://127.0.0.1:3001",
+      "http://localhost:3101",
+      "http://127.0.0.1:3101",
+    ],
     allowMethods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["*"],
     credentials: true,

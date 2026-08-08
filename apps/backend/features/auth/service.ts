@@ -231,8 +231,13 @@ export class AuthService {
       throw new BadRequestError("PASSKEY_NOT_FOUND");
     }
 
+    const allowCredentials = passkeys.map((passkey) => ({
+      id: passkey.credentialId as Base64URLString,
+    }));
+
     const publicKey = await createAuthenticationOptions({
       challenge: Uint8Array.from(randomBytes(32)),
+      allowCredentials,
     });
     const challengeInput: ChallengeCreate = {
       userId: user.id,

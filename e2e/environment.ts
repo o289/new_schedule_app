@@ -9,6 +9,7 @@ if (existsSync(localEnvironmentFile)) {
 
 export interface E2EEnvironment {
   databaseUrl: string;
+  apiUrl: string;
   webauthnRpId: string;
   webauthnRpName: string;
   webauthnOrigin: string;
@@ -53,6 +54,7 @@ export function getE2EEnvironment(): E2EEnvironment {
 
   return {
     databaseUrl,
+    apiUrl: requiredUrl("E2E_API_URL"),
     webauthnRpId: required("E2E_WEBAUTHN_RP_ID"),
     webauthnRpName: required("E2E_WEBAUTHN_RP_NAME"),
     webauthnOrigin: required("E2E_WEBAUTHN_ORIGIN"),
@@ -61,4 +63,15 @@ export function getE2EEnvironment(): E2EEnvironment {
     refreshTokenExpiresIn: required("E2E_REFRESH_TOKEN_EXPIRES_IN"),
     algorithm,
   };
+}
+
+function requiredUrl(name: string): string {
+  const value = required(name);
+
+  try {
+    new URL(value);
+    return value;
+  } catch {
+    throw new Error(`${name} must be a URL`);
+  }
 }
