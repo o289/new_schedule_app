@@ -30,7 +30,7 @@ describe("Session Manager", () => {
     expect(getAccessToken()).toBe("new-access-token");
   });
 
-  it("refresh失敗時にTokenとQuery cacheを消す", async () => {
+  it("refresh失敗時にTokenを消すが実行中のQuery cacheは消さない", async () => {
     saveTokens({ accessToken: "expired-token", refreshToken: "refresh-token" });
     queryClient.setQueryData(categoryKeys.lists(), [{ id: "category-id" }]);
 
@@ -39,6 +39,18 @@ describe("Session Manager", () => {
         Promise.reject(new Error("refresh failed")),
       ),
     ).rejects.toThrow("refresh failed");
+
+    expect(getAccessToken()).toBeNull();
+    expect(queryClient.getQueryData(categoryKeys.lists())).toEqual([
+      { id: "category-id" },
+    ]);
+  });
+
+  it("clearSessionでTokenとQuery cacheを消す", () => {
+    saveTokens({ accessToken: "access-token", refreshToken: "refresh-token" });
+    queryClient.setQueryData(categoryKeys.lists(), [{ id: "category-id" }]);
+
+    clearSession();
 
     expect(getAccessToken()).toBeNull();
     expect(queryClient.getQueryData(categoryKeys.lists())).toBeUndefined();

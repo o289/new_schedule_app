@@ -45,7 +45,7 @@ export function useSession() {
 
   return {
     user: sessionQuery.data ?? null,
-    isAuthenticated: Boolean(sessionQuery.data),
+    isAuthenticated: Boolean(sessionQuery.data) && !sessionQuery.isError,
     isLoading: hasSession && sessionQuery.isPending,
     logout,
   };

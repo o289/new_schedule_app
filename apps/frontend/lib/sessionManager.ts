@@ -22,11 +22,15 @@ export function saveTokens(tokens: {
   localStorage.setItem("refreshToken", tokens.refreshToken);
 }
 
-export function clearSession() {
+export function clearTokens() {
   accessToken = null;
   refreshToken = null;
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
+}
+
+export function clearSession() {
+  clearTokens();
   queryClient.clear();
 }
 
@@ -45,7 +49,8 @@ export function refreshAccessToken(
         return newAccessToken;
       })
       .catch((error: unknown) => {
-        clearSession();
+        // Keep the active auth query alive so React Query can publish the error.
+        clearTokens();
         throw error;
       })
       .finally(() => {
