@@ -38,9 +38,18 @@ export default defineConfig({
     {
       name: "chromium",
       dependencies: ["setup"],
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: [/auth\.setup\.ts/, /mobile\.spec\.ts/],
       use: {
         ...devices["Desktop Chrome"],
+        storageState: authStatePath,
+      },
+    },
+    {
+      name: "chromium-mobile",
+      dependencies: ["setup"],
+      testMatch: /mobile\.spec\.ts/,
+      use: {
+        ...devices["iPhone 13"],
         storageState: authStatePath,
       },
     },
