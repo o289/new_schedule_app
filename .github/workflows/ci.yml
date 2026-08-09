@@ -1,11 +1,11 @@
 name: CI
 
-# すべてのブランチへのpushとPull Requestで品質確認だけを行う。
-# このWorkflowはイメージのpushやVPSへの接続を行わない。
+# すべてのブランチへのpushで軽量な品質確認を行う。
+# mainへのpushでは、追加でE2Eを行い、全成功後にステージングへ進める。
+# Pull Requestイベント自体では起動しない。
 on:
   push:
     branches: ["**"]
-  pull_request:
 
 permissions:
   contents: read
@@ -49,6 +49,7 @@ jobs:
 
   e2e:
     name: Chromium・WebKit E2Eテスト
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
