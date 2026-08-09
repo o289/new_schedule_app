@@ -1,7 +1,7 @@
 // scheduleViewAdapter.js
 
-import type { ScheduleDateResponse } from "../../types/schedule";
-import { getLocalDateTimeParts } from "../../../../packages/utils/local-datetime";
+import type { ScheduleDateResponse } from "#frontend/types/schedule";
+import { getLocalDateTimeParts } from "#utils/local-datetime";
 import { crossesCalendarDate } from "../schedules/scheduleTime";
 
 function getTodayISODate() {

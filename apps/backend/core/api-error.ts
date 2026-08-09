@@ -1,4 +1,4 @@
-import type { ApiErrorCode } from "../../../packages/contracts/api-error";
+import type { ApiErrorCode } from "#contracts/api-error";
 
 type ApiErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 500;
 

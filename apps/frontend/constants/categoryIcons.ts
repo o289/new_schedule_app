@@ -35,10 +35,7 @@ import TrainOutlinedIcon from "@mui/icons-material/TrainOutlined";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import type { SvgIconComponent } from "@mui/icons-material";
 
-import {
-  categoryIconValues,
-  type CategoryIcon,
-} from "../../../packages/schemas/category";
+import { categoryIconValues, type CategoryIcon } from "#schemas/category";
 
 export const CATEGORY_ICON_COMPONENTS = {
   tag: LocalOfferOutlinedIcon,

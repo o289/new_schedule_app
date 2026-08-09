@@ -1,7 +1,4 @@
-import {
-  categoryColorValues,
-  type CategoryColor,
-} from "../../../packages/schemas/category";
+import { categoryColorValues, type CategoryColor } from "#schemas/category";
 
 type CategoryColorOption = {
   value: CategoryColor;

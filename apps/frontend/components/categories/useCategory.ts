@@ -1,18 +1,16 @@
-// src/pages/categories/useCategory.ts
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { useAlert } from "../../context/AlertContext";
-import useLoading from "../../hooks/useLoading";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAlert } from "#frontend/context/AlertContext";
+import { categoryApi } from "#frontend/lib/api";
+import { getApiErrorCode } from "#frontend/lib/apiError";
+import { categoryKeys, scheduleKeys } from "#frontend/lib/queryKeys";
 import type {
   CategoryColor,
   CategoryCreate,
   CategoryIcon,
   CategoryResponse,
-} from "../../../../packages/schemas/category";
-
-const BASE_URL = "/categories";
+} from "#schemas/category";
 
 type Category = CategoryResponse;
 
@@ -20,11 +18,41 @@ type CategoryForm = CategoryCreate;
 
 export function useCategory() {
   const { showAlert } = useAlert();
-  const { authFetch } = useAuth();
-  const { isFetching, startFetching, stopFetching } = useLoading();
+  const queryClient = useQueryClient();
 
-  // 一覧
-  const [categories, setCategories] = useState<Category[]>([]);
+  const categoriesQuery = useQuery({
+    queryKey: categoryKeys.lists(),
+    queryFn: ({ signal }) => categoryApi.list(signal),
+  });
+
+  const createCategory = useMutation({
+    mutationFn: categoryApi.create,
+    onError: (error) => showAlert(getApiErrorCode(error)),
+  });
+
+  const updateCategory = useMutation({
+    mutationFn: ({
+      id,
+      category,
+    }: {
+      id: Category["id"];
+      category: CategoryForm;
+    }) => categoryApi.update(id, category),
+    onError: (error) => showAlert(getApiErrorCode(error)),
+  });
+
+  const deleteCategory = useMutation({
+    mutationFn: categoryApi.remove,
+    onError: (error) => showAlert(getApiErrorCode(error)),
+  });
+
+  const categories = categoriesQuery.data ?? [];
+
+  useEffect(() => {
+    if (categoriesQuery.error) {
+      showAlert(getApiErrorCode(categoriesQuery.error));
+    }
+  }, [categoriesQuery.error, showAlert]);
 
   // フォーム（新規・編集共通）
   const [form, setForm] = useState<CategoryForm>({
@@ -35,22 +63,6 @@ export function useCategory() {
 
   // 編集対象
   const [editingId, setEditingId] = useState<Category["id"] | null>(null);
-
-  // ========================
-  // 一覧取得
-  // ========================
-
-  const fetchCategories = async () => {
-    startFetching();
-
-    try {
-      const res = await authFetch<Category[]>(BASE_URL, { method: "GET" });
-
-      setCategories(res);
-    } finally {
-      stopFetching();
-    }
-  };
 
   // ========================
   // フォーム変更
@@ -82,31 +94,24 @@ export function useCategory() {
 
   const handleSubmit = async () => {
     if (editingId) {
-      // 更新
+      await updateCategory.mutateAsync({ id: editingId, category: form });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: categoryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all }),
+      ]);
 
-      await authFetch(`${BASE_URL}/${editingId}`, {
-        method: "PUT",
-        body: JSON.stringify(form),
-      });
-
+      setForm({ name: "", color: "gray", icon: "tag" });
+      setEditingId(null);
       showAlert("UPDATE_SUCCESS");
+      return;
     } else {
-      // 作成
-
-      await authFetch(BASE_URL, {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-
-      showAlert("CREATE_SUCCESS");
+      await createCategory.mutateAsync(form);
+      await queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
     }
 
-    // フォームリセット
     setForm({ name: "", color: "gray", icon: "tag" });
     setEditingId(null);
-
-    // 親画面と共有しているカテゴリー一覧を、API取得完了後に更新する。
-    await fetchCategories();
+    showAlert("CREATE_SUCCESS");
   };
 
   // ========================
@@ -144,30 +149,19 @@ export function useCategory() {
   const handleDelete = async (category: Category) => {
     setEditingId(category.id);
 
-    await authFetch(`${BASE_URL}/${category.id}`, { method: "DELETE" });
-
-    // 即時UI反映
-    // setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
-    await fetchCategories();
+    await deleteCategory.mutateAsync(category.id);
+    await queryClient.invalidateQueries({ queryKey: categoryKeys.all });
     showAlert("DELETE_SUCCESS");
   };
-
-  // ========================
-  // 初期ロード
-  // ========================
-
-  useEffect(() => {
-    fetchCategories();
-  }, []);
 
   return {
     // state
     categories,
     form,
     editingId,
-    isFetching,
+    isFetching: categoriesQuery.isFetching,
+    isPending: categoriesQuery.isPending,
     // actions
-    fetchCategories,
     handleChange,
     handleSubmit,
     handleEditClick,

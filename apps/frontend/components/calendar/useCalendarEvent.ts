@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { EventInput } from "@fullcalendar/core";
-import type { ScheduleResponse } from "../../types/schedule";
+import type { ScheduleResponse } from "#frontend/types/schedule";
 
 export function useCalendarEvents(schedules: ScheduleResponse[]) {
   const events = useMemo<EventInput[]>(() => {

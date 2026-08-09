@@ -1,4 +1,4 @@
-import type { ApiErrorCode } from "../../../packages/contracts/api-error";
+import type { ApiErrorCode } from "#contracts/api-error";
 
 export type AlertType = "success" | "warning" | "error";
 

@@ -1,4 +1,4 @@
-import type { CategoryColor } from "../../../packages/schemas/category";
+import type { CategoryColor } from "#schemas/category";
 
 export interface CategoryTheme {
   border: string;

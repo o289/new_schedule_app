@@ -8,16 +8,13 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import {
-  toISODate,
-  toISODatetime,
-} from "../../../../packages/utils/local-datetime";
-import { formatDateTime } from "../../utils/date";
+import { toISODate, toISODatetime } from "#utils/local-datetime";
+import { formatDateTime } from "#frontend/utils/date";
 
 import CloseIcon from "@mui/icons-material/Close";
 
-import TimePicker from "../../components/commonPicker/TimePicker";
-import type { ScheduleFormDate } from "../../types/schedule";
+import TimePicker from "#frontend/components/commonPicker/TimePicker";
+import type { ScheduleFormDate } from "#frontend/types/schedule";
 import { buildScheduleDateRange } from "./scheduleTime";
 
 interface EditableDate {

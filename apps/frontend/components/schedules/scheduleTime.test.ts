@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScheduleFormDate } from "../../types/schedule";
+import type { ScheduleFormDate } from "#frontend/types/schedule";
 import {
   buildScheduleDateRange,
   formatScheduleDateRange,

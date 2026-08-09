@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { generateMonthGrid, shiftMonth } from "../../utils/monthGrid";
+import { generateMonthGrid, shiftMonth } from "#frontend/utils/monthGrid";
 import TimePicker from "../commonPicker/TimePicker";
 import ScheduleDatesModal from "../schedules/DatesModal";
 import { useScheduleDateTime } from "../schedules/handleDateTime";
@@ -18,10 +18,10 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import type { FormEvent } from "react";
-import type { CategoryResponse, ScheduleForm } from "../../types/schedule";
+import type { CategoryResponse, ScheduleForm } from "#frontend/types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
 
 interface ScheduleAsideFormProps {
@@ -116,6 +116,7 @@ export default function ScheduleAsideForm({
           <TextField
             fullWidth
             variant="outlined"
+            slotProps={{ htmlInput: { "aria-label": "予定タイトル" } }}
             placeholder="タイトルを入力"
             name="title"
             value={draftSchedule.title || ""}
@@ -137,6 +138,7 @@ export default function ScheduleAsideForm({
           <FormControl fullWidth>
             <Select
               displayEmpty
+              aria-label="カテゴリーを選択"
               name="categoryId"
               value={draftSchedule.categoryId || ""}
               onChange={onChange}
@@ -261,6 +263,7 @@ export default function ScheduleAsideForm({
                 <div className="mb-6 flex items-center justify-between">
                   <button
                     type="button"
+                    aria-label="前の月を表示"
                     onClick={prevMonth}
                     className="px-2 text-3xl text-[#444]"
                   >
@@ -273,6 +276,7 @@ export default function ScheduleAsideForm({
 
                   <button
                     type="button"
+                    aria-label="次の月を表示"
                     onClick={nextMonth}
                     className="px-2 text-3xl text-[#444]"
                   >
@@ -299,10 +303,14 @@ export default function ScheduleAsideForm({
                       );
 
                       return (
-                        <div
+                        <button
+                          type="button"
+                          aria-label={`${dateString}の日程を選択`}
+                          aria-pressed={isSelected}
+                          disabled={!isCurrentMonth}
                           key={`${weekIndex}-${dayIndex}`}
                           className={[
-                            "flex h-12 cursor-pointer items-center justify-center rounded-xl transition-colors",
+                            "flex h-12 w-full cursor-pointer items-center justify-center rounded-xl border-0 transition-colors disabled:cursor-default",
                             isCurrentMonth ? "text-[#222]" : "text-[#d1d5db]",
                             isSelected
                               ? "bg-[#3b82f6] text-white"
@@ -319,7 +327,7 @@ export default function ScheduleAsideForm({
                           }}
                         >
                           {day}
-                        </div>
+                        </button>
                       );
                     }),
                   )}
@@ -348,6 +356,7 @@ export default function ScheduleAsideForm({
             multiline
             rows={4}
             variant="outlined"
+            slotProps={{ htmlInput: { "aria-label": "予定メモ" } }}
             placeholder="メモを入力"
             name="note"
             value={draftSchedule.note || ""}

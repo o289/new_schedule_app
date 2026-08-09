@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ScheduleForm, ScheduleResponse } from "../../types/schedule";
+import type { ScheduleForm, ScheduleResponse } from "#frontend/types/schedule";
 import { toScheduleForm } from "./scheduleFormAdapter";
 
 export type ScheduleChangeEvent = {

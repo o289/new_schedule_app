@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { ScheduleForm, ScheduleFormDate } from "../../types/schedule";
+import type { ScheduleForm, ScheduleFormDate } from "#frontend/types/schedule";
 import {
   buildScheduleDateRange,
   getMostFrequentTimeRange,

@@ -4,8 +4,8 @@ import type {
   ScheduleCreate,
   ScheduleDateUpdate,
   ScheduleUpdate,
-} from "../../../../packages/schemas/schedule";
-import { BaseRepository } from "../../database/repository";
+} from "#schemas/schedule";
+import { BaseRepository } from "#backend/database/repository";
 import { categories } from "../category/model";
 import { scheduleDates, schedules } from "./model";
 

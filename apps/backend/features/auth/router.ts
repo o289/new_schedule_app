@@ -1,13 +1,13 @@
 import { Hono } from "hono";
 
-import { BadRequestError } from "../../core/api-error";
-import { parseJsonBody } from "../../core/request";
+import { BadRequestError } from "#backend/core/api-error";
+import { parseJsonBody } from "#backend/core/request";
 import {
   passkeyLoginOptionsRequestSchema,
   passkeyLoginVerifyRequestSchema,
   passkeyRegisterOptionsRequestSchema,
   passkeyRegisterVerifyRequestSchema,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 import { AuthService } from "./service";
 
 export const authRouter = new Hono().basePath("/auth/passkey");

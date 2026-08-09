@@ -1,11 +1,11 @@
 name: CI
 
-# すべてのブランチへのpushとPull Requestで品質確認だけを行う。
-# このWorkflowはイメージのpushやVPSへの接続を行わない。
+# すべてのブランチへのpushで軽量な品質確認を行う。
+# mainへのpushでは、追加でE2Eを行い、全成功後にステージングへ進める。
+# Pull Requestイベント自体では起動しない。
 on:
   push:
     branches: ["**"]
-  pull_request:
 
 permissions:
   contents: read
@@ -46,3 +46,77 @@ jobs:
 
       - name: テスト
         run: pnpm test
+
+  e2e:
+    name: Chromium・WebKit E2Eテスト
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # E2Eだけが使用する使い捨てのPostgreSQL。staging・productionの接続情報は使用しない。
+    services:
+      postgresql-e2e:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app_e2e_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    # 値はCI専用のテスト設定であり、環境ごとのSecretは参照しない。
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/app_e2e_test
+      E2E_API_URL: http://localhost:8100
+      E2E_WEBAUTHN_RP_ID: localhost
+      E2E_WEBAUTHN_RP_NAME: Schedule App E2E
+      E2E_WEBAUTHN_ORIGIN: http://localhost:3101
+      E2E_SECRET_KEY: e2e-ci-only-secret-key
+      E2E_ACCESS_TOKEN_EXPIRES_IN: "300"
+      E2E_REFRESH_TOKEN_EXPIRES_IN: "3600"
+      E2E_ALGORITHM: HS256
+
+    steps:
+      # E2Eの対象となるコミットを取得する。
+      - name: ソースコードを取得
+        uses: actions/checkout@v5
+
+      # package.jsonのpackageManager指定に従ってpnpmを有効化する。
+      - name: pnpmを有効化
+        uses: pnpm/action-setup@v6
+
+      # AGENTS.mdで固定しているNode.jsを使用し、pnpm storeをキャッシュする。
+      - name: Node.js 22.23.1を設定
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+
+      # lockfileどおりに依存関係を入れる。
+      - name: 依存関係をインストール
+        run: pnpm install --frozen-lockfile
+
+      # Chromium・WebKitとUbuntu上で必要なシステム依存を導入する。
+      - name: Playwright Chromium・WebKitを導入
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      # Playwrightのbackend起動scriptがmigrationを適用してから、Frontend・Backend・実ブラウザを起動する。
+      - name: E2Eテスト
+        run: pnpm test:e2e
+
+      # 失敗時のtrace・screenshotとHTML reportを保存する。.authのstorageStateは含めない。
+      - name: Playwrightの実行結果を保存
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

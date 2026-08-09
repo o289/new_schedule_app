@@ -1,10 +1,10 @@
-import type { ScheduleFormDate } from "../../types/schedule";
+import type { ScheduleFormDate } from "#frontend/types/schedule";
 import {
   addDaysToISODate,
   getLocalDateTimeParts,
   toISODate,
   toISODatetime,
-} from "../../../../packages/utils/local-datetime";
+} from "#utils/local-datetime";
 
 export interface TimeRange {
   start: string;

@@ -2,7 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 
-import type { ApiErrorResponse } from "../../packages/contracts/api-error";
+import type { ApiErrorResponse } from "#contracts/api-error";
 import { ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
 import { categoryRouter } from "./features/category/router";
@@ -28,7 +28,12 @@ const setStaticCacheHeader = (path: string, context: Context) => {
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3001", "http://127.0.0.1:3001"],
+    origin: [
+      "http://localhost:3001",
+      "http://127.0.0.1:3001",
+      "http://localhost:3101",
+      "http://127.0.0.1:3101",
+    ],
     allowMethods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["*"],
     credentials: true,

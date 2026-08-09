@@ -3,13 +3,13 @@ import type {
   ScheduleDateCreate,
   ScheduleDateUpdate,
   ScheduleUpdate,
-} from "../../../../packages/schemas/schedule";
+} from "#schemas/schedule";
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
-} from "../../core/api-error";
-import { hasDatabaseErrorCode } from "../../core/database-error";
+} from "#backend/core/api-error";
+import { hasDatabaseErrorCode } from "#backend/core/database-error";
 import type { User } from "../user/repository";
 import { CategoryRepository } from "../category/repository";
 import {

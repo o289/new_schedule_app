@@ -3,7 +3,7 @@ import {
   getLocalDateTimeParts,
   isSameDate,
   toDateOnly,
-} from "../../../packages/utils/local-datetime";
+} from "#utils/local-datetime";
 
 export function formatDateTime(
   isoString: string,

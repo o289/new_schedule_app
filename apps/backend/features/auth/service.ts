@@ -2,23 +2,23 @@ import { createHash, randomBytes } from "node:crypto";
 
 import type { Base64URLString } from "@simplewebauthn/server";
 
-import type { ChallengeCreate } from "../../../../packages/schemas/challenge";
-import type { PasskeyCreate } from "../../../../packages/schemas/passkey";
+import type { ChallengeCreate } from "#schemas/challenge";
+import type { PasskeyCreate } from "#schemas/passkey";
 import {
   ApiError,
   BadRequestError,
   ConflictError,
   UnauthorizedError,
-} from "../../core/api-error";
-import { createAccessToken, createRefreshToken } from "../../core/security";
+} from "#backend/core/api-error";
+import { createAccessToken, createRefreshToken } from "#backend/core/security";
 import {
   createAuthenticationOptions,
   createRegistrationOptions,
   verifyAuthentication,
   verifyRegistration,
-} from "../../core/webauthn";
-import { db } from "../../database/client";
-import type { Database } from "../../database/repository";
+} from "#backend/core/webauthn";
+import { db } from "#backend/database/client";
+import type { Database } from "#backend/database/repository";
 import { ChallengeRepository } from "../challenge/repository";
 import { PasskeyRepository } from "../passkey/repository";
 import { UserRepository } from "../user/repository";
@@ -31,7 +31,7 @@ import type {
   PasskeyRegisterVerifyRequest,
   PasskeyRegisterVerifyResponse,
   TokenResponse,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 
 const challengeLifetimeMilliseconds = 5 * 60 * 1000;
 
@@ -44,6 +44,8 @@ function logPasskeyAuth(
   event: string,
   details: Record<string, unknown>,
 ): void {
+  if (process.env.NODE_ENV === "test") return;
+
   console[level](
     JSON.stringify({
       scope: "passkey-auth",
@@ -229,8 +231,13 @@ export class AuthService {
       throw new BadRequestError("PASSKEY_NOT_FOUND");
     }
 
+    const allowCredentials = passkeys.map((passkey) => ({
+      id: passkey.credentialId as Base64URLString,
+    }));
+
     const publicKey = await createAuthenticationOptions({
       challenge: Uint8Array.from(randomBytes(32)),
+      allowCredentials,
     });
     const challengeInput: ChallengeCreate = {
       userId: user.id,

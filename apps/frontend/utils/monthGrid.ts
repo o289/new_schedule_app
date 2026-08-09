@@ -1,4 +1,4 @@
-import { formatDate, isSameDate } from "../../../packages/utils/local-datetime";
+import { formatDate, isSameDate } from "#utils/local-datetime";
 
 /**
  * 月を週配列（最大6行）に変換

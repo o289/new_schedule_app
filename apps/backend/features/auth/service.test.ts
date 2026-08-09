@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PasskeyLoginVerifyRequest,
   PasskeyRegisterVerifyRequest,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 
 const mocks = vi.hoisted(() => ({
   user: {
@@ -277,6 +277,11 @@ describe("AuthService", () => {
     expect(
       mocks.createAuthenticationOptions.mock.calls[0]?.[0].challenge,
     ).toHaveLength(32);
+    expect(mocks.createAuthenticationOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowCredentials: [{ id: passkey.credentialId }],
+      }),
+    );
     expect(result).toEqual({
       data: { publicKey: { challenge: "public-login-challenge" } },
     });

@@ -2,7 +2,7 @@ import { base64urlToUint8Array } from "./base64url";
 import type {
   PasskeyLoginOptionsResponse,
   PasskeyRegisterOptionsResponse,
-} from "../../../../packages/schemas/auth";
+} from "#schemas/auth";
 
 type BackendCredentialDescriptor = Omit<PublicKeyCredentialDescriptor, "id"> & {
   id: string;

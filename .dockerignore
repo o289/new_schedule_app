@@ -10,6 +10,10 @@ node_modules
 dist
 build
 coverage
+playwright-report
+test-results
+blob-report
+e2e/.auth
 docs
 .vscode
 .idea

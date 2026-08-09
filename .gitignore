@@ -25,6 +25,10 @@ postgres_data/
 npm-debug.log*
 .cache/
 .vite/
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
 
 # editor / OS
 .DS_Store
@@ -34,4 +38,3 @@ npm-debug.log*
 # local-only files
 mock.html
 docs/*
-!docs/本番環境構成.md

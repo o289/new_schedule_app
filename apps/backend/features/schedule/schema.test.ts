@@ -4,7 +4,7 @@ import {
   scheduleCreateSchema,
   scheduleResponseSchema,
   scheduleUpdateSchema,
-} from "../../../../packages/schemas/schedule";
+} from "#schemas/schedule";
 
 const categoryId = "22222222-2222-4222-8222-222222222222";
 

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
 
-import { AuthProvider } from "./context/AuthContext.jsx"; // ←追加
+import { queryClient } from "./lib/queryClient";
 import { AlertProvider } from "./context/AlertContext.jsx";
 import AppRoutes from "./AppRoutes.js";
 
@@ -8,9 +9,9 @@ function App() {
   return (
     <Router>
       <AlertProvider>
-        <AuthProvider>
+        <QueryClientProvider client={queryClient}>
           <AppRoutes />
-        </AuthProvider>
+        </QueryClientProvider>
       </AlertProvider>
     </Router>
   );

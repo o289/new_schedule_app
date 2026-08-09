@@ -1,10 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
-import type {
-  CategoryCreate,
-  CategoryUpdate,
-} from "../../../../packages/schemas/category";
-import { BaseRepository } from "../../database/repository";
+import type { CategoryCreate, CategoryUpdate } from "#schemas/category";
+import { BaseRepository } from "#backend/database/repository";
 import { categories } from "./model";
 
 export type Category = typeof categories.$inferSelect;

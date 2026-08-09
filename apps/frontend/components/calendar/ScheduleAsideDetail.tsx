@@ -7,11 +7,11 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PendingOutlinedIcon from "@mui/icons-material/PendingOutlined";
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { AsideMode } from "../../context/CalendarContext";
-import type { ScheduleResponse } from "../../types/schedule";
-import { formatDateTime } from "../../utils/date";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
+import type { AsideMode } from "#frontend/context/CalendarContext";
+import type { ScheduleResponse } from "#frontend/types/schedule";
+import { formatDateTime } from "#frontend/utils/date";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import { buildTimeGroupsFromDates } from "./scheduleViewAdapter";
 import { DateTimeCard } from "./DateTimeCard";
 import ConfirmDialog from "../ConfirmDialog";
@@ -86,24 +86,10 @@ export default function ScheduleAsideDetail({
       </Button>
       <div className="p-4">
         <div className="bg-white rounded-3xl shadow-md p-6 mb-6">
-          <div className="mb-6 flex flex-wrap items-start gap-3">
+          <div className="mb-6 justify-center">
             <h1 className="text-4xl font-bold break-words">{schedule.title}</h1>
-            {schedule.isTentative && (
-              <Chip
-                icon={<PendingOutlinedIcon />}
-                label="仮押さえ・未確定"
-                aria-label="仮押さえ・未確定の予定"
-                sx={{
-                  mt: 1,
-                  backgroundColor: theme.bg,
-                  border: `1px solid ${theme.border}`,
-                  color: theme.border,
-                  fontWeight: 700,
-                  "& .MuiChip-icon": { color: theme.border },
-                }}
-              />
-            )}
           </div>
+
           <Divider className="!mb-6" />
 
           <div className="flex items-center gap-4 mb-6">
@@ -142,6 +128,23 @@ export default function ScheduleAsideDetail({
               />
             </div>
           </div>
+
+          {schedule.isTentative && (
+            <div className="flex items-center gap-4 mb-6">
+              <Chip
+                icon={<PendingOutlinedIcon />}
+                label="仮押さえ・未確定"
+                aria-label="仮押さえ・未確定の予定"
+                sx={{
+                  backgroundColor: theme.bg,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.border,
+                  fontWeight: 700,
+                  "& .MuiChip-icon": { color: theme.border },
+                }}
+              />
+            </div>
+          )}
 
           {schedule.note && (
             <>

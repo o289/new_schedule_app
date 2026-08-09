@@ -1,6 +1,5 @@
-import { useAuth } from "../../context/AuthContext";
-
 import { Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { Add as AddIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -9,12 +8,16 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
-import { useCalendar } from "../../context/CalendarContext";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
+import { useCalendar } from "#frontend/context/CalendarContext";
+import { useSession } from "#frontend/hooks/useSession";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import type { CategoryResponse } from "../../types/schedule";
-import type { ScheduleForm } from "../../types/schedule";
+import type {
+  CategoryResponse,
+  ScheduleForm,
+  ScheduleResponse,
+} from "#frontend/types/schedule";
 import type { ScheduleChangeEvent } from "../schedules/useScheduleForm";
 import type { useCategory } from "../categories/useCategory";
 
@@ -32,6 +35,7 @@ type CategoryController = Pick<
 
 interface CalendarAsideProps {
   categories: CategoryResponse[];
+  schedules: ScheduleResponse[];
   category: CategoryController;
   draftSchedule: ScheduleForm;
   resetForm: () => void;
@@ -45,6 +49,7 @@ interface CalendarAsideProps {
 
 export default function CalendarAside({
   categories,
+  schedules,
   category,
   draftSchedule,
   resetForm,
@@ -55,13 +60,21 @@ export default function CalendarAside({
   setIsDrawerOpen,
   closeButton,
 }: CalendarAsideProps) {
-  const { selectedScheduleDateId, selectedSchedule, asideMode, setAsideMode } =
-    useCalendar();
+  const {
+    selectedScheduleDateId,
+    selectedScheduleId,
+    asideMode,
+    setAsideMode,
+  } = useCalendar();
+  const selectedSchedule =
+    schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null;
 
-  const { user, handleLogout } = useAuth();
-  const onLogout = () => {
+  const { user, logout } = useSession();
+  const navigate = useNavigate();
+  const onLogout = async () => {
     if (!window.confirm("ログアウトしますか？")) return;
-    handleLogout();
+    await logout();
+    navigate("/", { replace: true });
   };
 
   function renderAsideContent() {
@@ -166,6 +179,7 @@ export default function CalendarAside({
 
                   <button
                     type="button"
+                    aria-label="カテゴリーを管理"
                     onClick={() => setAsideMode("category")}
                     className="text-sm font-medium text-[#6b7280] hover:text-[#111827]"
                   >

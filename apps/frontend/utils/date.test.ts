@@ -6,7 +6,7 @@ import {
   getLocalDateTimeParts,
   isSameDate,
   toISODatetime,
-} from "../../../packages/utils/local-datetime";
+} from "#utils/local-datetime";
 import { formatDateTime } from "./date";
 
 describe("日本時間の日時文字列", () => {

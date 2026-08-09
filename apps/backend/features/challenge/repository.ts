@@ -1,7 +1,7 @@
 import { eq, lt } from "drizzle-orm";
 
-import type { ChallengeCreate } from "../../../../packages/schemas/challenge";
-import { BaseRepository } from "../../database/repository";
+import type { ChallengeCreate } from "#schemas/challenge";
+import { BaseRepository } from "#backend/database/repository";
 import { challenges } from "./model";
 
 export type Challenge = typeof challenges.$inferSelect;

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { BaseRepository } from "../../database/repository";
+import { BaseRepository } from "#backend/database/repository";
 import { users } from "./model";
 
 export type User = typeof users.$inferSelect;

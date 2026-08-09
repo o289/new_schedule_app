@@ -1,8 +1,11 @@
 import { renderCategories } from "./categoryUI";
 import CategoryCard from "./CategoryCard";
 import ConfirmDialog from "../ConfirmDialog";
-import { CATEGORY_COLORS } from "../../constants/categoryColors";
-import { CATEGORY_ICONS, getCategoryIcon } from "../../constants/categoryIcons";
+import { CATEGORY_COLORS } from "#frontend/constants/categoryColors";
+import {
+  CATEGORY_ICONS,
+  getCategoryIcon,
+} from "#frontend/constants/categoryIcons";
 
 import { Button } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
@@ -10,12 +13,12 @@ import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import type { AsideMode } from "../../context/CalendarContext";
+import type { AsideMode } from "#frontend/context/CalendarContext";
 import type {
   CategoryColor,
   CategoryIcon,
   CategoryResponse,
-} from "../../../../packages/schemas/category";
+} from "#schemas/category";
 
 type Category = CategoryResponse;
 
@@ -99,6 +102,7 @@ export default function CategoryPanel({
             </h3>
 
             <input
+              aria-label="カテゴリ名"
               className="mb-3 w-full rounded-lg border border-[#ccc] p-3 text-[16px] leading-[1.4]"
               name="name"
               value={formData.name}
@@ -107,6 +111,7 @@ export default function CategoryPanel({
               required
             />
             <select
+              aria-label="カテゴリの色"
               className="mb-3 w-full rounded-lg border border-[#ccc] p-3 text-[16px] leading-[1.4]"
               name="color"
               value={formData.color}
@@ -130,6 +135,7 @@ export default function CategoryPanel({
               <SelectedIcon aria-hidden="true" className="text-[#4a90e2]" />
               <select
                 id="category-icon"
+                aria-label="カテゴリのアイコン"
                 className="w-full bg-transparent py-3 text-[16px] leading-[1.4] outline-none"
                 name="icon"
                 value={formData.icon}

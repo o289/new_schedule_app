@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScheduleResponse } from "../../types/schedule";
+import type { ScheduleResponse } from "#frontend/types/schedule";
 import { toScheduleForm } from "./scheduleFormAdapter";
 
 const schedule: ScheduleResponse = {

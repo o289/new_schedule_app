@@ -1,8 +1,8 @@
-import { getCategoryTheme } from "../../utils/getCategoryTheme";
-import { getCategoryIcon } from "../../constants/categoryIcons";
+import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
+import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import type { EventApi } from "@fullcalendar/core";
-import type { CategoryIcon } from "../../../../packages/schemas/category";
-import type { ScheduleResponse } from "../../types/schedule";
+import type { CategoryIcon } from "#schemas/category";
+import type { ScheduleResponse } from "#frontend/types/schedule";
 
 interface EventCardProps {
   event: EventApi;
