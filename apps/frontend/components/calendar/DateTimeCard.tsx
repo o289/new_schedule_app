@@ -14,6 +14,10 @@ interface TimeGroup {
   dates: TimeGroupDate[];
 }
 
+export function sortTimeGroupDates(dates: TimeGroupDate[]): TimeGroupDate[] {
+  return [...dates].sort((left, right) => left.date.localeCompare(right.date));
+}
+
 export function DateTimeCard({ timeGroup }: { timeGroup: TimeGroup }) {
   /**
    * YYYY-MM-DD → 「M月D日」
@@ -40,7 +44,7 @@ export function DateTimeCard({ timeGroup }: { timeGroup: TimeGroup }) {
     };
   }
 
-  const dates = normalizeDates(timeGroup?.dates);
+  const dates = sortTimeGroupDates(normalizeDates(timeGroup?.dates));
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
