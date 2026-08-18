@@ -21,6 +21,12 @@ pnpm typecheck
 pnpm test
 ```
 
+### Docker Composeの使い分け
+
+- 通常の実装確認、typecheck、unit testは`compose.dev.yml`を使用する。
+- DB統合テストは`compose.test.yml`を使用する。
+- E2Eテスト用DBは`compose.e2e.yml`を使用する。
+
 ## 注意事項
 
 - `node --version` がv22.23.1以外なら、作業を続けずNode.jsのバージョンを切り替える。
