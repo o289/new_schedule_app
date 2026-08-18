@@ -104,3 +104,32 @@ export function updateAllDatesTime(
     ...buildScheduleDateRange(toISODate(date.startDate), range),
   }));
 }
+
+/** 指定日の選択状態をまとめて切り替える。 */
+export function toggleScheduleDates(
+  dates: ScheduleFormDate[],
+  dateStrings: string[],
+  range: TimeRange,
+): ScheduleFormDate[] {
+  const targetDates = [...new Set(dateStrings)];
+  if (targetDates.length === 0) return dates;
+
+  const targetDateSet = new Set(targetDates);
+  const selectedDateSet = new Set(
+    dates.map((date) => toISODate(date.startDate)),
+  );
+  const allSelected = targetDates.every((date) => selectedDateSet.has(date));
+
+  if (allSelected) {
+    return dates.filter(
+      (date) => !targetDateSet.has(toISODate(date.startDate)),
+    );
+  }
+
+  return [
+    ...dates,
+    ...targetDates
+      .filter((date) => !selectedDateSet.has(date))
+      .map((date) => buildScheduleDateRange(date, range)),
+  ];
+}

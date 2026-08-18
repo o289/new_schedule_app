@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { generateMonthGrid, shiftMonth } from "#frontend/utils/monthGrid";
+import {
+  generateMonthGrid,
+  getCurrentMonthWeekdayDates,
+  shiftMonth,
+} from "#frontend/utils/monthGrid";
 import TimePicker from "../commonPicker/TimePicker";
 import ScheduleDatesModal from "../schedules/DatesModal";
 import { useScheduleDateTime } from "../schedules/handleDateTime";
@@ -42,8 +46,16 @@ export default function ScheduleAsideForm({
   onCancel,
 }: ScheduleAsideFormProps) {
   // フォーム
-  const { dates, start, setStart, end, setEnd, addDate, removeDate } =
-    useScheduleDateTime(draftSchedule, onChange, mode === "edit");
+  const {
+    dates,
+    start,
+    setStart,
+    end,
+    setEnd,
+    addDate,
+    removeDate,
+    toggleDates,
+  } = useScheduleDateTime(draftSchedule, onChange, mode === "edit");
   const hasSameStartAndEnd = start !== "" && start === end;
   const crossesMidnight = start !== "" && end !== "" && end < start;
 
@@ -88,6 +100,15 @@ export default function ScheduleAsideForm({
   };
 
   const weeks = generateMonthGrid(year, month);
+  const weekdays = [
+    { label: "日", weekday: 0, colorClass: "text-red-500" },
+    { label: "月", weekday: 1, colorClass: "" },
+    { label: "火", weekday: 2, colorClass: "" },
+    { label: "水", weekday: 3, colorClass: "" },
+    { label: "木", weekday: 4, colorClass: "" },
+    { label: "金", weekday: 5, colorClass: "" },
+    { label: "土", weekday: 6, colorClass: "text-blue-500" },
+  ];
   return (
     <>
       <Button
@@ -285,20 +306,37 @@ export default function ScheduleAsideForm({
                 </div>
 
                 <div className="mb-4 grid grid-cols-7 text-center text-[16px] font-semibold">
-                  <div className="text-red-500">日</div>
-                  <div>月</div>
-                  <div>火</div>
-                  <div>水</div>
-                  <div>木</div>
-                  <div>金</div>
-                  <div className="text-blue-500">土</div>
+                  {weekdays.map(({ label, weekday, colorClass }) => {
+                    const weekdayDates = getCurrentMonthWeekdayDates(
+                      weeks,
+                      weekday,
+                    );
+                    const isAllSelected = weekdayDates.every((date) =>
+                      dates.some((item) => item.startDate.startsWith(date)),
+                    );
+
+                    return (
+                      <button
+                        type="button"
+                        key={weekday}
+                        aria-label={`${year}年${month}月の${label}曜日をすべて選択`}
+                        aria-pressed={isAllSelected}
+                        className={`rounded px-1 transition-colors hover:bg-[#eef4ff] ${colorClass} ${
+                          isAllSelected ? "bg-[#dbeafe]" : ""
+                        }`}
+                        onClick={() => toggleDates(weekdayDates)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="grid grid-cols-7 gap-2 text-center text-[16px]">
                   {weeks.map((week, weekIndex) =>
                     week.map((dayObj, dayIndex) => {
                       const { dateString, day, isCurrentMonth } = dayObj;
-                      const isSelected = draftSchedule.dates?.some((d) =>
+                      const isSelected = dates.some((d) =>
                         d.startDate.startsWith(dateString),
                       );
 

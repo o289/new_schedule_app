@@ -4,6 +4,7 @@ import type { ScheduleForm, ScheduleFormDate } from "#frontend/types/schedule";
 import {
   buildScheduleDateRange,
   getMostFrequentTimeRange,
+  toggleScheduleDates,
   updateAllDatesTime,
 } from "./scheduleTime";
 
@@ -72,5 +73,22 @@ export function useScheduleDateTime(
     onChange({ target: { name: "dates", value: nextDates } });
   };
 
-  return { dates, start, setStart, end, setEnd, addDate, removeDate };
+  const toggleDates = (dateStrings: string[]) => {
+    if (!start || !end || start === end) return;
+
+    const nextDates = toggleScheduleDates(dates, dateStrings, { start, end });
+    setDates(nextDates);
+    onChange({ target: { name: "dates", value: nextDates } });
+  };
+
+  return {
+    dates,
+    start,
+    setStart,
+    end,
+    setEnd,
+    addDate,
+    removeDate,
+    toggleDates,
+  };
 }
