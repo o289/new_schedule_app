@@ -64,6 +64,50 @@ export const ALERT_MESSAGES = {
     type: "warning",
     message: "ToDoを追加するスケジュールがありません",
   },
+  ALREADY_GROUP_MEMBER: {
+    type: "warning",
+    message: "すでにこのグループに参加しています",
+  },
+  INVALID_DATE_RANGE: {
+    type: "warning",
+    message: "表示期間を確認してください",
+  },
+  OWNER_CANNOT_LEAVE: {
+    type: "warning",
+    message: "オーナーはグループを退出できません",
+  },
+  CANNOT_REMOVE_OWNER: {
+    type: "warning",
+    message: "オーナーを追放することはできません",
+  },
+  CANNOT_REMOVE_SELF: {
+    type: "warning",
+    message: "自分自身を追放することはできません",
+  },
+  GROUP_OWNER_REQUIRED: {
+    type: "warning",
+    message: "この操作はグループオーナーのみ実行できます",
+  },
+  NOT_FOUND_GROUP: {
+    type: "warning",
+    message: "指定されたグループが見つかりませんでした",
+  },
+  NOT_FOUND_GROUP_MEMBER: {
+    type: "warning",
+    message: "指定されたグループメンバーが見つかりませんでした",
+  },
+  INVALID_JOIN_CODE: {
+    type: "warning",
+    message: "参加コードが正しくありません",
+  },
+  GROUP_MEMBER_LIMIT_REACHED: {
+    type: "warning",
+    message: "このグループは定員に達しています",
+  },
+  GROUP_REJOIN_FORBIDDEN: {
+    type: "warning",
+    message: "このグループには再参加できません",
+  },
   // Auth
   EMAIL_ALREADY_EXISTS: {
     type: "warning",

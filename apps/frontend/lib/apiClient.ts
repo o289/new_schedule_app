@@ -1,4 +1,5 @@
 import { isApiErrorCode, type ApiErrorCode } from "#contracts/api-error";
+import { alreadyGroupMemberErrorSchema } from "#schemas/group";
 import { ApiClientError } from "./apiError";
 import {
   clearSession,
@@ -19,6 +20,11 @@ function errorCode(data: unknown, fallback: ApiErrorCode = "SERVER_ERROR") {
     return data.code;
   }
   return fallback;
+}
+
+function errorDetails(data: unknown): { groupId: string } | undefined {
+  const result = alreadyGroupMemberErrorSchema.safeParse(data);
+  return result.success ? result.data.data : undefined;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -47,7 +53,11 @@ async function request<T>(
   const response = await fetch(`${apiUrl}${path}`, { ...options, headers });
   const data = await parseResponse<T>(response);
   if (!response.ok) {
-    throw new ApiClientError(errorCode(data), response.status);
+    throw new ApiClientError(
+      errorCode(data),
+      response.status,
+      errorDetails(data),
+    );
   }
   return data;
 }

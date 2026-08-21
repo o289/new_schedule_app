@@ -4,6 +4,7 @@ import { Add as AddIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
@@ -208,6 +209,15 @@ export default function CalendarAside({
                   );
                 })}
               </div>
+
+              <Button
+                variant="outlined"
+                startIcon={<GroupsRoundedIcon />}
+                onClick={() => navigate("/groups")}
+                className="!mt-2 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
+              >
+                グループ
+              </Button>
 
               <Button
                 variant="outlined"

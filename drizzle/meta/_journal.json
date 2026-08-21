@@ -50,6 +50,13 @@
       "when": 1787305752111,
       "tag": "0006_common_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787308592507,
+      "tag": "0007_flawless_fenris",
+      "breakpoints": true
     }
   ]
 }

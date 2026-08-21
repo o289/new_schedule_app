@@ -5,6 +5,13 @@ import type {
   TokenResponse,
 } from "#schemas/auth";
 import type { AvatarKey, PublicUserProfile, UserResponse } from "#schemas/user";
+import type {
+  GroupCalendarResponse,
+  GroupCreate,
+  GroupDetailResponse,
+  GroupJoin,
+  GroupResponse,
+} from "#schemas/group";
 import type { ScheduleForm, ScheduleResponse } from "../types/schedule";
 import { apiClient } from "./apiClient";
 
@@ -46,6 +53,50 @@ export const scheduleApi = {
     }),
   remove: (id: string | undefined) =>
     apiClient.authenticated<void>(`/schedules/${id}`, { method: "DELETE" }),
+};
+
+export const groupApi = {
+  list: (signal?: AbortSignal) =>
+    apiClient.authenticated<GroupResponse[]>("/groups", {
+      method: "GET",
+      ...(signal ? { signal } : {}),
+    }),
+  create: (group: GroupCreate) =>
+    apiClient.authenticated<{ group: GroupResponse; joinCode: string }>(
+      "/groups",
+      { method: "POST", body: JSON.stringify(group) },
+    ),
+  detail: (groupId: string, signal?: AbortSignal) =>
+    apiClient.authenticated<GroupDetailResponse>(`/groups/${groupId}`, {
+      method: "GET",
+      ...(signal ? { signal } : {}),
+    }),
+  join: (input: GroupJoin) =>
+    apiClient.authenticated<GroupResponse>("/groups/join", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  remove: (groupId: string) =>
+    apiClient.authenticated<void>(`/groups/${groupId}`, { method: "DELETE" }),
+  kick: (groupId: string, userId: string) =>
+    apiClient.authenticated<void>(`/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    }),
+  leave: (groupId: string) =>
+    apiClient.authenticated<void>(`/groups/${groupId}/leave`, {
+      method: "POST",
+    }),
+  calendar: (
+    groupId: string,
+    range: { startDate: string; endDate: string },
+    signal?: AbortSignal,
+  ) => {
+    const query = new URLSearchParams(range).toString();
+    return apiClient.authenticated<GroupCalendarResponse>(
+      `/groups/${groupId}/calendar?${query}`,
+      { method: "GET", ...(signal ? { signal } : {}) },
+    );
+  },
 };
 
 export const authApi = {

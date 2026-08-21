@@ -47,6 +47,8 @@ test("ログアウト後に別ユーザーへ切り替えても前ユーザー�
     .getByLabel("メールアドレス")
     .fill(`${createE2EName("next-user")}@e2e.test`);
   await page.getByRole("button", { name: "アプリの利用を開始" }).click();
+  await page.getByLabel("表示名").fill("次のE2Eユーザー");
+  await page.getByRole("button", { name: "登録して利用を開始" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText(categoryName, { exact: true })).not.toBeVisible();
   await expect(
