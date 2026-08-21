@@ -28,7 +28,7 @@ COPY . ./
 
 RUN pnpm build:frontend && pnpm build:backend && pnpm prune --prod
 
-FROM node:22-alpine AS production
+FROM node:22.23.1-alpine AS production
 
 ENV NODE_ENV=production
 

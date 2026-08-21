@@ -35,7 +35,7 @@
     "test:watch": "vitest",
     "test:frontend": "vitest run --project frontend",
     "test:backend": "vitest run --project backend",
-    "test:integration": "vitest run --project backend apps/backend/index.test.ts",
+    "test:integration": "vitest run --project integration",
     "e2e:db:up": "docker compose -f compose.e2e.yml up -d --wait",
     "e2e:db:down": "docker compose -f compose.e2e.yml down -v",
     "e2e:backend": "tsx e2e/start-backend.ts",
