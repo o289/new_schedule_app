@@ -9,6 +9,7 @@
 
 ## 実装計画
 
+- 実装に着手する前に、[`IMPLEMENTATION_DECISION_FLOW.md`](IMPLEMENTATION_DECISION_FLOW.md)の判断フローに従う。
 - 実装計画は[`IMPLEMENTATION_PLAN_TEMPLATE.md`](IMPLEMENTATION_PLAN_TEMPLATE.md)の形式で作成する。
 - 複数フェーズの計画では、各フェーズに変更対象、実装内容、完了条件、品質ゲートを記載する。
 - 現在のフェーズの品質ゲートがすべてPASSになるまで、次のフェーズを開始しない。
