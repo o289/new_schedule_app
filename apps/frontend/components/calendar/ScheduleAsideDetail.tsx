@@ -5,6 +5,7 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PendingOutlinedIcon from "@mui/icons-material/PendingOutlined";
+import VideoCallOutlinedIcon from "@mui/icons-material/VideoCallOutlined";
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { AsideMode } from "#frontend/context/CalendarContext";
@@ -16,6 +17,7 @@ import { buildTimeGroupsFromDates } from "./scheduleViewAdapter";
 import { DateTimeCard } from "./DateTimeCard";
 import ConfirmDialog from "../ConfirmDialog";
 import { formatScheduleDateRange } from "../schedules/scheduleTime";
+import { getMeetingProvider } from "#frontend/utils/meetingUrl";
 
 interface Props {
   schedule: ScheduleResponse;
@@ -42,6 +44,7 @@ export default function ScheduleAsideDetail({
     schedule.dates[0];
   const startDate = selectedScheduleDate?.startDate;
   const endDate = selectedScheduleDate?.endDate;
+  const meetingProvider = getMeetingProvider(schedule.url);
 
   if (!startDate || !endDate) return <>取得できなかった</>;
 
@@ -171,6 +174,21 @@ export default function ScheduleAsideDetail({
         )}
 
         <div className="flex flex-col gap-4">
+          {meetingProvider && schedule.url && (
+            <Button
+              type="button"
+              variant="contained"
+              component="a"
+              href={schedule.url}
+              target="_blank"
+              rel="noreferrer"
+              startIcon={<VideoCallOutlinedIcon />}
+              size="large"
+            >
+              {meetingProvider}の会議に参加
+            </Button>
+          )}
+
           <Button
             type="button"
             variant="outlined"

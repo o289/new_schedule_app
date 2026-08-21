@@ -1,0 +1,1 @@
+ALTER TABLE "schedules" ADD COLUMN "url" varchar(2048);

@@ -16,6 +16,7 @@ function serializeSchedule(schedule: Schedule) {
     id: schedule.id,
     title: schedule.title,
     ...(schedule.note !== null && { note: schedule.note }),
+    ...(schedule.url !== null && { url: schedule.url }),
     categoryId: schedule.categoryId,
     isTentative: schedule.isTentative,
     category: schedule.category,

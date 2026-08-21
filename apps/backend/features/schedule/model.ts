@@ -25,6 +25,8 @@ export const schedules = pgTable(
 
     note: text("note"),
 
+    url: varchar("url", { length: 2048 }),
+
     categoryId: uuid("category_id").notNull(),
 
     isTentative: boolean("is_tentative").notNull().default(false),

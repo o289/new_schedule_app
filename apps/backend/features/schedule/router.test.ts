@@ -59,6 +59,7 @@ const schedule = {
   userId: user.id,
   title: "meeting",
   note: null,
+  url: "https://meet.google.com/abc-defg-hij",
   categoryId: category.id,
   isTentative: false,
   category,
@@ -94,6 +95,7 @@ describe("schedule router", () => {
     const body = {
       title: "meeting",
       categoryId: category.id,
+      url: "https://meet.google.com/abc-defg-hij",
       dates: [
         {
           startDate: "2025-01-01T10:00:00",
@@ -115,6 +117,7 @@ describe("schedule router", () => {
     await expect(response.json()).resolves.toMatchObject({
       id: schedule.id,
       isTentative: false,
+      url: "https://meet.google.com/abc-defg-hij",
       category: {
         name: "仕事",
         color: "red",

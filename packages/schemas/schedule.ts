@@ -29,6 +29,7 @@ export const scheduleDateResponseSchema = scheduleDateBaseSchema.extend({
 export const scheduleBaseSchema = z.object({
   title: z.string().max(50).optional(),
   note: z.string().optional(),
+  url: z.url().max(2048).nullable().optional(),
   categoryId: z.uuid().optional(),
 });
 

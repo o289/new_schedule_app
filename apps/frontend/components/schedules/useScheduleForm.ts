@@ -5,7 +5,7 @@ import { toScheduleForm } from "./scheduleFormAdapter";
 export type ScheduleChangeEvent = {
   target: {
     name: string;
-    value: string | boolean | ScheduleForm["dates"];
+    value: string | boolean | null | ScheduleForm["dates"];
   };
 };
 
@@ -18,6 +18,7 @@ function isScheduleDateChange(
 const initialSchedule: ScheduleForm = {
   title: "",
   note: "",
+  url: null,
   dates: [],
   categoryId: "",
   isTentative: false,

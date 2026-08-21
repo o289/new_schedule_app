@@ -32,6 +32,7 @@ export class ScheduleRepository extends BaseRepository {
         .values({
           title: input.title,
           note: input.note,
+          url: input.url,
           categoryId: input.categoryId,
           isTentative: input.isTentative,
           userId,

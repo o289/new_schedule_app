@@ -6,6 +6,7 @@ import { toScheduleForm } from "./scheduleFormAdapter";
 const schedule: ScheduleResponse = {
   id: "11111111-1111-4111-8111-111111111111",
   title: "授業",
+  url: "https://meet.google.com/abc-defg-hij",
   categoryId: "22222222-2222-4222-8222-222222222222",
   isTentative: true,
   category: { name: "学校", color: "red", icon: "school" },
@@ -26,6 +27,7 @@ describe("toScheduleForm", () => {
       id: schedule.id,
       title: "授業",
       note: "",
+      url: "https://meet.google.com/abc-defg-hij",
       categoryId: schedule.categoryId,
       isTentative: true,
       dates: schedule.dates,

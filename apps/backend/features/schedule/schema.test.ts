@@ -44,6 +44,26 @@ describe("schedule schema", () => {
     });
   });
 
+  it("任意の会議URLを受理し、不正なURLを拒否する", () => {
+    expect(
+      scheduleCreateSchema.safeParse({
+        title: "会議",
+        categoryId,
+        url: "https://meet.google.com/abc-defg-hij",
+        dates,
+      }).success,
+    ).toBe(true);
+    expect(
+      scheduleCreateSchema.safeParse({
+        title: "会議",
+        categoryId,
+        url: "not-a-url",
+        dates,
+      }).success,
+    ).toBe(false);
+    expect(scheduleUpdateSchema.safeParse({ url: null }).success).toBe(true);
+  });
+
   it.each(["true", 1, null])("真偽値以外の値を拒否する", (value) => {
     expect(
       scheduleCreateSchema.safeParse({
@@ -74,6 +94,7 @@ describe("schedule schema", () => {
       scheduleResponseSchema.safeParse({
         ...baseResponse,
         isTentative: false,
+        url: "https://teams.microsoft.com/l/meetup-join/example",
       }).success,
     ).toBe(true);
   });

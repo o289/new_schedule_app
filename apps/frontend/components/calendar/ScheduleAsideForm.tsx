@@ -22,6 +22,7 @@ import {
 import SendIcon from "@mui/icons-material/Send";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import LinkIcon from "@mui/icons-material/Link";
 import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
 import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import type { FormEvent } from "react";
@@ -213,6 +214,35 @@ export default function ScheduleAsideForm({
               })}
             </Select>
           </FormControl>
+        </div>
+
+        <div className="mb-6">
+          <div className="mb-2 text-left text-[18px] font-bold text-[#222]">
+            URL（任意）
+          </div>
+          <TextField
+            fullWidth
+            type="url"
+            variant="outlined"
+            slotProps={{ htmlInput: { "aria-label": "スケジュールURL" } }}
+            placeholder="https://meet.google.com/..."
+            value={draftSchedule.url ?? ""}
+            onChange={(event) =>
+              onChange({
+                target: {
+                  name: "url",
+                  value: event.target.value || null,
+                },
+              })
+            }
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LinkIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
         </div>
 
         <div className="mb-6">
