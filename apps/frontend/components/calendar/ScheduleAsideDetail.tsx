@@ -211,7 +211,7 @@ export default function ScheduleAsideDetail({
 
           <Button
             type="button"
-            variant="outlined"
+            variant="contained"
             color="error"
             startIcon={<DeleteIcon />}
             size="large"
