@@ -20,6 +20,10 @@ export const challenges = pgTable("challenges", {
     length: 20,
   }).notNull(),
 
+  registrationName: varchar("registration_name", { length: 50 }),
+
+  registrationAvatar: varchar("registration_avatar", { length: 20 }),
+
   expiresAt: timestamp("expires_at", {
     withTimezone: true,
   }).notNull(),

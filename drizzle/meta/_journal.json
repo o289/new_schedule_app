@@ -43,6 +43,13 @@
       "when": 1787283866487,
       "tag": "0005_lame_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787305752111,
+      "tag": "0006_common_stone_men",
+      "breakpoints": true
     }
   ]
 }

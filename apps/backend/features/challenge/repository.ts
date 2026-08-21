@@ -12,6 +12,8 @@ export class ChallengeRepository extends BaseRepository {
       userId: input.userId,
       challenge: input.challenge,
       type: input.type,
+      registrationName: input.registrationName,
+      registrationAvatar: input.registrationAvatar,
       expiresAt: new Date(input.expiresAt),
     };
 
@@ -23,6 +25,8 @@ export class ChallengeRepository extends BaseRepository {
         set: {
           challenge: values.challenge,
           type: values.type,
+          registrationName: values.registrationName,
+          registrationAvatar: values.registrationAvatar,
           expiresAt: values.expiresAt,
         },
       })

@@ -4,7 +4,7 @@ import type {
   PasskeyRegisterOptionsResponse,
   TokenResponse,
 } from "#schemas/auth";
-import type { UserResponse } from "#schemas/user";
+import type { AvatarKey, PublicUserProfile, UserResponse } from "#schemas/user";
 import type { ScheduleForm, ScheduleResponse } from "../types/schedule";
 import { apiClient } from "./apiClient";
 
@@ -59,10 +59,14 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify(credential),
     }),
-  registerOptions: (email: string) =>
+  registerOptions: (profile: {
+    email: string;
+    name: string;
+    avatar: AvatarKey | null;
+  }) =>
     apiClient.public<PasskeyRegisterOptionsResponse>(
       "/auth/passkey/register/options",
-      { method: "POST", body: JSON.stringify({ email }) },
+      { method: "POST", body: JSON.stringify(profile) },
     ),
   registerVerify: (credential: unknown) =>
     apiClient.public<void>("/auth/passkey/register/verify", {
@@ -73,6 +77,11 @@ export const authApi = {
     apiClient.authenticated<UserResponse>("/auth/me", {
       method: "GET",
       ...(signal ? { signal } : {}),
+    }),
+  updateProfile: (profile: PublicUserProfile) =>
+    apiClient.authenticated<UserResponse>("/auth/me", {
+      method: "PUT",
+      body: JSON.stringify(profile),
     }),
   logout: (refreshToken: string) =>
     apiClient.public<void>("/auth/logout", {

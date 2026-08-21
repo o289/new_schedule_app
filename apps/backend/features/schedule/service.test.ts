@@ -5,6 +5,8 @@ import { ScheduleService } from "./service";
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
   email: "schedule@example.com",
+  name: "スケジュールユーザー",
+  avatar: null,
   refreshToken: null,
 };
 const category = {

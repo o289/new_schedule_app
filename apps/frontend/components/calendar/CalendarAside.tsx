@@ -8,6 +8,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import ScheduleAsideForm from "./ScheduleAsideForm";
 import ScheduleAsideDetail from "./ScheduleAsideDetail";
 import CategoryAsidePage from "../categories/CategoryAsidePage";
+import { ProfileAvatar } from "../common/ProfileAvatar";
 import { getCategoryTheme } from "#frontend/utils/getCategoryTheme";
 import { getCategoryIcon } from "#frontend/constants/categoryIcons";
 import { useCalendar } from "#frontend/context/CalendarContext";
@@ -217,24 +218,27 @@ export default function CalendarAside({
                 ログアウト
               </Button>
 
-              <div className="mt-4 flex items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 shadow-sm">
+              <button
+                type="button"
+                onClick={() => navigate("/setting")}
+                className="mt-4 flex w-full items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#f9fafb]"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f3f4f6] text-xl text-[#9ca3af]">
-                    👤
-                  </div>
+                  <ProfileAvatar
+                    name={user?.name ?? ""}
+                    avatar={user?.avatar ?? null}
+                    size={48}
+                  />
 
                   <div className="text-left">
                     <div className="text-sm font-semibold text-[#111827]">
-                      ユーザー名
-                    </div>
-                    <div className="text-xs break-all text-[#6b7280]">
-                      {user?.email ?? ""}
+                      {user?.name ?? "ユーザー名"}
                     </div>
                   </div>
                 </div>
 
-                <span className="text-[#6b7280]">⌄</span>
-              </div>
+                <span className="text-lg text-[#6b7280]">›</span>
+              </button>
             </div>
           </>
         );

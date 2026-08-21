@@ -142,6 +142,8 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
 
     const registerOptions = await post(app, "/auth/passkey/register/options", {
       email,
+      name: "統合テストユーザー",
+      avatar: "sky",
     });
     expect(registerOptions.status).toBe(200);
     const registerOptionsBody = await registerOptions.json();
@@ -180,7 +182,11 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       headers: { Authorization: `Bearer ${tokens.data.access_token}` },
     });
     expect(me.status).toBe(200);
-    await expect(me.json()).resolves.toEqual({ email });
+    await expect(me.json()).resolves.toEqual({
+      email,
+      name: "統合テストユーザー",
+      avatar: "sky",
+    });
 
     // 実DBでカテゴリーを作成・取得する。select対象の列とDBスキーマが
     // ずれた場合（例: icon列のマイグレーション未適用）はここで検出する。

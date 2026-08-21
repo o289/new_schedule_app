@@ -4,6 +4,7 @@ import type { Base64URLString } from "@simplewebauthn/server";
 
 import type { ChallengeCreate } from "#schemas/challenge";
 import type { PasskeyCreate } from "#schemas/passkey";
+import { avatarKeySchema } from "#schemas/user";
 import {
   ApiError,
   BadRequestError,
@@ -34,6 +35,7 @@ import type {
 } from "#schemas/auth";
 
 const challengeLifetimeMilliseconds = 5 * 60 * 1000;
+const provisionalUserName = "新しいユーザー";
 
 function challengeFingerprint(challenge: string): string {
   return createHash("sha256").update(challenge).digest("hex").slice(0, 12);
@@ -84,7 +86,7 @@ export class AuthService {
   private readonly passkeyRepository: PasskeyRepository;
   private readonly challengeRepository: ChallengeRepository;
 
-  constructor(database: Database = db) {
+  constructor(private readonly database: Database = db) {
     this.userRepository = new UserRepository(database);
     this.passkeyRepository = new PasskeyRepository(database);
     this.challengeRepository = new ChallengeRepository(database);
@@ -94,11 +96,15 @@ export class AuthService {
     payload: PasskeyRegisterOptionsRequest,
   ): Promise<PasskeyRegisterOptionsResponse> {
     const email = payload.email.trim().toLowerCase();
+    const name = payload.name.trim();
+    const existingUser = await this.userRepository.getByEmail(email);
     const user =
-      (await this.userRepository.getByEmail(email)) ??
-      (await this.userRepository.createUser(email));
+      existingUser ??
+      (await this.userRepository.createUser(email, provisionalUserName));
 
     const existingPasskeys = await this.passkeyRepository.getByUser(user.id);
+    const canConfirmProfile =
+      existingPasskeys.length === 0 && user.name === provisionalUserName;
     const excludeCredentials = existingPasskeys.map((passkey) => ({
       id: passkey.credentialId as Base64URLString,
     }));
@@ -114,6 +120,8 @@ export class AuthService {
       userId: user.id,
       challenge: publicKey.challenge,
       type: "register",
+      registrationName: canConfirmProfile ? name : null,
+      registrationAvatar: canConfirmProfile ? payload.avatar : null,
       expiresAt: new Date(
         Date.now() + challengeLifetimeMilliseconds,
       ).toISOString(),
@@ -167,6 +175,8 @@ export class AuthService {
       throw new BadRequestError("AUTH_INVALID_CHALLENGE");
     }
 
+    let challengeDeleted = false;
+
     try {
       if (challenge.expiresAt.getTime() < Date.now()) {
         logPasskeyAuth("warn", "register.challenge_expired", {
@@ -196,7 +206,26 @@ export class AuthService {
         transports: null,
       };
 
-      await this.passkeyRepository.create(passkeyInput);
+      await this.database.transaction(async (transaction) => {
+        const passkeyRepository = new PasskeyRepository(transaction);
+        const userRepository = new UserRepository(transaction);
+        const challengeRepository = new ChallengeRepository(transaction);
+
+        await passkeyRepository.create(passkeyInput);
+
+        if (typeof challenge.registrationName === "string") {
+          await userRepository.updateProfile(challenge.userId, {
+            name: challenge.registrationName,
+            avatar:
+              challenge.registrationAvatar === null
+                ? null
+                : avatarKeySchema.parse(challenge.registrationAvatar),
+          });
+        }
+
+        await challengeRepository.deleteByUser(challenge.userId);
+      });
+      challengeDeleted = true;
       logPasskeyAuth("info", "register.verify_succeeded", {
         userId: challenge.userId,
         challengeFingerprint: receivedFingerprint,
@@ -209,7 +238,9 @@ export class AuthService {
 
       throw new BadRequestError("PASSKEY_VERIFICATION_FAILED");
     } finally {
-      await this.challengeRepository.deleteByUser(challenge.userId);
+      if (!challengeDeleted) {
+        await this.challengeRepository.deleteByUser(challenge.userId);
+      }
       logPasskeyAuth("info", "register.challenge_deleted", {
         userId: challenge.userId,
         challengeFingerprint: receivedFingerprint,
@@ -243,6 +274,8 @@ export class AuthService {
       userId: user.id,
       challenge: publicKey.challenge,
       type: "login",
+      registrationName: null,
+      registrationAvatar: null,
       expiresAt: new Date(
         Date.now() + challengeLifetimeMilliseconds,
       ).toISOString(),

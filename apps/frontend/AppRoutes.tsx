@@ -3,6 +3,7 @@ import RequireAuth from "./components/RequireAuth";
 import { CalendarProvider } from "./context/CalendarContext";
 import EntrancePage from "./pages/EntrancePage";
 import Dashboard from "./pages/Dashboard";
+import EditUserPage from "./components/user/EditUserPage";
 
 export default function AppRoutes() {
   return (
@@ -19,6 +20,7 @@ export default function AppRoutes() {
               </CalendarProvider>
             }
           />
+          <Route path="/setting" element={<EditUserPage />} />
         </Route>
       </Routes>
     </>

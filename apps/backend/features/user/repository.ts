@@ -1,15 +1,16 @@
 import { eq } from "drizzle-orm";
 
 import { BaseRepository } from "#backend/database/repository";
+import type { AvatarKey } from "#schemas/user";
 import { users } from "./model";
 
 export type User = typeof users.$inferSelect;
 
 export class UserRepository extends BaseRepository {
-  async createUser(email: string): Promise<User> {
+  async createUser(email: string, name: string): Promise<User> {
     const [user] = await this.database
       .insert(users)
-      .values({ email })
+      .values({ email, name, avatar: null })
       .returning();
 
     if (!user) {
@@ -56,6 +57,19 @@ export class UserRepository extends BaseRepository {
     const [user] = await this.database
       .update(users)
       .set({ refreshToken: token })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return user ?? null;
+  }
+
+  async updateProfile(
+    userId: string,
+    profile: { name: string; avatar: AvatarKey | null },
+  ): Promise<User | null> {
+    const [user] = await this.database
+      .update(users)
+      .set(profile)
       .where(eq(users.id, userId))
       .returning();
 
