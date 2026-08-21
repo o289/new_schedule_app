@@ -18,11 +18,12 @@
 各フェーズは次の順序で進める。
 
 1. 現在のフェーズだけを実装する。
-2. `pnpm verify:phase`を実行する。
-3. typecheckが失敗した場合は原因を分析して修正し、`pnpm verify:phase`を再実行する。
-4. testが失敗した場合は原因を分析して修正し、testだけでなく`pnpm verify:phase`を再実行する。
-5. typecheckとtestの両方が成功した場合のみ、そのフェーズを完了にする。
-6. 次のフェーズへ進む。
+2. `pnpm format`を実行する。
+3. `pnpm verify:phase`を実行する。
+4. typecheckが失敗した場合は原因を分析して修正し、`pnpm verify:phase`を再実行する。
+5. testが失敗した場合は原因を分析して修正し、testだけでなく`pnpm verify:phase`を再実行する。
+6. typecheckとtestの両方が成功した場合のみ、そのフェーズを完了にする。
+7. 次のフェーズへ進む。
 
 すべてのフェーズ完了後にも`pnpm verify:phase`を実行し、全体の回帰がないことを確認する。
 

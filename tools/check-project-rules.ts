@@ -38,8 +38,10 @@ function resolveRelativeImport(file: string, specifier: string): string {
 }
 
 function isLocalRelativeImport(specifier: string): boolean {
-  return specifier.startsWith("./") ||
-    (specifier.startsWith("../") && !specifier.startsWith("../../"));
+  return (
+    specifier.startsWith("./") ||
+    (specifier.startsWith("../") && !specifier.startsWith("../../"))
+  );
 }
 
 function moduleScope(path: string, app: "frontend" | "backend"): string {
