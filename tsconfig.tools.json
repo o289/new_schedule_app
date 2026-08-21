@@ -15,7 +15,8 @@
     "vitest.config.ts",
     "drizzle.config.ts",
     "playwright.config.ts",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    "tools/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

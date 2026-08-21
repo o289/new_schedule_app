@@ -1,50 +1,46 @@
-# エージェント実行環境
+# エージェント開発フロー
 
-このプロジェクトでNode.js／pnpmコマンドを実行する前に、必ず **Node.js v22.23.1** を使用してください。
-
-`package.json` が許容するNode.jsの範囲は `>=22.13 <23` です。Node.js 20系および23系以降は使用しません。
-
-## 実行手順
-
-NVMが利用できる環境では、各作業の開始時に以下を実行します。
-
-```bash
-nvm use 22.23.1
-node --version
-```
-
-出力が `v22.23.1` であることを確認してから、依存関係のインストール、型チェック、テスト、ビルドを実行してください。
-
-```bash
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm test
-```
-
-### Docker Composeの使い分け
+## 実行環境
 
 - 通常の実装確認、typecheck、unit testは`compose.dev.yml`を使用する。
 - DB統合テストは`compose.test.yml`を使用する。
 - E2Eテスト用DBは`compose.e2e.yml`を使用する。
+- Node.js、pnpm、TypeScript、import境界の機械判定は`pnpm typecheck`に含まれるプロジェクトルール検査に従う。
 
-## 注意事項
+## 実装計画
 
-- `node --version` がv22.23.1以外なら、作業を続けずNode.jsのバージョンを切り替える。
-- Codexや自動実行環境では、対話ターミナルと異なるNode.jsが選ばれることがある。コマンド実行前に毎回確認する。
-- TypeScript 7はネイティブ実行ファイルを使うため、非対応Node.js環境では `Unknown system error -8` が発生する場合がある。
+- 実装計画は[`IMPLEMENTATION_PLAN_TEMPLATE.md`](IMPLEMENTATION_PLAN_TEMPLATE.md)の形式で作成する。
+- 複数フェーズの計画では、各フェーズに変更対象、実装内容、完了条件、品質ゲートを記載する。
+- 現在のフェーズの品質ゲートがすべてPASSになるまで、次のフェーズを開始しない。
 
-## コーディングルール
+## フェーズ品質ゲート
 
-- pnpmは`package.json`の`packageManager`に指定されたバージョンを必ず使用する。
-- TypeScriptでは`any`を使用しない。
+各フェーズは次の順序で進める。
+
+1. 現在のフェーズだけを実装する。
+2. `pnpm verify:phase`を実行する。
+3. typecheckが失敗した場合は原因を分析して修正し、`pnpm verify:phase`を再実行する。
+4. testが失敗した場合は原因を分析して修正し、testだけでなく`pnpm verify:phase`を再実行する。
+5. typecheckとtestの両方が成功した場合のみ、そのフェーズを完了にする。
+6. 次のフェーズへ進む。
+
+すべてのフェーズ完了後にも`pnpm verify:phase`を実行し、全体の回帰がないことを確認する。
+
+検証を実行できない場合はフェーズを完了扱いにせず、実行できない理由と必要な対応を報告する。
+
+## DB変更を含むフェーズ
+
+DBモデルを変更した場合は、品質ゲートの前に以下を行う。
+
+1. `pnpm db:generate`でmigrationを生成する。
+2. 生成されたSQLを確認する。
+3. 接続先がローカル開発DBであることを確認する。
+4. `pnpm db:migrate`を実行する。
+5. 通常の品質ゲートに加えて、`compose.test.yml`でDB統合テストを実行する。
+
+DBモデルの変更がない場合はmigrationを実行しない。
+
+## コーディング上の判断
+
 - コメントは必要最小限にする。
-
-## importルール
-
-- OS上の絶対パス（`/Users/...`など）はimportに使用しない。
-- `apps`から`packages`を参照する場合は、`#schemas/*`、`#contracts/*`、`#utils/*`を使用する。
-- frontend内で別featureまたは共通層を参照する場合は、`#frontend/*`を使用する。
-- backend内で別featureまたは共通層を参照する場合は、`#backend/*`を使用する。
-- 同一feature内の隣接ファイルは、`./`または`../`の相対importを維持する。
-- `packages`から`apps`をimportしない。frontendから`#backend/*`、backendから`#frontend/*`をimportしない。
-- alias定義は`package.json#imports`を唯一の定義場所とし、`tsconfig`の`paths`やVite/Vitestの個別aliasを追加しない。
+- 実装計画の範囲外に変更が必要になった場合は、理由を報告してから進める。

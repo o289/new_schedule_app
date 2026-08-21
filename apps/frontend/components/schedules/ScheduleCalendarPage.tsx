@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useCategory } from "../categories/useCategory";
-import { useSchedule } from "../schedules/useSchedule";
+import { useSchedule } from "./useSchedule";
 
 import useIsMobile from "#frontend/hooks/useIsMobile";
 
