@@ -9,8 +9,10 @@ import CalendarAside from "#frontend/components/calendar/CalendarAside";
 
 import { Drawer, CircularProgress } from "@mui/material";
 import CalendarHeader from "#frontend/components/calendar/CalendarHeader";
+import { useCalendar } from "#frontend/context/CalendarContext";
 
 export default function ScheduleCalendarPage() {
+  const { selectedCalendar } = useCalendar();
   const category = useCategory();
 
   const {
@@ -61,7 +63,9 @@ export default function ScheduleCalendarPage() {
         </div>
 
         <div className="flex-1 overflow-auto bg-white px-5">
-          <CalendarHeader isMobile={isMobile} />
+          {selectedCalendar.kind === "personal" && (
+            <CalendarHeader isMobile={isMobile} />
+          )}
           <CalendarMain
             schedules={schedules}
             resetDraft={resetDraft}

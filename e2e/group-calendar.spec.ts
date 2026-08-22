@@ -6,17 +6,16 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
 }) => {
   const groupName = createE2EName("group-calendar");
 
-  await page.goto("/groups");
+  await page.getByRole("button", { name: "グループ" }).click();
   await page.getByRole("button", { name: "作成する" }).click();
   await page.getByLabel("グループ名").fill(groupName);
   await page.getByRole("button", { name: "作成する" }).last().click();
   await page.getByRole("button", { name: "閉じる" }).click();
-  await page.getByRole("link", { name: new RegExp(groupName) }).click();
-  await page.getByRole("button", { name: "カレンダーを見る" }).click();
-
+  await expect(page.getByText(groupName, { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "グループカレンダー" }),
+    page.getByRole("button", { name: "コードをコピー" }),
   ).toBeVisible();
+
   await expect(page.locator(".fc-timegrid-col[data-date]")).toHaveCount(7);
   await expect(
     page.getByRole("button", { name: "前の週を表示" }),
@@ -27,6 +26,16 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
   await expect(
     page.getByRole("button", { name: "スケジュール登録" }),
   ).toHaveCount(0);
+
+  await page.getByLabel("表示するカレンダー").click();
+  await page.getByRole("option", { name: "マイカレンダー" }).click();
+  await expect(
+    page.getByRole("button", { name: "スケジュール登録" }),
+  ).toBeVisible();
+
+  await page.getByLabel("表示するカレンダー").click();
+  await page.getByRole("option", { name: groupName }).click();
+  await expect(page.locator(".fc-timegrid-col[data-date]")).toHaveCount(7);
 
   await page.setViewportSize({ width: 320, height: 720 });
   const isHorizontallyScrollable = await page

@@ -20,18 +20,19 @@ import {
   toGroupCalendarEvents,
   type GroupCalendarRange,
 } from "./groupCalendarView";
-import "./GroupCalendar.css";
 
 type GroupCalendarProps = {
   segments: GroupDailyBusySegment[];
   initialDate: string;
   onRangeChange: (range: GroupCalendarRange) => void;
+  onMenuOpen?: () => void;
 };
 
 export default function GroupCalendar({
   segments,
   initialDate,
   onRangeChange,
+  onMenuOpen,
 }: GroupCalendarProps) {
   const calendarRef = useRef<FullCalendar | null>(null);
   const [title, setTitle] = useState("");
@@ -61,29 +62,45 @@ export default function GroupCalendar({
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            aria-label="前の週を表示"
-            className="group-calendar-navigation"
-            onClick={() => calendarRef.current?.getApi().prev()}
-          >
-            <ChevronLeftIcon />
-          </button>
-          <button
-            type="button"
-            aria-label="次の週を表示"
-            className="group-calendar-navigation"
-            onClick={() => calendarRef.current?.getApi().next()}
-          >
-            <ChevronRightIcon />
-          </button>
+        <div className="contents md:flex md:gap-2">
+          {onMenuOpen && (
+            <button
+              type="button"
+              aria-label="メニューを開く"
+              className="flex h-12 items-center gap-1 rounded-2xl bg-white px-3 text-base font-bold text-[#111827] shadow-md"
+              onClick={onMenuOpen}
+            >
+              <ChevronLeftIcon />
+              メニュー
+            </button>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              aria-label="前の週を表示"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+              onClick={() => calendarRef.current?.getApi().prev()}
+            >
+              <ChevronLeftIcon />
+            </button>
+            <button
+              type="button"
+              aria-label="次の週を表示"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+              onClick={() => calendarRef.current?.getApi().next()}
+            >
+              <ChevronRightIcon />
+            </button>
+          </div>
         </div>
-        <h2 className="text-base font-bold text-[#111827]">{title}</h2>
+        <h2 className="hidden text-base font-bold text-[#111827] md:block">
+          {title}
+        </h2>
       </div>
 
-      <div className="group-calendar-scroll rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-        <div className="group-calendar-min-width">
+      <div className="min-w-full min-w-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
+        <div className="min-w-[760px]">
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, interactionPlugin, luxonPlugin]}
@@ -94,8 +111,6 @@ export default function GroupCalendar({
             firstDay={0}
             headerToolbar={false}
             allDaySlot={false}
-            slotMinTime="00:00:00"
-            slotMaxTime="24:00:00"
             slotDuration="00:30:00"
             editable={false}
             selectable={false}

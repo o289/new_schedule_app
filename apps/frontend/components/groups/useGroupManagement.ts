@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 
 import type { GroupCreate, GroupJoin } from "#schemas/group";
 import { useAlert } from "#frontend/context/AlertContext";
@@ -10,7 +9,6 @@ import { groupKeys } from "#frontend/lib/queryKeys";
 
 export function useGroupList() {
   const { showAlert } = useAlert();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const listQuery = useQuery({
     queryKey: groupKeys.lists(),
@@ -19,12 +17,8 @@ export function useGroupList() {
 
   useEffect(() => {
     if (!listQuery.error) return;
-    const error = listQuery.error;
-    showAlert(getApiErrorCode(error));
-    if (error instanceof ApiClientError && error.status === 404) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [listQuery.error, navigate, showAlert]);
+    showAlert(getApiErrorCode(listQuery.error));
+  }, [listQuery.error, showAlert]);
 
   const createMutation = useMutation({
     mutationFn: (input: GroupCreate) => groupApi.create(input),
@@ -36,9 +30,8 @@ export function useGroupList() {
   const joinMutation = useMutation({
     mutationFn: (input: GroupJoin) => groupApi.join(input),
     retry: false,
-    onSuccess: async (group) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
-      navigate(`/groups/${group.id}`);
     },
     onError: (error) => {
       if (
@@ -46,17 +39,10 @@ export function useGroupList() {
         error.code === "ALREADY_GROUP_MEMBER" &&
         error.details
       ) {
-        navigate(`/groups/${error.details.groupId}`);
         return;
       }
 
       showAlert(getApiErrorCode(error));
-      if (error instanceof ApiClientError && error.status === 403) {
-        navigate("/groups", { replace: true });
-      }
-      if (error instanceof ApiClientError && error.status === 404) {
-        navigate("/dashboard", { replace: true });
-      }
     },
   });
 
@@ -65,7 +51,6 @@ export function useGroupList() {
 
 export function useGroupDetail(groupId: string) {
   const { showAlert } = useAlert();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const detailQuery = useQuery({
     queryKey: groupKeys.detail(groupId),
@@ -74,15 +59,8 @@ export function useGroupDetail(groupId: string) {
 
   useEffect(() => {
     if (!detailQuery.error) return;
-    const error = detailQuery.error;
-    showAlert(getApiErrorCode(error));
-    if (error instanceof ApiClientError && error.status === 403) {
-      navigate("/groups", { replace: true });
-    }
-    if (error instanceof ApiClientError && error.status === 404) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [detailQuery.error, navigate, showAlert]);
+    showAlert(getApiErrorCode(detailQuery.error));
+  }, [detailQuery.error, showAlert]);
 
   const invalidateDetail = () =>
     queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
@@ -99,7 +77,6 @@ export function useGroupDetail(groupId: string) {
     onSuccess: async () => {
       removeGroupCache();
       await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
-      navigate("/groups", { replace: true });
     },
   });
   const kickMutation = useMutation({
@@ -118,18 +95,11 @@ export function useGroupDetail(groupId: string) {
     onSuccess: async () => {
       removeGroupCache();
       await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
-      navigate("/groups", { replace: true });
     },
   });
 
   const handleMutationError = (error: unknown) => {
     showAlert(getApiErrorCode(error));
-    if (error instanceof ApiClientError && error.status === 403) {
-      navigate("/groups", { replace: true });
-    }
-    if (error instanceof ApiClientError && error.status === 404) {
-      navigate("/dashboard", { replace: true });
-    }
   };
 
   return {
