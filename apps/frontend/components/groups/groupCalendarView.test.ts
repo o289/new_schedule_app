@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GroupDailyBusySegment } from "./groupCalendarSegments";
 import {
   formatGroupCalendarEventTime,
+  formatGroupCalendarEventTimeRange,
   getGroupCalendarRange,
   getInitialGroupCalendarRange,
   toGroupCalendarEvents,
@@ -63,5 +64,20 @@ describe("group calendar view adapter", () => {
     expect(formatGroupCalendarEventTime("2026-08-23T09:30:00")).toBe(
       "2026年08月23日 09:30",
     );
+  });
+
+  it("同日なら時刻のみ、日跨ぎなら終了時刻に翌日を付けて表示する", () => {
+    expect(
+      formatGroupCalendarEventTimeRange(
+        "2026-08-23T09:30:00",
+        "2026-08-23T10:30:00",
+      ),
+    ).toBe("09:30〜10:30");
+    expect(
+      formatGroupCalendarEventTimeRange(
+        "2026-08-23T23:30:00",
+        "2026-08-24T01:00:00",
+      ),
+    ).toBe("23:30〜翌日 01:00");
   });
 });

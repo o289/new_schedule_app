@@ -79,3 +79,17 @@ export function formatGroupCalendarEventTime(value: string): string {
   const [year, month, date] = day!.split("-");
   return `${year}年${month}月${date}日 ${time!.slice(0, 5)}`;
 }
+
+export function formatGroupCalendarEventTimeRange(
+  startDate: string,
+  endDate: string,
+): string {
+  const startTime = startDate.split("T")[1]!.slice(0, 5);
+  const endTime = endDate.split("T")[1]!.slice(0, 5);
+  const startDay = startDate.split("T")[0];
+  const endDay = endDate.split("T")[0];
+
+  return startDay === endDay
+    ? `${startTime}〜${endTime}`
+    : `${startTime}〜翌日 ${endTime}`;
+}

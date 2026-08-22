@@ -3,7 +3,7 @@ import { Drawer, IconButton } from "@mui/material";
 
 import { ProfileAvatar } from "#frontend/components/common/ProfileAvatar";
 import type { GroupDailyBusySegment } from "./groupCalendarSegments";
-import { formatGroupCalendarEventTime } from "./groupCalendarView";
+import { formatGroupCalendarEventTimeRange } from "./groupCalendarView";
 
 type GroupEventDetailDrawerProps = {
   segment: GroupDailyBusySegment | null;
@@ -19,22 +19,25 @@ export default function GroupEventDetailDrawer({
       anchor="right"
       open={segment !== null}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: "min(100%, 360px)", sm: 400 } } }}
+      PaperProps={{ sx: { width: { xs: "100vw", sm: 400 } } }}
     >
       <section aria-label="グループ予定の詳細" className="h-full p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-[#2563eb]">予定あり</p>
-            {segment && (
-              <p className="mt-2 text-sm text-[#4b5563]">
-                {formatGroupCalendarEventTime(segment.startDate)}〜
-                {formatGroupCalendarEventTime(segment.endDate)}
-              </p>
-            )}
-          </div>
+        <div className="flex justify-end">
           <IconButton aria-label="予定詳細を閉じる" onClick={onClose}>
             <CloseIcon />
           </IconButton>
+        </div>
+
+        <div className="text-center">
+          <p className="text-sm font-semibold text-[#2563eb]">予定あり</p>
+          {segment && (
+            <p className="mt-2 text-sm text-[#4b5563]">
+              {formatGroupCalendarEventTimeRange(
+                segment.startDate,
+                segment.endDate,
+              )}
+            </p>
+          )}
         </div>
 
         <h2 className="mt-8 text-lg font-bold text-[#111827]">
@@ -56,8 +59,10 @@ export default function GroupEventDetailDrawer({
                   {event.member.name}
                 </p>
                 <p className="mt-1 text-xs text-[#4b5563]">
-                  {formatGroupCalendarEventTime(event.startDate)}〜
-                  {formatGroupCalendarEventTime(event.endDate)}
+                  {formatGroupCalendarEventTimeRange(
+                    event.startDate,
+                    event.endDate,
+                  )}
                 </p>
               </div>
             </li>
