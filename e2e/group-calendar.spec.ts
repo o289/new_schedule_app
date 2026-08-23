@@ -11,7 +11,9 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
   await page.getByLabel("グループ名").fill(groupName);
   await page.getByRole("button", { name: "作成する" }).last().click();
   await page.getByRole("button", { name: "閉じる" }).click();
-  await expect(page.getByText(groupName, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: groupName, exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "メンバーを招待" }),
   ).toBeVisible();
@@ -38,11 +40,13 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
   await expect(page.locator(".fc-timegrid-col[data-date]")).toHaveCount(7);
 
   await page.setViewportSize({ width: 320, height: 720 });
-  const isHorizontallyScrollable = await page
-    .locator(".group-calendar-scroll")
-    .evaluate((element) => {
-      const container = element as HTMLElement;
-      return container.scrollWidth > container.clientWidth;
-    });
-  expect(isHorizontallyScrollable).toBe(true);
+  const calendarScroll = page.locator(".group-calendar-scroll");
+  await expect
+    .poll(() =>
+      calendarScroll.evaluate((element) => {
+        const container = element as HTMLElement;
+        return container.scrollWidth > container.clientWidth;
+      }),
+    )
+    .toBe(true);
 });

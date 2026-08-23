@@ -146,6 +146,7 @@ test("ログアウトでセッションを削除し、dashboardを保護する",
   await installVirtualAuthenticator(context);
   await registerAndLogin(page, createE2EEmail("logout"));
 
+  await page.goto("/setting");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "ログアウト" }).click();
 

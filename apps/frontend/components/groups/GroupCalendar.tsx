@@ -99,8 +99,8 @@ export default function GroupCalendar({
         </h2>
       </div>
 
-      <div className="min-w-full min-w-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-        <div className="min-w-[760px]">
+      <div className="group-calendar-scroll w-full min-w-0 max-w-full overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
+        <div className="w-[760px]">
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, interactionPlugin, luxonPlugin]}

@@ -34,6 +34,7 @@ test("ログアウト後に別ユーザーへ切り替えても前ユーザー�
   await expect(page.getByText(scheduleTitle, { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "戻る" }).click();
+  await page.goto("/setting");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "ログアウト" }).click();
   await expect(page).toHaveURL("/");
