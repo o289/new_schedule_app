@@ -15,10 +15,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-}
-
 body {
   margin: 0;
   display: block;
@@ -29,23 +25,4 @@ body {
   background: #f5f6f8;
   text-align: center;
   font-family: sans-serif;
-}
-
-h1 {
-  font-size: 2em;
-  line-height: 1.1;
-  margin-top: 0;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: blue;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
 }

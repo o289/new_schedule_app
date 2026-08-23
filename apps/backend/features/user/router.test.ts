@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   requireCurrentUser: vi.fn(),
   verifyAccessToken: vi.fn(),
   getById: vi.fn(),
+  updateProfile: vi.fn(),
 }));
 
 vi.mock("../auth/service", () => ({
@@ -28,6 +29,7 @@ vi.mock("../../core/current-user", () => ({
 vi.mock("./repository", () => ({
   UserRepository: class {
     getById = mocks.getById;
+    updateProfile = mocks.updateProfile;
   },
 }));
 
@@ -80,6 +82,8 @@ describe("user router", () => {
     mocks.requireCurrentUser.mockResolvedValue({
       id: "user-id",
       email: "test@example.com",
+      name: "テストユーザー",
+      avatar: "sky",
       refreshToken: "secret-refresh-token",
     });
 
@@ -90,8 +94,67 @@ describe("user router", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       email: "test@example.com",
+      name: "テストユーザー",
+      avatar: "sky",
     });
     expect(mocks.requireCurrentUser).toHaveBeenCalledOnce();
+  });
+
+  it("PUT /auth/me はプロフィールを更新する", async () => {
+    const user = {
+      id: "user-id",
+      email: "test@example.com",
+      name: "更新後の名前",
+      avatar: "violet" as const,
+      refreshToken: "secret-refresh-token",
+    };
+    mocks.requireCurrentUser.mockResolvedValue(user);
+    mocks.updateProfile.mockResolvedValue(user);
+
+    const response = await app.request("/auth/me", {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer access-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "更新後の名前", avatar: "violet" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      email: "test@example.com",
+      name: "更新後の名前",
+      avatar: "violet",
+    });
+    expect(mocks.updateProfile).toHaveBeenCalledWith("user-id", {
+      name: "更新後の名前",
+      avatar: "violet",
+    });
+  });
+
+  it("PUT /auth/me は不正な入力を422にする", async () => {
+    mocks.requireCurrentUser.mockResolvedValue({
+      id: "user-id",
+      email: "test@example.com",
+      name: "テストユーザー",
+      avatar: null,
+      refreshToken: "secret-refresh-token",
+    });
+
+    const response = await app.request("/auth/me", {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer access-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "", avatar: "invalid" }),
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+    });
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
   });
 
   it("不正なrefreshリクエストを400にする", async () => {

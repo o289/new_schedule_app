@@ -7,7 +7,17 @@ import {
   type MobileCalendarView,
 } from "../components/calendar/calendarView";
 
-export type AsideMode = "create" | "edit" | "detail" | "category" | null;
+export type AsideMode =
+  | "create"
+  | "edit"
+  | "detail"
+  | "category"
+  | "group-list"
+  | "group-detail"
+  | null;
+
+export type CalendarSelection =
+  { kind: "personal" } | { kind: "group"; groupId: string };
 
 interface CalendarContextValue {
   calendarRef: RefObject<FullCalendar | null>;
@@ -22,6 +32,12 @@ interface CalendarContextValue {
   setSelectedScheduleId: (scheduleId: string | null) => void;
   asideMode: AsideMode;
   setAsideMode: (mode: AsideMode) => void;
+  selectedCalendar: CalendarSelection;
+  setSelectedCalendar: (selection: CalendarSelection) => void;
+  createdJoinCode: { groupId: string; joinCode: string } | null;
+  setCreatedJoinCode: (
+    joinCode: { groupId: string; joinCode: string } | null,
+  ) => void;
   handleDesktopWeekSelect: (date: Date) => void;
   handleMobileDaySelect: (date: Date) => void;
   handleNext: () => void;
@@ -43,6 +59,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     null,
   );
   const [asideMode, setAsideMode] = useState<AsideMode>(null);
+  const [selectedCalendar, setSelectedCalendar] = useState<CalendarSelection>({
+    kind: "personal",
+  });
+  const [createdJoinCode, setCreatedJoinCode] = useState<{
+    groupId: string;
+    joinCode: string;
+  } | null>(null);
   const calendarRef = useRef<FullCalendar | null>(null);
 
   const handleDesktopWeekSelect = (date: Date) => {
@@ -96,6 +119,10 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         setSelectedScheduleId,
         asideMode,
         setAsideMode,
+        selectedCalendar,
+        setSelectedCalendar,
+        createdJoinCode,
+        setCreatedJoinCode,
         handleDesktopWeekSelect,
         handleMobileDaySelect,
         handleNext,

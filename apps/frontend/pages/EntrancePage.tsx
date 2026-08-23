@@ -3,7 +3,14 @@ import type { FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
-import { Button, TextField } from "@mui/material";
+import {
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+} from "@mui/material";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
@@ -22,9 +29,19 @@ import { getApiErrorCode, ApiClientError } from "../lib/apiError";
 import { authKeys } from "../lib/queryKeys";
 import { saveTokens } from "../lib/sessionManager";
 import { useAlert } from "../context/AlertContext";
+import { avatarKeySchema, type AvatarKey } from "#schemas/user";
 
-export default function EntrancePage() {
+type EntryResult = "authenticated" | "registration-required";
+
+export default function EntrancePage({
+  onAuthenticated,
+}: {
+  onAuthenticated?: () => void;
+}) {
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState<AvatarKey | "">("");
+  const [isRegistration, setIsRegistration] = useState(false);
   const { showAlert } = useAlert();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -52,38 +69,56 @@ export default function EntrancePage() {
   };
 
   const loginMutation = useMutation({
-    mutationFn: async (email: string) => {
-      try {
+    mutationFn: async (): Promise<EntryResult> => {
+      if (isRegistration) {
+        const registerOptionsRes = await authApi.registerOptions({
+          email,
+          name,
+          avatar: avatar || null,
+        });
+        const registrationCredential = await startRegistration(
+          registerOptionsRes.data.publicKey,
+        );
+        await authApi.registerVerify(
+          formatRegistrationCredential(registrationCredential),
+        );
         await executeLoginFlow(email);
-        return;
-      } catch (error) {
-        if (
-          !(error instanceof ApiClientError) ||
-          error.code !== "PASSKEY_NOT_FOUND"
-        ) {
-          throw error;
-        }
+        return "authenticated";
       }
 
-      const registerOptionsRes = await authApi.registerOptions(email);
-      const registrationCredential = await startRegistration(
-        registerOptionsRes.data.publicKey,
-      );
-      await authApi.registerVerify(
-        formatRegistrationCredential(registrationCredential),
-      );
-      await executeLoginFlow(email);
+      try {
+        await executeLoginFlow(email);
+        return "authenticated";
+      } catch (error) {
+        if (
+          error instanceof ApiClientError &&
+          error.code === "PASSKEY_NOT_FOUND"
+        ) {
+          return "registration-required";
+        }
+        throw error;
+      }
     },
-    onSuccess: () => navigate("/dashboard"),
+    onSuccess: (result) => {
+      if (result === "registration-required") {
+        setIsRegistration(true);
+        return;
+      }
+      if (onAuthenticated) {
+        onAuthenticated();
+        return;
+      }
+      navigate("/dashboard");
+    },
     onError: (error) => showAlert(getApiErrorCode(error)),
   });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!email) return;
+    if (!email || (isRegistration && !name.trim())) return;
 
-    await loginMutation.mutateAsync(email);
+    await loginMutation.mutateAsync();
   };
 
   return (
@@ -156,6 +191,52 @@ export default function EntrancePage() {
                 }}
               />
 
+              {isRegistration && (
+                <>
+                  <TextField
+                    fullWidth
+                    required
+                    name="name"
+                    id="name"
+                    label="表示名"
+                    placeholder="例: 山田 花子"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="name"
+                    sx={{ marginTop: 2 }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          borderRadius: "12px",
+                          backgroundColor: "#f9fafb",
+                        },
+                      },
+                    }}
+                  />
+
+                  <FormControl fullWidth sx={{ marginTop: 2 }}>
+                    <InputLabel id="avatar-label">アバター</InputLabel>
+                    <Select
+                      labelId="avatar-label"
+                      id="avatar"
+                      label="アバター"
+                      value={avatar}
+                      onChange={(event) =>
+                        setAvatar(event.target.value as AvatarKey | "")
+                      }
+                      sx={{ borderRadius: "12px", backgroundColor: "#f9fafb" }}
+                    >
+                      <MenuItem value="">選択しない</MenuItem>
+                      {avatarKeySchema.options.map((avatarKey) => (
+                        <MenuItem key={avatarKey} value={avatarKey}>
+                          {avatarKey}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </>
+              )}
+
               <Button
                 fullWidth
                 type="submit"
@@ -175,7 +256,9 @@ export default function EntrancePage() {
               >
                 {loginMutation.isPending
                   ? "確認しています…"
-                  : "アプリの利用を開始"}
+                  : isRegistration
+                    ? "登録して利用を開始"
+                    : "アプリの利用を開始"}
               </Button>
 
               <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-[#7b8491]">

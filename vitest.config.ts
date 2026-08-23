@@ -41,7 +41,15 @@ export default defineConfig({
       {
         test: {
           name: "backend",
-          include: ["apps/backend/**/*.test.ts"],
+          include: ["apps/backend/**/*.test.ts", "packages/**/*.test.ts"],
+          exclude: ["apps/backend/**/*.integration.test.ts"],
+          environment: "node",
+        },
+      },
+      {
+        test: {
+          name: "integration",
+          include: ["apps/backend/**/*.integration.test.ts"],
           environment: "node",
         },
       },

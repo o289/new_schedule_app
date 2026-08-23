@@ -20,6 +20,16 @@ async function registerAndLogin(page: Page, email: string): Promise<void> {
   await page.goto("/");
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByRole("button", { name: "アプリの利用を開始" }).click();
+
+  const nameInput = page.getByLabel("表示名");
+  await Promise.race([
+    expect(page).toHaveURL(/\/dashboard$/),
+    nameInput.waitFor({ state: "visible" }),
+  ]);
+  if (await nameInput.isVisible()) {
+    await nameInput.fill("E2E テストユーザー");
+    await page.getByRole("button", { name: "登録して利用を開始" }).click();
+  }
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
@@ -103,7 +113,11 @@ test("初回メールアドレスで登録後にログインし、dashboardを�
         {
           path: "/auth/me",
           status: 200,
-          body: { email },
+          body: {
+            email,
+            name: "E2E テストユーザー",
+            avatar: null,
+          },
         },
       ]),
     );
@@ -132,6 +146,7 @@ test("ログアウトでセッションを削除し、dashboardを保護する",
   await installVirtualAuthenticator(context);
   await registerAndLogin(page, createE2EEmail("logout"));
 
+  await page.goto("/setting");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "ログアウト" }).click();
 

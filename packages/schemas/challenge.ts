@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { avatarKeySchema, userNameSchema } from "./user";
 
 /**
  * Repositoryへ渡すDB保存用スキーマ
@@ -7,6 +8,8 @@ export const challengeCreateSchema = z.object({
   userId: z.uuid(),
   challenge: z.string(),
   type: z.enum(["register", "login"]),
+  registrationName: userNameSchema.nullable(),
+  registrationAvatar: avatarKeySchema.nullable(),
   expiresAt: z.iso.datetime(),
 });
 
@@ -18,6 +21,8 @@ export const challengeResponseSchema = z.object({
   userId: z.uuid(),
   challenge: z.string(),
   type: z.enum(["register", "login"]),
+  registrationName: userNameSchema.nullable(),
+  registrationAvatar: avatarKeySchema.nullable(),
   expiresAt: z.iso.datetime(),
 });
 

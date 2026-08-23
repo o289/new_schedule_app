@@ -6,11 +6,13 @@ import type {
 } from "@simplewebauthn/server";
 import { z } from "zod";
 
-import { userEmailSchema } from "./user";
+import { avatarKeySchema, userEmailSchema, userNameSchema } from "./user";
 
 /** Passkey登録optionsを取得するリクエスト。 */
 export const passkeyRegisterOptionsRequestSchema = z.object({
   email: userEmailSchema,
+  name: userNameSchema,
+  avatar: avatarKeySchema.nullable(),
 });
 
 const credentialBaseShape = {

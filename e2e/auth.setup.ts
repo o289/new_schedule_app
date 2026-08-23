@@ -20,6 +20,8 @@ setup("認証済みE2Eユーザーを作成する", async ({ context, page }) =>
   await page.goto("/");
   await page.getByLabel("メールアドレス").fill(createE2EEmail("setup"));
   await page.getByRole("button", { name: "アプリの利用を開始" }).click();
+  await page.getByLabel("表示名").fill("E2E テストユーザー");
+  await page.getByRole("button", { name: "登録して利用を開始" }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect

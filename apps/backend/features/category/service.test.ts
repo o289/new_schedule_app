@@ -7,6 +7,8 @@ import { CategoryRepository } from "./repository";
 const user = {
   id: "11111111-1111-4111-8111-111111111111",
   email: "category@example.com",
+  name: "カテゴリーユーザー",
+  avatar: null,
   refreshToken: null,
 };
 

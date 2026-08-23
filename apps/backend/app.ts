@@ -3,9 +3,11 @@ import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 
 import type { ApiErrorResponse } from "#contracts/api-error";
-import { ApiError } from "./core/api-error";
+import { alreadyGroupMemberErrorSchema } from "#schemas/group";
+import { AlreadyGroupMemberError, ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
 import { categoryRouter } from "./features/category/router";
+import { groupRouter } from "./features/group/router";
 import { scheduleRouter } from "./features/schedule/router";
 import { userRouter } from "./features/user/router";
 
@@ -46,11 +48,13 @@ app.get("/ping", (c) => c.json({ message: "pong" }));
 app.use("/auth/*", noStore);
 app.use("/categories/*", noStore);
 app.use("/schedules/*", noStore);
+app.use("/groups/*", noStore);
 
 app.route("/", authRouter);
 app.route("/", userRouter);
 app.route("/", categoryRouter);
 app.route("/", scheduleRouter);
+app.route("/", groupRouter);
 
 if (process.env.NODE_ENV === "production") {
   // 本番コンテナでは React のビルド結果を同じオリジンから配信する。
@@ -67,8 +71,15 @@ if (process.env.NODE_ENV === "production") {
 
 app.onError((error, context) => {
   if (error instanceof ApiError) {
-    const response: ApiErrorResponse = { code: error.code };
-    return context.json(response, error.status);
+    if (error instanceof AlreadyGroupMemberError) {
+      const response: ApiErrorResponse = alreadyGroupMemberErrorSchema.parse({
+        code: error.code,
+        data: { groupId: error.groupId },
+      });
+      return context.json(response, error.status);
+    }
+
+    return context.json({ code: error.code }, error.status);
   }
 
   console.error(error);

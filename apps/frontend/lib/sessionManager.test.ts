@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { categoryKeys } from "./queryKeys";
+import { categoryKeys, groupKeys } from "./queryKeys";
 import { queryClient } from "./queryClient";
 import {
   clearSession,
@@ -49,10 +49,12 @@ describe("Session Manager", () => {
   it("clearSessionでTokenとQuery cacheを消す", () => {
     saveTokens({ accessToken: "access-token", refreshToken: "refresh-token" });
     queryClient.setQueryData(categoryKeys.lists(), [{ id: "category-id" }]);
+    queryClient.setQueryData(groupKeys.lists(), [{ id: "group-id" }]);
 
     clearSession();
 
     expect(getAccessToken()).toBeNull();
     expect(queryClient.getQueryData(categoryKeys.lists())).toBeUndefined();
+    expect(queryClient.getQueryData(groupKeys.lists())).toBeUndefined();
   });
 });

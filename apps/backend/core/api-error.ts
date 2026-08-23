@@ -42,6 +42,12 @@ export class ConflictError extends ApiError {
   }
 }
 
+export class AlreadyGroupMemberError extends ConflictError {
+  constructor(readonly groupId: string) {
+    super("ALREADY_GROUP_MEMBER");
+  }
+}
+
 export class ValidationError extends ApiError {
   constructor(code: ApiErrorCode) {
     super(422, code);

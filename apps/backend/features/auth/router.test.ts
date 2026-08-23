@@ -78,6 +78,8 @@ describe("auth router", () => {
 
     const response = await post("/auth/passkey/register/options", {
       email: "test@example.com",
+      name: "テストユーザー",
+      avatar: "sky",
     });
 
     expect(response.status).toBe(200);
@@ -85,6 +87,8 @@ describe("auth router", () => {
     await expect(response.json()).resolves.toEqual(result);
     expect(serviceMocks.registerOptions).toHaveBeenCalledWith({
       email: "test@example.com",
+      name: "テストユーザー",
+      avatar: "sky",
     });
   });
 

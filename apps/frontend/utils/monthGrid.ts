@@ -74,6 +74,17 @@ export function generateMonthGrid(
   return weeks;
 }
 
+/** 表示月に含まれる指定曜日の日付文字列を返す。 */
+export function getCurrentMonthWeekdayDates(
+  weeks: MonthGridDay[][],
+  weekday: number,
+): string[] {
+  return weeks
+    .flat()
+    .filter((day) => day.isCurrentMonth && day.date.getDay() === weekday)
+    .map((day) => day.dateString);
+}
+
 /**
  * 日オブジェクト生成（UI依存なし）
  */

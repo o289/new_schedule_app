@@ -8,6 +8,7 @@ import {
   timestamp,
   check,
   foreignKey,
+  index,
 } from "drizzle-orm/pg-core";
 
 import { users } from "../user/model";
@@ -25,6 +26,8 @@ export const schedules = pgTable(
 
     note: text("note"),
 
+    url: varchar("url", { length: 2048 }),
+
     categoryId: uuid("category_id").notNull(),
 
     isTentative: boolean("is_tentative").notNull().default(false),
@@ -41,6 +44,7 @@ export const schedules = pgTable(
       foreignColumns: [categories.id, categories.userId],
       name: "schedules_category_user_fk",
     }),
+    index("schedules_user_id_index").on(table.userId),
   ],
 );
 
@@ -67,6 +71,7 @@ export const scheduleDates = pgTable(
   },
   (table) => [
     check("chk_end_after_start", sql`${table.endDate} >= ${table.startDate}`),
+    index("schedule_dates_start_end_index").on(table.startDate, table.endDate),
   ],
 );
 
