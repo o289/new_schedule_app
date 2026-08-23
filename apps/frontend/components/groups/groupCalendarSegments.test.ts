@@ -28,7 +28,7 @@ function event(
 }
 
 describe("group calendar segments", () => {
-  it("1人・複数人・重複予定を日ごとの外接区間へ集約する", () => {
+  it("重複・隣接する予定だけを同じ区間へ集約する", () => {
     const daily = aggregateGroupBusyEvents([
       event(
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -54,12 +54,47 @@ describe("group calendar segments", () => {
       {
         day: "2026-08-21",
         startDate: "2026-08-21T09:00:00",
-        endDate: "2026-08-21T13:00:00",
+        endDate: "2026-08-21T11:00:00",
         memberCount: 2,
         memberIds: [memberA.userId, memberB.userId],
+        events: [
+          { dateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+          { dateId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+        ],
+      },
+      {
+        day: "2026-08-21",
+        startDate: "2026-08-21T12:00:00",
+        endDate: "2026-08-21T13:00:00",
+        memberCount: 1,
+        memberIds: [memberA.userId],
+        events: [{ dateId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }],
       },
     ]);
-    expect(daily[0]?.events).toHaveLength(3);
+  });
+
+  it("終了時刻と開始時刻が同じ予定は連続した1区間にする", () => {
+    const daily = aggregateGroupBusyEvents([
+      event(
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        memberA,
+        "2026-08-21T00:00:00",
+        "2026-08-21T01:00:00",
+      ),
+      event(
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        memberB,
+        "2026-08-21T01:00:00",
+        "2026-08-21T02:00:00",
+      ),
+    ]);
+
+    expect(daily).toHaveLength(1);
+    expect(daily[0]).toMatchObject({
+      startDate: "2026-08-21T00:00:00",
+      endDate: "2026-08-21T02:00:00",
+      memberCount: 2,
+    });
   });
 
   it("日跨ぎ予定を日境界で分割し、終了端は翌日に含めない", () => {

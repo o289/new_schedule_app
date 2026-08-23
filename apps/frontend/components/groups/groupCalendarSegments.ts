@@ -77,25 +77,46 @@ export function aggregateGroupBusyEvents(
   }
 
   return [...byDay.entries()]
-    .map(([day, segments]) => {
+    .flatMap(([day, segments]) => {
       const sorted = [...segments].sort((left, right) =>
         left.startDate.localeCompare(right.startDate),
       );
-      const memberIds = [
-        ...new Set(sorted.map((event) => event.member.userId)),
-      ];
-      return {
-        day,
-        startDate: sorted[0]!.startDate,
-        endDate: [...sorted].sort((left, right) =>
-          right.endDate.localeCompare(left.endDate),
-        )[0]!.endDate,
-        memberCount: memberIds.length,
-        memberIds,
-        events: sorted,
-      };
+      const groups: GroupCalendarSegment[][] = [];
+
+      for (const segment of sorted) {
+        const current = groups.at(-1);
+        const currentEnd = current?.reduce(
+          (latest, event) => (event.endDate > latest ? event.endDate : latest),
+          current[0]!.endDate,
+        );
+
+        if (!current || !currentEnd || segment.startDate > currentEnd) {
+          groups.push([segment]);
+        } else {
+          current.push(segment);
+        }
+      }
+
+      return groups.map((group) => {
+        const memberIds = [
+          ...new Set(group.map((event) => event.member.userId)),
+        ];
+        const endDate = group.reduce(
+          (latest, event) => (event.endDate > latest ? event.endDate : latest),
+          group[0]!.endDate,
+        );
+
+        return {
+          day,
+          startDate: group[0]!.startDate,
+          endDate,
+          memberCount: memberIds.length,
+          memberIds,
+          events: group,
+        };
+      });
     })
-    .sort((left, right) => left.day.localeCompare(right.day));
+    .sort((left, right) => left.startDate.localeCompare(right.startDate));
 }
 
 function addMinutes(value: string, minutes: number): string {
