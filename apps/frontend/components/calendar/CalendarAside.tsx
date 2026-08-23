@@ -2,7 +2,6 @@ import { Button, MenuItem, Select } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { Add as AddIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
-import UndoIcon from "@mui/icons-material/Undo";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 
@@ -124,16 +123,11 @@ export default function CalendarAside({
     selectedCalendar,
     setSelectedCalendar,
   } = useCalendar();
-  const { user, logout } = useSession();
+  const { user } = useSession();
   const { listQuery } = useGroupList();
   const selectedSchedule =
     schedules.find((schedule) => schedule.id === selectedScheduleId) ?? null;
   const navigate = useNavigate();
-  const onLogout = async () => {
-    if (!window.confirm("ログアウトしますか？")) return;
-    await logout();
-    navigate("/", { replace: true });
-  };
 
   function renderAsideContent() {
     switch (asideMode) {
@@ -296,15 +290,6 @@ export default function CalendarAside({
                 className="!mt-2 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
               >
                 グループ
-              </Button>
-
-              <Button
-                variant="outlined"
-                startIcon={<UndoIcon />}
-                onClick={onLogout}
-                className="!mt-2 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
-              >
-                ログアウト
               </Button>
 
               <button

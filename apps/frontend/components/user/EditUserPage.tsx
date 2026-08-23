@@ -1,4 +1,5 @@
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import UndoIcon from "@mui/icons-material/Undo";
 import { Button, TextField } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -25,7 +26,7 @@ export default function EditUserPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showAlert } = useAlert();
-  const { user } = useSession();
+  const { user, logout } = useSession();
   const [name, setName] = useState(user?.name ?? "");
   const [avatar, setAvatar] = useState<AvatarKey | null>(user?.avatar ?? null);
 
@@ -43,6 +44,12 @@ export default function EditUserPage() {
   const handleSave = async () => {
     if (!name.trim()) return;
     await updateProfileMutation.mutateAsync();
+  };
+
+  const handleLogout = async () => {
+    if (!window.confirm("ログアウトしますか？")) return;
+    await logout();
+    navigate("/", { replace: true });
   };
 
   return (
@@ -144,6 +151,15 @@ export default function EditUserPage() {
             {updateProfileMutation.isPending ? "保存しています…" : "保存する"}
           </Button>
         </div>
+
+        <Button
+          variant="outlined"
+          startIcon={<UndoIcon />}
+          onClick={handleLogout}
+          className="!mt-4 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
+        >
+          ログアウト
+        </Button>
       </section>
     </main>
   );
