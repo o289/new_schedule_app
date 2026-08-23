@@ -44,6 +44,10 @@ export type GroupCreationResult = {
   joinCode: string;
 };
 
+export type GroupInvitationResult = {
+  joinCode: string;
+};
+
 export function digestJoinCode(joinCode: string): string {
   return createHash("sha256").update(normalizeJoinCode(joinCode)).digest("hex");
 }
@@ -159,6 +163,35 @@ export class GroupRepository extends BaseRepository {
     input: GroupCreate,
     ownerUserId: string,
   ): Promise<GroupCreationResult> {
+    const generated = await this.withGeneratedJoinCode((joinCodeDigest) =>
+      this.createWithOwner(input, ownerUserId, joinCodeDigest),
+    );
+
+    return { group: generated.result, joinCode: generated.joinCode };
+  }
+
+  async regenerateJoinCode(
+    groupId: string,
+  ): Promise<GroupInvitationResult | null> {
+    const generated = await this.withGeneratedJoinCode(
+      async (joinCodeDigest) => {
+        const [group] = await this.database
+          .update(groups)
+          .set({ joinCodeDigest })
+          .where(eq(groups.id, groupId))
+          .returning({ id: groups.id });
+
+        return group !== undefined;
+      },
+    );
+
+    if (!generated.result) return null;
+    return { joinCode: generated.joinCode };
+  }
+
+  private async withGeneratedJoinCode<T>(
+    operation: (joinCodeDigest: string) => Promise<T>,
+  ): Promise<{ result: T; joinCode: string }> {
     for (
       let attempt = 0;
       attempt < maxJoinCodeGenerationAttempts;
@@ -167,12 +200,8 @@ export class GroupRepository extends BaseRepository {
       const joinCode = normalizeJoinCode(randomBytes(18).toString("base64url"));
 
       try {
-        const group = await this.createWithOwner(
-          input,
-          ownerUserId,
-          digestJoinCode(joinCode),
-        );
-        return { group, joinCode };
+        const result = await operation(digestJoinCode(joinCode));
+        return { result, joinCode };
       } catch (error) {
         if (!isUniqueViolation(error)) {
           throw error;

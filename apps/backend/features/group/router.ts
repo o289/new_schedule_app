@@ -6,6 +6,7 @@ import {
   groupCreateSchema,
   groupCreatedResponseSchema,
   groupDetailResponseSchema,
+  groupInvitationResponseSchema,
   groupJoinSchema,
   groupResponseSchema,
 } from "#schemas/group";
@@ -48,6 +49,18 @@ groupRouter.post("/join", async (context) => {
   );
 
   return context.json(groupResponseSchema.parse(group), 201);
+});
+
+groupRouter.post("/:groupId/invitation", async (context) => {
+  const invitation = await new GroupService().regenerateInvitation(
+    await requireCurrentUser(context),
+    parseUuidParam(
+      context.req.param("groupId"),
+      () => new ValidationError("VALIDATION_ERROR"),
+    ),
+  );
+
+  return context.json(groupInvitationResponseSchema.parse(invitation), 201);
 });
 
 groupRouter.get("/:groupId/calendar", async (context) => {

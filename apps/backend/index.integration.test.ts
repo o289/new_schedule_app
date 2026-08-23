@@ -601,7 +601,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       joinCode: string;
     };
     const groupId = createdBody.group.id;
-    const joinCode = createdBody.joinCode;
+    const originalJoinCode = createdBody.joinCode;
     expect(JSON.stringify(createdBody)).not.toContain("joinCodeDigest");
 
     const listed = await request(ownerToken, "/groups");
@@ -638,6 +638,33 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     const hiddenBeforeJoin = await request(memberToken, `/groups/${groupId}`);
     expect(hiddenBeforeJoin.status).toBe(404);
 
+    const hiddenInvitation = await request(
+      memberToken,
+      `/groups/${groupId}/invitation`,
+      { method: "POST" },
+    );
+    expect(hiddenInvitation.status).toBe(404);
+
+    const regenerated = await request(
+      ownerToken,
+      `/groups/${groupId}/invitation`,
+      { method: "POST" },
+    );
+    expect(regenerated.status).toBe(201);
+    const regeneratedBody = (await regenerated.json()) as { joinCode: string };
+    const joinCode = regeneratedBody.joinCode;
+    expect(joinCode).not.toBe(originalJoinCode);
+    expect(JSON.stringify(regeneratedBody)).not.toContain("joinCodeDigest");
+
+    const oldInvitation = await request(memberToken, "/groups/join", {
+      method: "POST",
+      body: JSON.stringify({ joinCode: originalJoinCode }),
+    });
+    expect(oldInvitation.status).toBe(404);
+    await expect(oldInvitation.json()).resolves.toEqual({
+      code: "INVALID_JOIN_CODE",
+    });
+
     const joined = await request(memberToken, "/groups/join", {
       method: "POST",
       body: JSON.stringify({ joinCode: ` ${joinCode}\n` }),
@@ -647,6 +674,16 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       id: groupId,
       currentUserRole: "member",
       memberCount: 2,
+    });
+
+    const memberInvitation = await request(
+      memberToken,
+      `/groups/${groupId}/invitation`,
+      { method: "POST" },
+    );
+    expect(memberInvitation.status).toBe(403);
+    await expect(memberInvitation.json()).resolves.toEqual({
+      code: "GROUP_OWNER_REQUIRED",
     });
 
     const memberDelete = await request(memberToken, `/groups/${groupId}`, {

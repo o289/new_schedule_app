@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   groupCalendarResponseSchema,
+  groupInvitationResponseSchema,
   groupJoinSchema,
   groupMemberResponseSchema,
 } from "./group";
@@ -12,6 +13,18 @@ describe("group schemas", () => {
       joinCode: "ABC12",
     });
     expect(() => groupJoinSchema.parse({ joinCode: "\u3000\t " })).toThrow();
+  });
+
+  it("招待再発行レスポンスはjoin code以外を受け入れない", () => {
+    expect(groupInvitationResponseSchema.parse({ joinCode: "INVITE" })).toEqual(
+      { joinCode: "INVITE" },
+    );
+    expect(() =>
+      groupInvitationResponseSchema.parse({
+        joinCode: "INVITE",
+        joinCodeDigest: "digest",
+      }),
+    ).toThrow();
   });
 
   it("公開メンバーにemailを含めない", () => {

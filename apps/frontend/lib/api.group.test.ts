@@ -16,6 +16,7 @@ describe("groupApi", () => {
     groupApi.create({ name: "グループ" });
     groupApi.detail("group-id", controller.signal);
     groupApi.join({ joinCode: "JOINCODE" });
+    groupApi.regenerateInvitation("group-id");
     groupApi.remove("group-id");
     groupApi.kick("group-id", "user-id");
     groupApi.leave("group-id");
@@ -36,6 +37,7 @@ describe("groupApi", () => {
         "/groups/join",
         { method: "POST", body: JSON.stringify({ joinCode: "JOINCODE" }) },
       ],
+      ["/groups/group-id/invitation", { method: "POST" }],
       ["/groups/group-id", { method: "DELETE" }],
       ["/groups/group-id/members/user-id", { method: "DELETE" }],
       ["/groups/group-id/leave", { method: "POST" }],

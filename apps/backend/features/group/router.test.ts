@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getGroup: vi.fn(),
   deleteGroup: vi.fn(),
   joinGroup: vi.fn(),
+  regenerateInvitation: vi.fn(),
   kickMember: vi.fn(),
   leaveGroup: vi.fn(),
   listCalendar: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("./service", () => ({
     getGroup = mocks.getGroup;
     deleteGroup = mocks.deleteGroup;
     joinGroup = mocks.joinGroup;
+    regenerateInvitation = mocks.regenerateInvitation;
     kickMember = mocks.kickMember;
     leaveGroup = mocks.leaveGroup;
     listCalendar = mocks.listCalendar;
@@ -149,6 +151,18 @@ describe("group router", () => {
     expect(mocks.joinGroup).toHaveBeenCalledWith(user, {
       joinCode: "JOINCODE",
     });
+  });
+
+  it("POST /groups/:groupId/invitation は新しい招待だけを返す", async () => {
+    mocks.regenerateInvitation.mockResolvedValue({ joinCode: "NEW-INVITE" });
+
+    const response = await request(`/groups/${groupId}/invitation`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ joinCode: "NEW-INVITE" });
+    expect(mocks.regenerateInvitation).toHaveBeenCalledWith(user, groupId);
   });
 
   it("DELETE /groups/:groupId/members/:userId は204を返す", async () => {

@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 
 import { useCalendar } from "#frontend/context/CalendarContext";
+import JoinCodeDialog from "./JoinCodeDialog";
 import GroupMemberList from "./GroupMemberList";
 import { useGroupDetail } from "./useGroupManagement";
 
@@ -18,18 +19,21 @@ export default function GroupDetailAside() {
     setSelectedCalendar,
     setAsideMode,
     createdJoinCode,
+    setCreatedJoinCode,
   } = useCalendar();
   const groupId =
     selectedCalendar.kind === "group" ? selectedCalendar.groupId : "";
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [kickUserId, setKickUserId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [invitationOpen, setInvitationOpen] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
   const {
     detailQuery,
     leaveMutation,
     kickMutation,
     deleteMutation,
+    regenerateInvitationMutation,
     handleMutationError,
   } = useGroupDetail(groupId);
 
@@ -47,10 +51,22 @@ export default function GroupDetailAside() {
     setSelectedCalendar({ kind: "personal" });
     setAsideMode(null);
   };
-  const copyJoinCode = async () => {
-    if (createdJoinCode?.groupId !== groupId) return;
-    await navigator.clipboard.writeText(createdJoinCode.joinCode);
-    setCopied(true);
+  const openInvitation = () => {
+    if (createdJoinCode?.groupId === groupId) {
+      setInvitationOpen(true);
+      return;
+    }
+    setRegenerateOpen(true);
+  };
+  const regenerateInvitation = async () => {
+    try {
+      const invitation = await regenerateInvitationMutation.mutateAsync();
+      setCreatedJoinCode({ groupId, joinCode: invitation.joinCode });
+      setRegenerateOpen(false);
+      setInvitationOpen(true);
+    } catch {
+      // エラー通知はhookで統一する。
+    }
   };
   const kick = async () => {
     if (!kickUserId) return;
@@ -101,9 +117,9 @@ export default function GroupDetailAside() {
           />
         </div>
 
-        {createdJoinCode?.groupId === groupId && (
-          <Button className="!mt-5" variant="outlined" onClick={copyJoinCode}>
-            {copied ? "コピーしました" : "コードをコピー"}
+        {isOwner && (
+          <Button className="!mt-5" variant="outlined" onClick={openInvitation}>
+            メンバーを招待
           </Button>
         )}
 
@@ -127,6 +143,37 @@ export default function GroupDetailAside() {
           )}
         </div>
       </div>
+
+      <JoinCodeDialog
+        joinCode={
+          invitationOpen && createdJoinCode?.groupId === groupId
+            ? createdJoinCode.joinCode
+            : null
+        }
+        onClose={() => setInvitationOpen(false)}
+        onRegenerate={() => {
+          setInvitationOpen(false);
+          setRegenerateOpen(true);
+        }}
+      />
+
+      <Dialog open={regenerateOpen} onClose={() => setRegenerateOpen(false)}>
+        <DialogTitle>新しい招待リンクを発行しますか？</DialogTitle>
+        <DialogContent>
+          以前の招待リンクと参加コードは使えなくなります。
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRegenerateOpen(false)}>キャンセル</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={regenerateInvitation}
+            disabled={regenerateInvitationMutation.isPending}
+          >
+            発行する
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)}>
         <DialogTitle>グループを退出しますか？</DialogTitle>

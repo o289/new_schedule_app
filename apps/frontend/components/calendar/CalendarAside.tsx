@@ -52,6 +52,12 @@ function CalendarSelector({
   groups: GroupResponse[] | undefined;
   onSelected: () => void;
 }) {
+  const selectedValue =
+    selectedCalendar.kind === "group" &&
+    groups?.some((group) => group.id === selectedCalendar.groupId)
+      ? selectedCalendar.groupId
+      : "personal";
+
   return (
     <div className="flex items-center gap-3 px-2">
       {selectedCalendar.kind === "personal" ? (
@@ -61,11 +67,7 @@ function CalendarSelector({
       )}
       <Select
         aria-label="表示するカレンダー"
-        value={
-          selectedCalendar.kind === "personal"
-            ? "personal"
-            : selectedCalendar.groupId
-        }
+        value={selectedValue}
         onChange={(event) => {
           const value = event.target.value;
           setSelectedCalendar(

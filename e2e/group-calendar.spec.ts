@@ -13,7 +13,7 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
   await page.getByRole("button", { name: "閉じる" }).click();
   await expect(page.getByText(groupName, { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "コードをコピー" }),
+    page.getByRole("button", { name: "メンバーを招待" }),
   ).toBeVisible();
 
   await expect(page.locator(".fc-timegrid-col[data-date]")).toHaveCount(7);

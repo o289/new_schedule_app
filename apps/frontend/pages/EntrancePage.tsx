@@ -33,7 +33,11 @@ import { avatarKeySchema, type AvatarKey } from "#schemas/user";
 
 type EntryResult = "authenticated" | "registration-required";
 
-export default function EntrancePage() {
+export default function EntrancePage({
+  onAuthenticated,
+}: {
+  onAuthenticated?: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState<AvatarKey | "">("");
@@ -98,6 +102,10 @@ export default function EntrancePage() {
     onSuccess: (result) => {
       if (result === "registration-required") {
         setIsRegistration(true);
+        return;
+      }
+      if (onAuthenticated) {
+        onAuthenticated();
         return;
       }
       navigate("/dashboard");

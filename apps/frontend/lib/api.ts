@@ -76,6 +76,11 @@ export const groupApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  regenerateInvitation: (groupId: string) =>
+    apiClient.authenticated<{ joinCode: string }>(
+      `/groups/${groupId}/invitation`,
+      { method: "POST" },
+    ),
   remove: (groupId: string) =>
     apiClient.authenticated<void>(`/groups/${groupId}`, { method: "DELETE" }),
   kick: (groupId: string, userId: string) =>

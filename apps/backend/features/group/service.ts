@@ -128,6 +128,18 @@ export class GroupService {
     }
   }
 
+  async regenerateInvitation(
+    user: User,
+    groupId: string,
+  ): Promise<{ joinCode: string }> {
+    await this.requireOwner(user.id, groupId);
+    const invitation = await this.repository.regenerateJoinCode(groupId);
+    if (!invitation) {
+      throw new NotFoundError("NOT_FOUND_GROUP");
+    }
+    return invitation;
+  }
+
   async joinGroup(user: User, input: GroupJoin): Promise<GroupResponse> {
     const result = await this.repository.joinIfAllowed(
       digestJoinCode(input.joinCode),

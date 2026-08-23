@@ -97,6 +97,11 @@ export function useGroupDetail(groupId: string) {
       await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
     },
   });
+  const regenerateInvitationMutation = useMutation({
+    mutationFn: () => groupApi.regenerateInvitation(groupId),
+    retry: false,
+    onError: (error) => showAlert(getApiErrorCode(error)),
+  });
 
   const handleMutationError = (error: unknown) => {
     showAlert(getApiErrorCode(error));
@@ -107,6 +112,7 @@ export function useGroupDetail(groupId: string) {
     leaveMutation,
     kickMutation,
     deleteMutation,
+    regenerateInvitationMutation,
     handleMutationError,
   };
 }

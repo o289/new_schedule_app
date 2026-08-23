@@ -72,6 +72,10 @@ export const groupCreatedResponseSchema = z
   })
   .strict();
 
+export const groupInvitationResponseSchema = z
+  .object({ joinCode: joinCodeSchema })
+  .strict();
+
 export const alreadyGroupMemberErrorSchema = z
   .object({
     code: z.literal("ALREADY_GROUP_MEMBER"),

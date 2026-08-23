@@ -4,12 +4,14 @@ import { CalendarProvider } from "./context/CalendarContext";
 import EntrancePage from "./pages/EntrancePage";
 import Dashboard from "./pages/Dashboard";
 import EditUserPage from "./components/user/EditUserPage";
+import GroupInvitationPage from "./pages/GroupInvitationPage";
 
 export default function AppRoutes() {
   return (
     <>
       <Routes>
         <Route path="/" element={<EntrancePage />} />
+        <Route path="/join" element={<GroupInvitationPage />} />
 
         <Route element={<RequireAuth />}>
           <Route
