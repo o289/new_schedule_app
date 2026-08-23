@@ -62,7 +62,7 @@ export default function GroupCalendar({
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="contents md:flex md:gap-2">
+        <div className="flex gap-2">
           {onMenuOpen && (
             <button
               type="button"
@@ -75,32 +75,30 @@ export default function GroupCalendar({
             </button>
           )}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              aria-label="前の週を表示"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
-              onClick={() => calendarRef.current?.getApi().prev()}
-            >
-              <ChevronLeftIcon />
-            </button>
-            <button
-              type="button"
-              aria-label="次の週を表示"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
-              onClick={() => calendarRef.current?.getApi().next()}
-            >
-              <ChevronRightIcon />
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="前の週を表示"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+            onClick={() => calendarRef.current?.getApi().prev()}
+          >
+            <ChevronLeftIcon />
+          </button>
+          <button
+            type="button"
+            aria-label="次の週を表示"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-[0_1px_2px_rgb(0_0_0_/_5%)] hover:bg-gray-100 focus-visible:outline-3 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+            onClick={() => calendarRef.current?.getApi().next()}
+          >
+            <ChevronRightIcon />
+          </button>
         </div>
         <h2 className="hidden text-base font-bold text-[#111827] md:block">
           {title}
         </h2>
       </div>
 
-      <div className="group-calendar-scroll w-full min-w-0 max-w-full overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
-        <div className="w-[760px]">
+      <div className="min-w-full min-w-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-2xl border border-[#e5e7eb] bg-white shadow-sm">
+        <div className="min-w-[760px]">
           <FullCalendar
             ref={calendarRef}
             plugins={[timeGridPlugin, interactionPlugin, luxonPlugin]}

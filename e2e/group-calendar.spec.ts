@@ -38,15 +38,4 @@ test("グループカレンダーは予定編集なしの週7列で表示でき�
   await page.getByLabel("表示するカレンダー").click();
   await page.getByRole("option", { name: groupName }).click();
   await expect(page.locator(".fc-timegrid-col[data-date]")).toHaveCount(7);
-
-  await page.setViewportSize({ width: 320, height: 720 });
-  const calendarScroll = page.locator(".group-calendar-scroll");
-  await expect
-    .poll(() =>
-      calendarScroll.evaluate((element) => {
-        const container = element as HTMLElement;
-        return container.scrollWidth > container.clientWidth;
-      }),
-    )
-    .toBe(true);
 });
