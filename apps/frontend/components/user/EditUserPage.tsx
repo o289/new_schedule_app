@@ -11,6 +11,7 @@ import { useSession } from "#frontend/hooks/useSession";
 import { authApi } from "#frontend/lib/api";
 import { getApiErrorCode } from "#frontend/lib/apiError";
 import { authKeys } from "#frontend/lib/queryKeys";
+import ConfirmDialog from "../ConfirmDialog";
 import { ProfileAvatar } from "../common/ProfileAvatar";
 
 const avatarLabels: Record<AvatarKey, string> = {
@@ -26,9 +27,10 @@ export default function EditUserPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showAlert } = useAlert();
-  const { user, logout } = useSession();
+  const { user, logout, logoutAll, isLoggingOut } = useSession();
   const [name, setName] = useState(user?.name ?? "");
   const [avatar, setAvatar] = useState<AvatarKey | null>(user?.avatar ?? null);
+  const [logoutAllDialogOpen, setLogoutAllDialogOpen] = useState(false);
 
   const updateProfileMutation = useMutation({
     mutationFn: () => authApi.updateProfile({ name, avatar }),
@@ -47,8 +49,13 @@ export default function EditUserPage() {
   };
 
   const handleLogout = async () => {
-    if (!window.confirm("ログアウトしますか？")) return;
     await logout();
+    navigate("/", { replace: true });
+  };
+
+  const handleLogoutAll = async () => {
+    await logoutAll();
+    setLogoutAllDialogOpen(false);
     navigate("/", { replace: true });
   };
 
@@ -152,15 +159,43 @@ export default function EditUserPage() {
           </Button>
         </div>
 
-        <Button
-          variant="outlined"
-          startIcon={<UndoIcon />}
-          onClick={handleLogout}
-          className="!mt-4 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
-        >
-          ログアウト
-        </Button>
+        <section className="mt-8 border-t border-[#e5e7eb] pt-6">
+          <h2 className="text-base font-semibold text-[#111827]">ログアウト</h2>
+          <p className="mt-1 text-sm text-[#6b7280]">
+            端末ごとのログイン状態を管理できます。
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            <Button
+              variant="outlined"
+              startIcon={<UndoIcon />}
+              onClick={() => void handleLogout()}
+              disabled={isLoggingOut}
+              className="!h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
+            >
+              この端末からログアウト
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<UndoIcon />}
+              onClick={() => setLogoutAllDialogOpen(true)}
+              disabled={isLoggingOut}
+              className="!h-14 !w-full !justify-start !rounded-xl !px-5 shadow-sm"
+            >
+              すべての端末からログアウト
+            </Button>
+          </div>
+        </section>
       </section>
+      <ConfirmDialog
+        open={logoutAllDialogOpen}
+        title="すべての端末からログアウトしますか？"
+        message="この端末を含む、ログイン中のすべての端末で再ログインが必要になります。"
+        isProcessing={isLoggingOut}
+        confirmLabel="すべてログアウトする"
+        onConfirm={handleLogoutAll}
+        onCancel={() => setLogoutAllDialogOpen(false)}
+      />
     </main>
   );
 }

@@ -38,7 +38,7 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
   await page.getByRole("button", { name: "カテゴリーを管理" }).click();
   await page.getByRole("button", { name: `${categoryName}を編集` }).click();
   await page.getByLabel("カテゴリ名").fill(updatedCategoryName);
-  await page.getByRole("button", { name: "更新" }).click();
+  await page.getByRole("button", { name: "更新", exact: true }).click();
   await returnToCalendarAside(page);
 
   await page.getByText(title, { exact: true }).click();
@@ -62,12 +62,12 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
   await expect(page.getByText("11:00 - 12:30", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "削除" }).click();
-  await page.getByRole("button", { name: "いいえ" }).click();
+  await page.getByRole("button", { name: "キャンセル" }).click();
   await expect(
     page.getByRole("heading", { name: updatedTitle, level: 1 }),
   ).toBeVisible();
   await page.getByRole("button", { name: "削除" }).click();
-  await page.getByRole("button", { name: "はい" }).click();
+  await page.getByRole("button", { name: "実行する" }).click();
   await expect(
     page.getByRole("heading", { name: updatedTitle, level: 1 }),
   ).toHaveCount(0);

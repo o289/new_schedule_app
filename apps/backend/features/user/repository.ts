@@ -40,29 +40,6 @@ export class UserRepository extends BaseRepository {
     return user ?? null;
   }
 
-  async getByRefreshToken(token: string): Promise<User | null> {
-    const [user] = await this.database
-      .select()
-      .from(users)
-      .where(eq(users.refreshToken, token))
-      .limit(1);
-
-    return user ?? null;
-  }
-
-  async updateRefreshToken(
-    userId: string,
-    token: string | null,
-  ): Promise<User | null> {
-    const [user] = await this.database
-      .update(users)
-      .set({ refreshToken: token })
-      .where(eq(users.id, userId))
-      .returning();
-
-    return user ?? null;
-  }
-
   async updateProfile(
     userId: string,
     profile: { name: string; avatar: AvatarKey | null },

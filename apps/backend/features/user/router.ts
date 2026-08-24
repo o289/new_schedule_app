@@ -34,6 +34,13 @@ userRouter.post("/logout", async (context) => {
   return context.body(null, 204);
 });
 
+userRouter.post("/logout-all", async (context) => {
+  const user = await requireCurrentUser(context);
+  await new AuthService().logoutAll(user.id);
+
+  return context.body(null, 204);
+});
+
 userRouter.get("/me", async (context) => {
   const user = await requireCurrentUser(context);
 

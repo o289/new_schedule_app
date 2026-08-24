@@ -41,7 +41,7 @@ test("カテゴリーを作成・更新・削除し、予定フォームの選�
     .getByRole("button", { name: `${updatedCategoryName}を削除` })
     .click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "いいえ" }).click();
+  await page.getByRole("button", { name: "キャンセル" }).click();
   await expect(
     page.getByText(updatedCategoryName, { exact: true }),
   ).toBeVisible();
@@ -49,7 +49,7 @@ test("カテゴリーを作成・更新・削除し、予定フォームの選�
   await page
     .getByRole("button", { name: `${updatedCategoryName}を削除` })
     .click();
-  await page.getByRole("button", { name: "はい" }).click();
+  await page.getByRole("button", { name: "実行する" }).click();
   await expect(
     page.getByText(updatedCategoryName, { exact: true }),
   ).not.toBeVisible();

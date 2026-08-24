@@ -5,6 +5,8 @@ test("認証fixtureのstorageStateでdashboardを開ける", async ({
 }) => {
   await authenticatedPage.goto("/setting");
   await expect(
-    authenticatedPage.getByRole("button", { name: "ログアウト" }),
+    authenticatedPage.getByRole("button", {
+      name: "この端末からログアウト",
+    }),
   ).toBeVisible();
 });

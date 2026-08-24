@@ -7,7 +7,7 @@ import { challenges } from "./model";
 export type Challenge = typeof challenges.$inferSelect;
 
 export class ChallengeRepository extends BaseRepository {
-  async createOrReplace(input: ChallengeCreate): Promise<Challenge> {
+  async create(input: ChallengeCreate): Promise<Challenge> {
     const values = {
       userId: input.userId,
       challenge: input.challenge,
@@ -20,20 +20,10 @@ export class ChallengeRepository extends BaseRepository {
     const [challenge] = await this.database
       .insert(challenges)
       .values(values)
-      .onConflictDoUpdate({
-        target: challenges.userId,
-        set: {
-          challenge: values.challenge,
-          type: values.type,
-          registrationName: values.registrationName,
-          registrationAvatar: values.registrationAvatar,
-          expiresAt: values.expiresAt,
-        },
-      })
       .returning();
 
     if (!challenge) {
-      throw new Error("Failed to create or replace challenge");
+      throw new Error("Failed to create challenge");
     }
 
     return challenge;
@@ -49,16 +39,6 @@ export class ChallengeRepository extends BaseRepository {
     return challenge ?? null;
   }
 
-  async getByUser(userId: string): Promise<Challenge | null> {
-    const [challenge] = await this.database
-      .select()
-      .from(challenges)
-      .where(eq(challenges.userId, userId))
-      .limit(1);
-
-    return challenge ?? null;
-  }
-
   async getByChallenge(value: string): Promise<Challenge | null> {
     const [challenge] = await this.database
       .select()
@@ -69,10 +49,10 @@ export class ChallengeRepository extends BaseRepository {
     return challenge ?? null;
   }
 
-  async deleteByUser(userId: string): Promise<boolean> {
+  async deleteById(id: string): Promise<boolean> {
     const deleted = await this.database
       .delete(challenges)
-      .where(eq(challenges.userId, userId))
+      .where(eq(challenges.id, id))
       .returning({ id: challenges.id });
 
     return deleted.length > 0;

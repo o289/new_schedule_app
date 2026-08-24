@@ -147,8 +147,7 @@ test("ログアウトでセッションを削除し、dashboardを保護する",
   await registerAndLogin(page, createE2EEmail("logout"));
 
   await page.goto("/setting");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "ログアウト" }).click();
+  await page.getByRole("button", { name: "この端末からログアウト" }).click();
 
   await expect(page).toHaveURL("/");
   await expect

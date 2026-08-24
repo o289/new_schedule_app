@@ -144,4 +144,6 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ refresh_token: refreshToken }),
     }),
+  logoutAll: () =>
+    apiClient.authenticated<void>("/auth/logout-all", { method: "POST" }),
 };

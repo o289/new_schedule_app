@@ -19,6 +19,7 @@ import {
   groups,
 } from "./features/group/model";
 import { scheduleDates, schedules } from "./features/schedule/model";
+import { authSessions } from "./features/auth-session/model";
 import { users } from "./features/user/model";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -85,13 +86,13 @@ function registrationCredential(challenge: string) {
   };
 }
 
-function authenticationCredential() {
+function authenticationCredential(challenge: string) {
   return {
     id: "integration-test-credential",
     rawId: "integration-test-credential",
     type: "public-key",
     response: {
-      clientDataJSON: clientDataJSON("not-used-by-login-verification"),
+      clientDataJSON: clientDataJSON(challenge),
       authenticatorData: "test-authenticator-data",
       signature: "test-signature",
     },
@@ -156,7 +157,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     await closeDatabase?.();
   });
 
-  it("optionsのchallengeとverifyへ送るclientDataJSONのchallengeが一致し、サインアップからログアウトまで完了する", async () => {
+  it("複数端末のログイン、更新トークンのローテーション、現在端末・全端末ログアウトを保証する", async () => {
     const email = "integration@example.com";
 
     const registerOptions = await post(app, "/auth/passkey/register/options", {
@@ -182,37 +183,78 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     expect(registerVerify.status).toBe(200);
     await expect(registerVerify.json()).resolves.toEqual({ data: null });
 
-    const loginOptions = await post(app, "/auth/passkey/login/options", {
+    const firstLoginOptions = await post(app, "/auth/passkey/login/options", {
       email,
     });
-    expect(loginOptions.status).toBe(200);
+    expect(firstLoginOptions.status).toBe(200);
+    const firstLoginChallenge = (await firstLoginOptions.json()).data.publicKey
+      .challenge;
 
-    const loginVerify = await post(
+    const secondLoginOptions = await post(app, "/auth/passkey/login/options", {
+      email,
+    });
+    expect(secondLoginOptions.status).toBe(200);
+    const secondLoginChallenge = (await secondLoginOptions.json()).data
+      .publicKey.challenge;
+    expect(secondLoginChallenge).not.toBe(firstLoginChallenge);
+
+    const firstLoginVerify = await post(
       app,
       "/auth/passkey/login/verify",
-      authenticationCredential(),
+      authenticationCredential(firstLoginChallenge),
     );
-    expect(loginVerify.status).toBe(200);
-    const tokens = await loginVerify.json();
-    expect(tokens.data.access_token).toEqual(expect.any(String));
-    expect(tokens.data.refresh_token).toEqual(expect.any(String));
+    expect(firstLoginVerify.status).toBe(200);
+    const firstTokens = await firstLoginVerify.json();
 
-    const me = await app.request("/auth/me", {
-      headers: { Authorization: `Bearer ${tokens.data.access_token}` },
+    const secondLoginVerify = await post(
+      app,
+      "/auth/passkey/login/verify",
+      authenticationCredential(secondLoginChallenge),
+    );
+    expect(secondLoginVerify.status).toBe(200);
+    const secondTokens = await secondLoginVerify.json();
+    expect(firstTokens.data.refresh_token).not.toBe(
+      secondTokens.data.refresh_token,
+    );
+    const storedSessions = await db.select().from(authSessions);
+    expect(storedSessions).toHaveLength(2);
+    expect(
+      storedSessions.map(
+        (session: { refreshTokenDigest: string }) => session.refreshTokenDigest,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+      ]),
+    );
+    expect(JSON.stringify(storedSessions)).not.toContain(
+      firstTokens.data.refresh_token,
+    );
+    expect(JSON.stringify(storedSessions)).not.toContain(
+      secondTokens.data.refresh_token,
+    );
+
+    const firstMe = await app.request("/auth/me", {
+      headers: { Authorization: `Bearer ${firstTokens.data.access_token}` },
     });
-    expect(me.status).toBe(200);
-    await expect(me.json()).resolves.toEqual({
+    expect(firstMe.status).toBe(200);
+    await expect(firstMe.json()).resolves.toEqual({
       email,
       name: "統合テストユーザー",
       avatar: "sky",
     });
+    const secondMe = await app.request("/auth/me", {
+      headers: { Authorization: `Bearer ${secondTokens.data.access_token}` },
+    });
+    expect(secondMe.status).toBe(200);
 
     // 実DBでカテゴリーを作成・取得する。select対象の列とDBスキーマが
     // ずれた場合（例: icon列のマイグレーション未適用）はここで検出する。
     const categoryCreate = await app.request("/categories", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${tokens.data.access_token}`,
+        Authorization: `Bearer ${firstTokens.data.access_token}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
@@ -230,7 +272,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     });
 
     const categories = await app.request("/categories", {
-      headers: { Authorization: `Bearer ${tokens.data.access_token}` },
+      headers: { Authorization: `Bearer ${firstTokens.data.access_token}` },
     });
     expect(categories.status).toBe(200);
     await expect(categories.json()).resolves.toEqual(
@@ -238,14 +280,40 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     );
 
     const refresh = await post(app, "/auth/refresh", {
-      refresh_token: tokens.data.refresh_token,
+      refresh_token: secondTokens.data.refresh_token,
     });
     expect(refresh.status).toBe(200);
+    const refreshedTokens = await refresh.json();
+    const reusedRefresh = await post(app, "/auth/refresh", {
+      refresh_token: secondTokens.data.refresh_token,
+    });
+    expect(reusedRefresh.status).toBe(401);
 
     const logout = await post(app, "/auth/logout", {
-      refresh_token: tokens.data.refresh_token,
+      refresh_token: firstTokens.data.refresh_token,
     });
     expect(logout.status).toBe(204);
+    const loggedOutFirstMe = await app.request("/auth/me", {
+      headers: { Authorization: `Bearer ${firstTokens.data.access_token}` },
+    });
+    expect(loggedOutFirstMe.status).toBe(401);
+
+    const stillLoggedInSecondMe = await app.request("/auth/me", {
+      headers: { Authorization: `Bearer ${refreshedTokens.data.access_token}` },
+    });
+    expect(stillLoggedInSecondMe.status).toBe(200);
+
+    const logoutAll = await app.request("/auth/logout-all", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${refreshedTokens.data.access_token}`,
+      },
+    });
+    expect(logoutAll.status).toBe(204);
+    const loggedOutSecondMe = await app.request("/auth/me", {
+      headers: { Authorization: `Bearer ${refreshedTokens.data.access_token}` },
+    });
+    expect(loggedOutSecondMe.status).toBe(401);
   });
 
   it("GroupのDB制約と削除時のcascadeを保証する", async () => {
@@ -575,9 +643,35 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       throw new Error("Failed to create group API users");
     }
 
+    const [ownerSession] = await db
+      .insert(authSessions)
+      .values({
+        userId: owner.id,
+        refreshTokenDigest: "f".repeat(64),
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .returning();
+    const [memberSession] = await db
+      .insert(authSessions)
+      .values({
+        userId: member.id,
+        refreshTokenDigest: "e".repeat(64),
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .returning();
+    if (!ownerSession || !memberSession) {
+      throw new Error("Failed to create API sessions");
+    }
+
     const { createAccessToken } = await import("./core/security");
-    const ownerToken = await createAccessToken({ sub: owner.id });
-    const memberToken = await createAccessToken({ sub: member.id });
+    const ownerToken = await createAccessToken({
+      sub: owner.id,
+      sid: ownerSession.id,
+    });
+    const memberToken = await createAccessToken({
+      sub: member.id,
+      sid: memberSession.id,
+    });
     const request = (token: string, path: string, options: RequestInit = {}) =>
       app.request(path, {
         ...options,

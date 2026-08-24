@@ -63,14 +63,16 @@ async function request<T>(
 }
 
 async function refresh(refreshToken: string) {
-  const response = await request<{ data: { access_token: string } }>(
-    "/auth/refresh",
-    {
-      method: "POST",
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    },
-  );
-  return response.data.access_token;
+  const response = await request<{
+    data: { access_token: string; refresh_token: string };
+  }>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  return {
+    accessToken: response.data.access_token,
+    refreshToken: response.data.refresh_token,
+  };
 }
 
 export const apiClient = {
@@ -88,8 +90,13 @@ export const apiClient = {
         throw error;
       }
 
-      const accessToken = await refreshAccessToken(refresh);
-      return request<T>(path, options, accessToken);
+      try {
+        const accessToken = await refreshAccessToken(refresh);
+        return request<T>(path, options, accessToken);
+      } catch (refreshError) {
+        clearSession();
+        throw refreshError;
+      }
     }
   },
 };
