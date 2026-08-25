@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+set -u
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_root"
+
+fail() {
+  printf 'run-e2e: %s\n' "$1" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 が見つかりません。"
+}
+
+[[ -f .nvmrc ]] || fail '.nvmrc が見つかりません。'
+required_node_version="$(tr -d '[:space:]' <.nvmrc)"
+[[ -n "$required_node_version" ]] || fail '.nvmrc にNode.jsバージョンが指定されていません。'
+required_node_version="${required_node_version#v}"
+expected_node_version="v${required_node_version}"
+
+current_node_version="$(node --version 2>/dev/null || true)"
+if [[ "$current_node_version" != "$expected_node_version" ]]; then
+  nvm_dir="${NVM_DIR:-${HOME}/.nvm}"
+  [[ -s "$nvm_dir/nvm.sh" ]] ||
+    fail "Node.js ${expected_node_version} が必要ですが、NVMを読み込めません: ${nvm_dir}/nvm.sh"
+
+  # shellcheck disable=SC1090
+  . "$nvm_dir/nvm.sh"
+  nvm use "$required_node_version" >/dev/null ||
+    fail "NVMでNode.js ${expected_node_version} へ切り替えられません。指定バージョンを事前に導入してください。"
+  current_node_version="$(node --version)"
+fi
+
+[[ "$current_node_version" == "$expected_node_version" ]] ||
+  fail "Node.js ${expected_node_version} が必要ですが、現在は ${current_node_version} です。"
+
+require_command pnpm
+require_command docker
+[[ -f .env.e2e ]] ||
+  fail '.env.e2e が見つかりません。e2e.env.exampleをコピーして設定してください。'
+
+while IFS= read -r environment_line || [[ -n "$environment_line" ]]; do
+  [[ -z "$environment_line" || "$environment_line" == \#* ]] && continue
+  environment_key="${environment_line%%=*}"
+  environment_value="${environment_line#*=}"
+  [[ "$environment_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] ||
+    fail ".env.e2e に不正な環境変数名があります: ${environment_key}"
+  export "${environment_key}=${environment_value}"
+done <.env.e2e
+
+for required_variable in \
+  E2E_DATABASE_URL \
+  E2E_API_URL \
+  E2E_WEBAUTHN_RP_ID \
+  E2E_WEBAUTHN_RP_NAME \
+  E2E_WEBAUTHN_ORIGIN \
+  E2E_SECRET_KEY \
+  E2E_ACCESS_TOKEN_EXPIRES_IN \
+  E2E_REFRESH_TOKEN_EXPIRES_IN \
+  E2E_ALGORITHM; do
+  [[ -n "${!required_variable:-}" ]] ||
+    fail ".env.e2e の ${required_variable} が設定されていません。"
+done
+
+database_started=false
+cleanup() {
+  local original_exit_code="${1:-$?}"
+  trap - EXIT INT TERM
+
+  if [[ "$database_started" == true ]]; then
+    if ! docker compose -f compose.e2e.yml down -v; then
+      printf 'run-e2e: E2E用PostgreSQLの停止に失敗しました。\n' >&2
+    fi
+  fi
+
+  exit "$original_exit_code"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+database_started=true
+docker compose -f compose.e2e.yml up -d --wait ||
+  fail 'E2E用PostgreSQLを起動できませんでした。'
+
+playwright_exit_code=0
+pnpm test:e2e || playwright_exit_code=$?
+cleanup "$playwright_exit_code"
