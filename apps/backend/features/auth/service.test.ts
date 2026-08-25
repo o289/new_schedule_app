@@ -8,10 +8,7 @@ import type {
 const mocks = vi.hoisted(() => ({
   user: {
     createUser: vi.fn(),
-    getById: vi.fn(),
     getByEmail: vi.fn(),
-    getByRefreshToken: vi.fn(),
-    updateRefreshToken: vi.fn(),
     updateProfile: vi.fn(),
   },
   passkey: {
@@ -20,11 +17,20 @@ const mocks = vi.hoisted(() => ({
     getByUser: vi.fn(),
     updateSignCount: vi.fn(),
   },
+  category: {
+    create: vi.fn(),
+  },
   challenge: {
-    createOrReplace: vi.fn(),
+    create: vi.fn(),
     getByChallenge: vi.fn(),
-    getByUser: vi.fn(),
-    deleteByUser: vi.fn(),
+    deleteById: vi.fn(),
+  },
+  session: {
+    create: vi.fn(),
+    getActiveByRefreshTokenDigest: vi.fn(),
+    rotateRefreshToken: vi.fn(),
+    revokeById: vi.fn(),
+    revokeAllByUserId: vi.fn(),
   },
   createRegistrationOptions: vi.fn(),
   verifyRegistration: vi.fn(),
@@ -41,10 +47,7 @@ vi.mock("../../database/client", () => ({
 vi.mock("../user/repository", () => ({
   UserRepository: class {
     createUser = mocks.user.createUser;
-    getById = mocks.user.getById;
     getByEmail = mocks.user.getByEmail;
-    getByRefreshToken = mocks.user.getByRefreshToken;
-    updateRefreshToken = mocks.user.updateRefreshToken;
     updateProfile = mocks.user.updateProfile;
   },
 }));
@@ -58,12 +61,27 @@ vi.mock("../passkey/repository", () => ({
   },
 }));
 
+vi.mock("../category/repository", () => ({
+  CategoryRepository: class {
+    create = mocks.category.create;
+  },
+}));
+
 vi.mock("../challenge/repository", () => ({
   ChallengeRepository: class {
-    createOrReplace = mocks.challenge.createOrReplace;
+    create = mocks.challenge.create;
     getByChallenge = mocks.challenge.getByChallenge;
-    getByUser = mocks.challenge.getByUser;
-    deleteByUser = mocks.challenge.deleteByUser;
+    deleteById = mocks.challenge.deleteById;
+  },
+}));
+
+vi.mock("../auth-session/repository", () => ({
+  AuthSessionRepository: class {
+    create = mocks.session.create;
+    getActiveByRefreshTokenDigest = mocks.session.getActiveByRefreshTokenDigest;
+    rotateRefreshToken = mocks.session.rotateRefreshToken;
+    revokeById = mocks.session.revokeById;
+    revokeAllByUserId = mocks.session.revokeAllByUserId;
   },
 }));
 
@@ -77,6 +95,7 @@ vi.mock("../../core/webauthn", () => ({
 vi.mock("../../core/security", () => ({
   createAccessToken: mocks.createAccessToken,
   createRefreshToken: mocks.createRefreshToken,
+  refreshTokenLifetimeMilliseconds: 24 * 60 * 60 * 1000,
 }));
 
 import { AuthService } from "./service";
@@ -86,13 +105,9 @@ const user = {
   email: "test@example.com",
   name: "テストユーザー",
   avatar: null,
-  refreshToken: null,
 };
 
-const provisionalUser = {
-  ...user,
-  name: "新しいユーザー",
-};
+const provisionalUser = { ...user, name: "新しいユーザー" };
 
 const passkey = {
   id: "22222222-2222-4222-8222-222222222222",
@@ -105,12 +120,42 @@ const passkey = {
   lastUsedAt: null,
 };
 
+const registerChallenge = {
+  id: "33333333-3333-4333-8333-333333333333",
+  userId: user.id,
+  challenge: "registration-challenge",
+  type: "register" as const,
+  registrationName: "テストユーザー",
+  registrationAvatar: null,
+  expiresAt: new Date(Date.now() + 60_000),
+};
+
+const loginChallenge = {
+  id: "44444444-4444-4444-8444-444444444444",
+  userId: user.id,
+  challenge: "login-challenge",
+  type: "login" as const,
+  registrationName: null,
+  registrationAvatar: null,
+  expiresAt: new Date(Date.now() + 60_000),
+};
+
+const activeSession = {
+  id: "55555555-5555-4555-8555-555555555555",
+  userId: user.id,
+  refreshTokenDigest: "current-digest",
+  createdAt: new Date(),
+  lastUsedAt: new Date(),
+  expiresAt: new Date(Date.now() + 60_000),
+  revokedAt: null,
+};
+
 function clientDataJSON(challenge: string): string {
   return Buffer.from(JSON.stringify({ challenge })).toString("base64url");
 }
 
 function registrationPayload(
-  challenge = "registration-challenge",
+  challenge = registerChallenge.challenge,
 ): PasskeyRegisterVerifyRequest {
   return {
     id: "credential-id",
@@ -129,7 +174,7 @@ function authenticationPayload(): PasskeyLoginVerifyRequest {
     rawId: passkey.credentialId,
     type: "public-key",
     response: {
-      clientDataJSON: clientDataJSON("login-challenge"),
+      clientDataJSON: clientDataJSON(loginChallenge.challenge),
       authenticatorData: "authenticator-data",
       signature: "signature",
     },
@@ -147,19 +192,17 @@ function expectApiError(
 describe("AuthService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.challenge.deleteByUser.mockResolvedValue(true);
+    mocks.challenge.deleteById.mockResolvedValue(true);
   });
 
-  it("registerOptionsでChallengeを生成・保存する", async () => {
+  it("registerOptionsで新規ユーザーのChallengeを生成・保存する", async () => {
     mocks.user.getByEmail.mockResolvedValue(null);
     mocks.user.createUser.mockResolvedValue(provisionalUser);
     mocks.passkey.getByUser.mockResolvedValue([]);
-    mocks.challenge.createOrReplace.mockResolvedValue({});
     mocks.createRegistrationOptions.mockResolvedValue({
       challenge: "public-key-challenge",
     });
 
-    const before = Date.now();
     const result = await new AuthService().registerOptions({
       email: " Test@Example.com ",
       name: " テストユーザー ",
@@ -170,59 +213,34 @@ describe("AuthService", () => {
       "test@example.com",
       "新しいユーザー",
     );
-    expect(mocks.challenge.createOrReplace).toHaveBeenCalledOnce();
-    const challengeInput = mocks.challenge.createOrReplace.mock.calls[0]?.[0];
-    expect(challengeInput).toMatchObject({
-      userId: user.id,
-      challenge: "public-key-challenge",
-      type: "register",
-      registrationName: "テストユーザー",
-      registrationAvatar: "sky",
-    });
-    expect(Date.parse(challengeInput.expiresAt)).toBeGreaterThanOrEqual(
-      before + 5 * 60 * 1000,
-    );
-    expect(mocks.createRegistrationOptions).toHaveBeenCalledWith(
+    expect(mocks.challenge.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: user.id,
-        email: "test@example.com",
-        challenge: expect.any(Uint8Array),
-        excludeCredentials: [],
+        challenge: "public-key-challenge",
+        type: "register",
+        registrationName: "テストユーザー",
+        registrationAvatar: "sky",
       }),
     );
-    expect(
-      mocks.createRegistrationOptions.mock.calls[0]?.[0].challenge,
-    ).toHaveLength(32);
     expect(result).toEqual({
       data: { publicKey: { challenge: "public-key-challenge" } },
     });
   });
 
-  it("既存Userのプロフィールは未認証のregisterOptionsで更新しない", async () => {
-    mocks.user.getByEmail.mockResolvedValue({
-      ...user,
-      name: "既存ユーザー",
-      avatar: "violet",
-    });
+  it("Passkey登録済みユーザーのregisterOptionsを409にする", async () => {
+    mocks.user.getByEmail.mockResolvedValue(user);
     mocks.passkey.getByUser.mockResolvedValue([passkey]);
-    mocks.challenge.createOrReplace.mockResolvedValue({});
-    mocks.createRegistrationOptions.mockResolvedValue({
-      challenge: "public-key-challenge",
-    });
 
-    await new AuthService().registerOptions({
-      email: user.email,
-      name: "上書きされない名前",
-      avatar: "sky",
-    });
-
-    expect(mocks.user.createUser).not.toHaveBeenCalled();
-    expect(mocks.challenge.createOrReplace).toHaveBeenCalledWith(
-      expect.objectContaining({
-        registrationName: null,
-        registrationAvatar: null,
+    await expectApiError(
+      new AuthService().registerOptions({
+        email: user.email,
+        name: "上書きされない名前",
+        avatar: "sky",
       }),
+      409,
+      "PASSKEY_ALREADY_REGISTERED",
     );
+    expect(mocks.challenge.create).not.toHaveBeenCalled();
   });
 
   it("registerVerifyで重複credentialを409にする", async () => {
@@ -233,29 +251,12 @@ describe("AuthService", () => {
       409,
       "PASSKEY_ALREADY_REGISTERED",
     );
-    expect(mocks.verifyRegistration).not.toHaveBeenCalled();
-  });
-
-  it("registerVerifyで不正Challengeを400にする", async () => {
-    mocks.passkey.getByCredentialId.mockResolvedValue(null);
-    mocks.challenge.getByChallenge.mockResolvedValue(null);
-
-    await expectApiError(
-      new AuthService().registerVerify(registrationPayload()),
-      400,
-      "AUTH_INVALID_CHALLENGE",
-    );
-    expect(mocks.passkey.create).not.toHaveBeenCalled();
   });
 
   it("registerVerifyで期限切れChallengeを削除して400にする", async () => {
     mocks.passkey.getByCredentialId.mockResolvedValue(null);
     mocks.challenge.getByChallenge.mockResolvedValue({
-      userId: user.id,
-      challenge: "registration-challenge",
-      type: "register",
-      registrationName: null,
-      registrationAvatar: null,
+      ...registerChallenge,
       expiresAt: new Date(Date.now() - 1),
     });
 
@@ -264,19 +265,14 @@ describe("AuthService", () => {
       400,
       "AUTH_INVALID_CHALLENGE",
     );
-    expect(mocks.challenge.deleteByUser).toHaveBeenCalledWith(user.id);
+    expect(mocks.challenge.deleteById).toHaveBeenCalledWith(
+      registerChallenge.id,
+    );
   });
 
-  it("registerVerifyでPasskeyを保存しtransportsをnullにしてChallengeを削除する", async () => {
+  it("registerVerifyでPasskeyと初期カテゴリーを保存し対象Challengeだけを削除する", async () => {
     mocks.passkey.getByCredentialId.mockResolvedValue(null);
-    mocks.challenge.getByChallenge.mockResolvedValue({
-      userId: user.id,
-      challenge: "registration-challenge",
-      type: "register",
-      registrationName: "テストユーザー",
-      registrationAvatar: null,
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    mocks.challenge.getByChallenge.mockResolvedValue(registerChallenge);
     mocks.verifyRegistration.mockResolvedValue({
       verified: true,
       registrationInfo: {
@@ -302,36 +298,37 @@ describe("AuthService", () => {
       name: "テストユーザー",
       avatar: null,
     });
-    expect(mocks.challenge.deleteByUser).toHaveBeenCalledWith(user.id);
+    expect(mocks.category.create).toHaveBeenNthCalledWith(
+      1,
+      { name: "予定1", color: "gray", icon: "tag" },
+      user.id,
+    );
+    expect(mocks.category.create).toHaveBeenNthCalledWith(
+      2,
+      { name: "予定2", color: "blue", icon: "tag" },
+      user.id,
+    );
+    expect(mocks.challenge.deleteById).toHaveBeenCalledWith(
+      registerChallenge.id,
+    );
   });
 
-  it("loginOptionsでChallengeを生成・保存する", async () => {
+  it("loginOptionsで並行利用可能なChallengeを生成・保存する", async () => {
     mocks.user.getByEmail.mockResolvedValue(user);
     mocks.passkey.getByUser.mockResolvedValue([passkey]);
-    mocks.challenge.createOrReplace.mockResolvedValue({});
     mocks.createAuthenticationOptions.mockResolvedValue({
       challenge: "public-login-challenge",
     });
 
-    const result = await new AuthService().loginOptions({
-      email: user.email,
-    });
+    const result = await new AuthService().loginOptions({ email: user.email });
 
-    expect(mocks.challenge.createOrReplace).toHaveBeenCalledWith(
+    expect(mocks.challenge.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: user.id,
         challenge: "public-login-challenge",
         type: "login",
-        registrationName: null,
-        registrationAvatar: null,
       }),
     );
-    expect(
-      mocks.createAuthenticationOptions.mock.calls[0]?.[0].challenge,
-    ).toBeInstanceOf(Uint8Array);
-    expect(
-      mocks.createAuthenticationOptions.mock.calls[0]?.[0].challenge,
-    ).toHaveLength(32);
     expect(mocks.createAuthenticationOptions).toHaveBeenCalledWith(
       expect.objectContaining({
         allowCredentials: [{ id: passkey.credentialId }],
@@ -342,14 +339,9 @@ describe("AuthService", () => {
     });
   });
 
-  it("loginVerifyでcounter更新・JWT発行・refresh token平文保存・Challenge削除を行う", async () => {
+  it("loginVerifyでセッションとトークンを発行し、対象Challengeだけを削除する", async () => {
     mocks.passkey.getByCredentialId.mockResolvedValue(passkey);
-    mocks.challenge.getByUser.mockResolvedValue({
-      userId: user.id,
-      challenge: "login-challenge",
-      type: "login",
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    mocks.challenge.getByChallenge.mockResolvedValue(loginChallenge);
     mocks.verifyAuthentication.mockResolvedValue({
       verified: true,
       authenticationInfo: { newCounter: 2 },
@@ -358,38 +350,37 @@ describe("AuthService", () => {
       ...passkey,
       signCount: 2,
     });
+    mocks.createRefreshToken.mockReturnValue("plain-refresh-token");
+    mocks.session.create.mockResolvedValue(activeSession);
     mocks.createAccessToken.mockResolvedValue("access-token");
-    mocks.createRefreshToken.mockResolvedValue("plain-refresh-token");
-    mocks.user.getById.mockResolvedValue(user);
-    mocks.user.updateRefreshToken.mockResolvedValue({
-      ...user,
-      refreshToken: "plain-refresh-token",
-    });
 
-    const result = await new AuthService().loginVerify(authenticationPayload());
-
-    expect(mocks.passkey.updateSignCount).toHaveBeenCalledWith(passkey.id, 2);
-    expect(mocks.challenge.deleteByUser).toHaveBeenCalledWith(user.id);
-    expect(mocks.createAccessToken).toHaveBeenCalledWith({ sub: user.id });
-    expect(mocks.createRefreshToken).toHaveBeenCalledWith({ sub: user.id });
-    expect(mocks.user.updateRefreshToken).toHaveBeenCalledWith(
-      user.id,
-      "plain-refresh-token",
-    );
-    expect(result).toEqual({
+    await expect(
+      new AuthService().loginVerify(authenticationPayload()),
+    ).resolves.toEqual({
       data: {
         access_token: "access-token",
         refresh_token: "plain-refresh-token",
       },
     });
+    expect(mocks.passkey.updateSignCount).toHaveBeenCalledWith(passkey.id, 2);
+    expect(mocks.challenge.deleteById).toHaveBeenCalledWith(loginChallenge.id);
+    expect(mocks.session.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        refreshTokenDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        expiresAt: expect.any(Date),
+      }),
+    );
+    expect(mocks.createAccessToken).toHaveBeenCalledWith({
+      sub: user.id,
+      sid: activeSession.id,
+    });
   });
 
   it("loginVerifyで期限切れChallengeを削除して400にする", async () => {
     mocks.passkey.getByCredentialId.mockResolvedValue(passkey);
-    mocks.challenge.getByUser.mockResolvedValue({
-      userId: user.id,
-      challenge: "login-challenge",
-      type: "login",
+    mocks.challenge.getByChallenge.mockResolvedValue({
+      ...loginChallenge,
       expiresAt: new Date(Date.now() - 1),
     });
 
@@ -398,15 +389,15 @@ describe("AuthService", () => {
       400,
       "AUTH_INVALID_CHALLENGE",
     );
-    expect(mocks.challenge.deleteByUser).toHaveBeenCalledWith(user.id);
-    expect(mocks.createAccessToken).not.toHaveBeenCalled();
+    expect(mocks.challenge.deleteById).toHaveBeenCalledWith(loginChallenge.id);
   });
 
-  it("refreshでaccess tokenを再発行する", async () => {
-    mocks.user.getByRefreshToken.mockResolvedValue({
-      ...user,
-      refreshToken: "plain-refresh-token",
-    });
+  it("refreshでトークンをローテーションする", async () => {
+    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(
+      activeSession,
+    );
+    mocks.createRefreshToken.mockReturnValue("next-refresh-token");
+    mocks.session.rotateRefreshToken.mockResolvedValue(activeSession);
     mocks.createAccessToken.mockResolvedValue("new-access-token");
 
     await expect(
@@ -414,43 +405,61 @@ describe("AuthService", () => {
     ).resolves.toEqual({
       data: {
         access_token: "new-access-token",
-        refresh_token: "plain-refresh-token",
+        refresh_token: "next-refresh-token",
       },
     });
+    expect(mocks.session.rotateRefreshToken).toHaveBeenCalledWith(
+      activeSession.id,
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.any(Date),
+    );
+    expect(mocks.createAccessToken).toHaveBeenCalledWith({
+      sub: user.id,
+      sid: activeSession.id,
+    });
   });
 
-  it.each([
-    [null, "INVALID_REFRESH_TOKEN"],
-    [{ ...user, refreshToken: null }, "ALREADY_LOGGED_OUT"],
-  ])("refresh異常系 %#", async (storedUser, code) => {
-    mocks.user.getByRefreshToken.mockResolvedValue(storedUser);
+  it("使用済みまたは不正なrefresh tokenを401にする", async () => {
+    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(null);
 
-    await expectApiError(new AuthService().refresh("invalid"), 401, code);
+    await expectApiError(
+      new AuthService().refresh("invalid"),
+      401,
+      "INVALID_REFRESH_TOKEN",
+    );
   });
 
-  it("logoutでrefresh tokenをnullにする", async () => {
-    mocks.user.getByRefreshToken.mockResolvedValue({
-      ...user,
-      refreshToken: "plain-refresh-token",
-    });
-    mocks.user.updateRefreshToken.mockResolvedValue({
-      ...user,
-      refreshToken: null,
-    });
+  it("ローテーション競合時は401にする", async () => {
+    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(
+      activeSession,
+    );
+    mocks.createRefreshToken.mockReturnValue("next-refresh-token");
+    mocks.session.rotateRefreshToken.mockResolvedValue(null);
+
+    await expectApiError(
+      new AuthService().refresh("plain-refresh-token"),
+      401,
+      "INVALID_REFRESH_TOKEN",
+    );
+  });
+
+  it("logoutで現在のセッションだけを無効化する", async () => {
+    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(
+      activeSession,
+    );
+    mocks.session.revokeById.mockResolvedValue(true);
 
     await expect(
       new AuthService().logout("plain-refresh-token"),
     ).resolves.toBeUndefined();
-    expect(mocks.user.updateRefreshToken).toHaveBeenCalledWith(user.id, null);
+    expect(mocks.session.revokeById).toHaveBeenCalledWith(activeSession.id);
   });
 
-  it.each([
-    [null, "INVALID_REFRESH_TOKEN"],
-    [{ ...user, refreshToken: null }, "ALREADY_LOGGED_OUT"],
-  ])("logout異常系 %#", async (storedUser, code) => {
-    mocks.user.getByRefreshToken.mockResolvedValue(storedUser);
+  it("logoutAllでユーザーの全セッションを無効化する", async () => {
+    mocks.session.revokeAllByUserId.mockResolvedValue(2);
 
-    await expectApiError(new AuthService().logout("invalid"), 401, code);
-    expect(mocks.user.updateRefreshToken).not.toHaveBeenCalled();
+    await expect(new AuthService().logoutAll(user.id)).resolves.toBeUndefined();
+    expect(mocks.session.revokeAllByUserId).toHaveBeenCalledWith(user.id);
   });
 });

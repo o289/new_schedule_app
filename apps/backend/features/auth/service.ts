@@ -11,7 +11,11 @@ import {
   ConflictError,
   UnauthorizedError,
 } from "#backend/core/api-error";
-import { createAccessToken, createRefreshToken } from "#backend/core/security";
+import {
+  createAccessToken,
+  createRefreshToken,
+  refreshTokenLifetimeMilliseconds,
+} from "#backend/core/security";
 import {
   createAuthenticationOptions,
   createRegistrationOptions,
@@ -20,7 +24,9 @@ import {
 } from "#backend/core/webauthn";
 import { db } from "#backend/database/client";
 import type { Database } from "#backend/database/repository";
+import { CategoryRepository } from "../category/repository";
 import { ChallengeRepository } from "../challenge/repository";
+import { AuthSessionRepository } from "../auth-session/repository";
 import { PasskeyRepository } from "../passkey/repository";
 import { UserRepository } from "../user/repository";
 import type {
@@ -85,11 +91,13 @@ export class AuthService {
   private readonly userRepository: UserRepository;
   private readonly passkeyRepository: PasskeyRepository;
   private readonly challengeRepository: ChallengeRepository;
+  private readonly authSessionRepository: AuthSessionRepository;
 
   constructor(private readonly database: Database = db) {
     this.userRepository = new UserRepository(database);
     this.passkeyRepository = new PasskeyRepository(database);
     this.challengeRepository = new ChallengeRepository(database);
+    this.authSessionRepository = new AuthSessionRepository(database);
   }
 
   async registerOptions(
@@ -103,6 +111,9 @@ export class AuthService {
       (await this.userRepository.createUser(email, provisionalUserName));
 
     const existingPasskeys = await this.passkeyRepository.getByUser(user.id);
+    if (existingPasskeys.length > 0) {
+      throw new ConflictError("PASSKEY_ALREADY_REGISTERED");
+    }
     const canConfirmProfile =
       existingPasskeys.length === 0 && user.name === provisionalUserName;
     const excludeCredentials = existingPasskeys.map((passkey) => ({
@@ -127,7 +138,7 @@ export class AuthService {
       ).toISOString(),
     };
 
-    await this.challengeRepository.createOrReplace(challengeInput);
+    await this.challengeRepository.create(challengeInput);
 
     logPasskeyAuth("info", "register.options_issued", {
       userId: user.id,
@@ -209,6 +220,7 @@ export class AuthService {
       await this.database.transaction(async (transaction) => {
         const passkeyRepository = new PasskeyRepository(transaction);
         const userRepository = new UserRepository(transaction);
+        const categoryRepository = new CategoryRepository(transaction);
         const challengeRepository = new ChallengeRepository(transaction);
 
         await passkeyRepository.create(passkeyInput);
@@ -223,7 +235,16 @@ export class AuthService {
           });
         }
 
-        await challengeRepository.deleteByUser(challenge.userId);
+        await categoryRepository.create(
+          { name: "予定1", color: "gray", icon: "tag" },
+          challenge.userId,
+        );
+        await categoryRepository.create(
+          { name: "予定2", color: "blue", icon: "tag" },
+          challenge.userId,
+        );
+
+        await challengeRepository.deleteById(challenge.id);
       });
       challengeDeleted = true;
       logPasskeyAuth("info", "register.verify_succeeded", {
@@ -239,7 +260,7 @@ export class AuthService {
       throw new BadRequestError("PASSKEY_VERIFICATION_FAILED");
     } finally {
       if (!challengeDeleted) {
-        await this.challengeRepository.deleteByUser(challenge.userId);
+        await this.challengeRepository.deleteById(challenge.id);
       }
       logPasskeyAuth("info", "register.challenge_deleted", {
         userId: challenge.userId,
@@ -281,7 +302,7 @@ export class AuthService {
       ).toISOString(),
     };
 
-    await this.challengeRepository.createOrReplace(challengeInput);
+    await this.challengeRepository.create(challengeInput);
     logPasskeyAuth("info", "login.options_issued", {
       userId: user.id,
       challengeFingerprint: challengeFingerprint(publicKey.challenge),
@@ -299,7 +320,11 @@ export class AuthService {
       throw new BadRequestError("PASSKEY_NOT_FOUND");
     }
 
-    const challenge = await this.challengeRepository.getByUser(passkey.userId);
+    const receivedChallenge = readClientDataChallenge(
+      payload.response.clientDataJSON,
+    );
+    const challenge =
+      await this.challengeRepository.getByChallenge(receivedChallenge);
     if (!challenge || challenge.type !== "login") {
       throw new BadRequestError("AUTH_INVALID_CHALLENGE");
     }
@@ -333,18 +358,21 @@ export class AuthService {
 
       throw new BadRequestError("PASSKEY_VERIFICATION_FAILED");
     } finally {
-      await this.challengeRepository.deleteByUser(passkey.userId);
+      await this.challengeRepository.deleteById(challenge.id);
     }
 
-    const accessToken = await createAccessToken({ sub: passkey.userId });
-    const refreshToken = await createRefreshToken({ sub: passkey.userId });
-
-    const user = await this.userRepository.getById(passkey.userId);
-    if (!user) {
-      throw new BadRequestError("USER_NOT_FOUND");
-    }
-
-    await this.userRepository.updateRefreshToken(user.id, refreshToken);
+    const refreshToken = createRefreshToken();
+    const session = await this.authSessionRepository.create({
+      userId: passkey.userId,
+      refreshTokenDigest: createHash("sha256")
+        .update(refreshToken)
+        .digest("hex"),
+      expiresAt: new Date(Date.now() + refreshTokenLifetimeMilliseconds),
+    });
+    const accessToken = await createAccessToken({
+      sub: passkey.userId,
+      sid: session.id,
+    });
 
     return {
       data: {
@@ -355,35 +383,46 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string): Promise<TokenResponse> {
-    const user = await this.userRepository.getByRefreshToken(refreshToken);
-    if (!user) {
-      throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
-    }
+    const currentRefreshTokenDigest = createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+    const session =
+      await this.authSessionRepository.getActiveByRefreshTokenDigest(
+        currentRefreshTokenDigest,
+      );
+    if (!session) throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
 
-    if (user.refreshToken === null) {
-      throw new UnauthorizedError("ALREADY_LOGGED_OUT");
-    }
-
-    const accessToken = await createAccessToken({ sub: user.id });
+    const nextRefreshToken = createRefreshToken();
+    const rotated = await this.authSessionRepository.rotateRefreshToken(
+      session.id,
+      currentRefreshTokenDigest,
+      createHash("sha256").update(nextRefreshToken).digest("hex"),
+      new Date(Date.now() + refreshTokenLifetimeMilliseconds),
+    );
+    if (!rotated) throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
+    const accessToken = await createAccessToken({
+      sub: session.userId,
+      sid: session.id,
+    });
 
     return {
       data: {
         access_token: accessToken,
-        refresh_token: refreshToken,
+        refresh_token: nextRefreshToken,
       },
     };
   }
 
   async logout(refreshToken: string): Promise<void> {
-    const user = await this.userRepository.getByRefreshToken(refreshToken);
-    if (!user) {
-      throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
-    }
+    const session =
+      await this.authSessionRepository.getActiveByRefreshTokenDigest(
+        createHash("sha256").update(refreshToken).digest("hex"),
+      );
+    if (!session) throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
+    await this.authSessionRepository.revokeById(session.id);
+  }
 
-    if (user.refreshToken === null) {
-      throw new UnauthorizedError("ALREADY_LOGGED_OUT");
-    }
-
-    await this.userRepository.updateRefreshToken(user.id, null);
+  async logoutAll(userId: string): Promise<void> {
+    await this.authSessionRepository.revokeAllByUserId(userId);
   }
 }

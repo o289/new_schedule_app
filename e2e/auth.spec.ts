@@ -10,6 +10,7 @@ import {
   installVirtualAuthenticator,
   virtualCredentialCount,
 } from "./helpers/webauthn";
+import { openScheduleForm } from "./helpers/calendar";
 import { getE2EEnvironment } from "./environment";
 
 const environment = getE2EEnvironment();
@@ -72,6 +73,15 @@ test("初回メールアドレスで登録後にログインし、dashboardを�
   const email = createE2EEmail("signup");
 
   await registerAndLogin(page, email);
+
+  await openScheduleForm(page);
+  await page.getByLabel("カテゴリーを選択").click();
+  await expect(
+    page.getByRole("option", { name: "予定1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "予定2", exact: true }),
+  ).toBeVisible();
 
   await expect
     .poll(() => virtualCredentialCount(context, environment.webauthnRpId))
@@ -147,8 +157,7 @@ test("ログアウトでセッションを削除し、dashboardを保護する",
   await registerAndLogin(page, createE2EEmail("logout"));
 
   await page.goto("/setting");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "ログアウト" }).click();
+  await page.getByRole("button", { name: "この端末からログアウト" }).click();
 
   await expect(page).toHaveURL("/");
   await expect

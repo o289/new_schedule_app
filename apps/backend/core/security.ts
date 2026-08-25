@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { jwtVerify, SignJWT, type JWTPayload } from "jose";
 
 import { env } from "../config/env";
@@ -27,12 +28,12 @@ export function createAccessToken(
   return createToken(data, expiresDeltaSeconds);
 }
 
-export function createRefreshToken(
-  data: JWTPayload,
-  expiresDeltaSeconds = env.REFRESH_TOKEN_EXPIRES_IN * secondsPerDay,
-): Promise<string> {
-  return createToken(data, expiresDeltaSeconds);
+export function createRefreshToken(): string {
+  return randomBytes(48).toString("base64url");
 }
+
+export const refreshTokenLifetimeMilliseconds =
+  env.REFRESH_TOKEN_EXPIRES_IN * secondsPerDay * 1000;
 
 export async function verifyAccessToken(token: string): Promise<JWTPayload> {
   const { payload } = await jwtVerify(token, secretKey, {

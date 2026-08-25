@@ -3,6 +3,20 @@ import { queryClient } from "./queryClient";
 let accessToken: string | null = localStorage.getItem("accessToken");
 let refreshToken: string | null = localStorage.getItem("refreshToken");
 let refreshPromise: Promise<string> | null = null;
+const sessionListeners = new Set<() => void>();
+
+function notifySessionListeners() {
+  sessionListeners.forEach((listener) => listener());
+}
+
+export function subscribeToSession(listener: () => void) {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
+
+export function hasStoredSession() {
+  return Boolean(accessToken || refreshToken);
+}
 
 export function getAccessToken() {
   return accessToken;
@@ -20,6 +34,7 @@ export function saveTokens(tokens: {
   refreshToken = tokens.refreshToken;
   localStorage.setItem("accessToken", tokens.accessToken);
   localStorage.setItem("refreshToken", tokens.refreshToken);
+  notifySessionListeners();
 }
 
 export function clearTokens() {
@@ -27,6 +42,7 @@ export function clearTokens() {
   refreshToken = null;
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
+  notifySessionListeners();
 }
 
 export function clearSession() {
@@ -35,7 +51,9 @@ export function clearSession() {
 }
 
 export function refreshAccessToken(
-  requestRefresh: (refreshToken: string) => Promise<string>,
+  requestRefresh: (
+    refreshToken: string,
+  ) => Promise<{ accessToken: string; refreshToken: string }>,
 ) {
   if (!refreshToken) {
     return Promise.reject(new Error("Refresh token is unavailable"));
@@ -43,10 +61,9 @@ export function refreshAccessToken(
 
   if (!refreshPromise) {
     refreshPromise = requestRefresh(refreshToken)
-      .then((newAccessToken) => {
-        accessToken = newAccessToken;
-        localStorage.setItem("accessToken", newAccessToken);
-        return newAccessToken;
+      .then((tokens) => {
+        saveTokens(tokens);
+        return tokens.accessToken;
       })
       .catch((error: unknown) => {
         // Keep the active auth query alive so React Query can publish the error.

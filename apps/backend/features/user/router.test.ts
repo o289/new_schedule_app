@@ -5,6 +5,7 @@ import { UnauthorizedError } from "#backend/core/api-error";
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   logout: vi.fn(),
+  logoutAll: vi.fn(),
   requireCurrentUser: vi.fn(),
   verifyAccessToken: vi.fn(),
   getById: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock("../auth/service", () => ({
   AuthService: class {
     refresh = mocks.refresh;
     logout = mocks.logout;
+    logoutAll = mocks.logoutAll;
   },
 }));
 
@@ -78,13 +80,25 @@ describe("user router", () => {
     expect(mocks.logout).toHaveBeenCalledWith("refresh");
   });
 
+  it("POST /auth/logout-allは認証ユーザーの全端末をログアウトする", async () => {
+    mocks.requireCurrentUser.mockResolvedValue({ id: "user-id" });
+    mocks.logoutAll.mockResolvedValue(undefined);
+
+    const response = await app.request("/auth/logout-all", {
+      method: "POST",
+      headers: { Authorization: "Bearer access-token" },
+    });
+
+    expect(response.status).toBe(204);
+    expect(mocks.logoutAll).toHaveBeenCalledWith("user-id");
+  });
+
   it("GET /auth/me", async () => {
     mocks.requireCurrentUser.mockResolvedValue({
       id: "user-id",
       email: "test@example.com",
       name: "テストユーザー",
       avatar: "sky",
-      refreshToken: "secret-refresh-token",
     });
 
     const response = await app.request("/auth/me", {
@@ -106,7 +120,6 @@ describe("user router", () => {
       email: "test@example.com",
       name: "更新後の名前",
       avatar: "violet" as const,
-      refreshToken: "secret-refresh-token",
     };
     mocks.requireCurrentUser.mockResolvedValue(user);
     mocks.updateProfile.mockResolvedValue(user);
@@ -138,7 +151,6 @@ describe("user router", () => {
       email: "test@example.com",
       name: "テストユーザー",
       avatar: null,
-      refreshToken: "secret-refresh-token",
     });
 
     const response = await app.request("/auth/me", {

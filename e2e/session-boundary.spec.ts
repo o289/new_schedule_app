@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/auth";
+import { expect, test } from "@playwright/test";
 import {
   createCategory,
   createE2EName,
@@ -8,12 +8,24 @@ import {
 } from "./helpers/calendar";
 import { installVirtualAuthenticator } from "./helpers/webauthn";
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test("ログアウト後に別ユーザーへ切り替えても前ユーザーの予定とカテゴリーを表示しない", async ({
-  authenticatedPage: page,
+  page,
   context,
 }) => {
   const categoryName = createE2EName("previous-user-category");
   const scheduleTitle = createE2EName("previous-user-schedule");
+
+  await installVirtualAuthenticator(context);
+  await page.goto("/");
+  await page
+    .getByLabel("メールアドレス")
+    .fill(`${createE2EName("previous-user")}@e2e.test`);
+  await page.getByRole("button", { name: "アプリの利用を開始" }).click();
+  await page.getByLabel("表示名").fill("前のE2Eユーザー");
+  await page.getByRole("button", { name: "登録して利用を開始" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
 
   await createCategory(page, {
     name: categoryName,
@@ -35,8 +47,7 @@ test("ログアウト後に別ユーザーへ切り替えても前ユーザー�
 
   await page.getByRole("button", { name: "戻る" }).click();
   await page.goto("/setting");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "ログアウト" }).click();
+  await page.getByRole("button", { name: "この端末からログアウト" }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByText(categoryName, { exact: true })).not.toBeVisible();
   await expect(

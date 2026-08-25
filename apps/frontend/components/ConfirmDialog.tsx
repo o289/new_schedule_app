@@ -12,6 +12,8 @@ interface ConfirmDialogProps {
   title?: string;
   message: string;
   isProcessing?: boolean;
+  cancelLabel?: string;
+  confirmLabel?: string;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -21,6 +23,8 @@ export default function ConfirmDialog({
   title = "確認",
   message,
   isProcessing = false,
+  cancelLabel = "キャンセル",
+  confirmLabel = "実行する",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -41,7 +45,7 @@ export default function ConfirmDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={isProcessing}>
-          いいえ
+          {cancelLabel}
         </Button>
         <Button
           onClick={() => void onConfirm()}
@@ -50,7 +54,7 @@ export default function ConfirmDialog({
           disabled={isProcessing}
           autoFocus
         >
-          はい
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

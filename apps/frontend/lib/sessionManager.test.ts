@@ -5,8 +5,10 @@ import { queryClient } from "./queryClient";
 import {
   clearSession,
   getAccessToken,
+  hasStoredSession,
   refreshAccessToken,
   saveTokens,
+  subscribeToSession,
 } from "./sessionManager";
 
 describe("Session Manager", () => {
@@ -17,7 +19,10 @@ describe("Session Manager", () => {
     let requests = 0;
     const requestRefresh = async () => {
       requests += 1;
-      return "new-access-token";
+      return {
+        accessToken: "new-access-token",
+        refreshToken: "new-refresh-token",
+      };
     };
 
     await expect(
@@ -28,6 +33,7 @@ describe("Session Manager", () => {
     ).resolves.toEqual(["new-access-token", "new-access-token"]);
     expect(requests).toBe(1);
     expect(getAccessToken()).toBe("new-access-token");
+    expect(localStorage.getItem("refreshToken")).toBe("new-refresh-token");
   });
 
   it("refresh失敗時にTokenを消すが実行中のQuery cacheは消さない", async () => {
@@ -56,5 +62,18 @@ describe("Session Manager", () => {
     expect(getAccessToken()).toBeNull();
     expect(queryClient.getQueryData(categoryKeys.lists())).toBeUndefined();
     expect(queryClient.getQueryData(groupKeys.lists())).toBeUndefined();
+  });
+
+  it("Tokenの保存と削除を購読者へ通知する", () => {
+    const snapshots: boolean[] = [];
+    const unsubscribe = subscribeToSession(() => {
+      snapshots.push(hasStoredSession());
+    });
+
+    saveTokens({ accessToken: "access-token", refreshToken: "refresh-token" });
+    clearSession();
+    unsubscribe();
+
+    expect(snapshots).toEqual([true, false]);
   });
 });
