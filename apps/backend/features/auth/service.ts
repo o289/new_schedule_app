@@ -24,6 +24,7 @@ import {
 } from "#backend/core/webauthn";
 import { db } from "#backend/database/client";
 import type { Database } from "#backend/database/repository";
+import { CategoryRepository } from "../category/repository";
 import { ChallengeRepository } from "../challenge/repository";
 import { AuthSessionRepository } from "../auth-session/repository";
 import { PasskeyRepository } from "../passkey/repository";
@@ -219,6 +220,7 @@ export class AuthService {
       await this.database.transaction(async (transaction) => {
         const passkeyRepository = new PasskeyRepository(transaction);
         const userRepository = new UserRepository(transaction);
+        const categoryRepository = new CategoryRepository(transaction);
         const challengeRepository = new ChallengeRepository(transaction);
 
         await passkeyRepository.create(passkeyInput);
@@ -232,6 +234,15 @@ export class AuthService {
                 : avatarKeySchema.parse(challenge.registrationAvatar),
           });
         }
+
+        await categoryRepository.create(
+          { name: "予定1", color: "gray", icon: "tag" },
+          challenge.userId,
+        );
+        await categoryRepository.create(
+          { name: "予定2", color: "blue", icon: "tag" },
+          challenge.userId,
+        );
 
         await challengeRepository.deleteById(challenge.id);
       });

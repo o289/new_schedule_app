@@ -12,7 +12,7 @@ import {
   vi,
 } from "vitest";
 
-import { categories } from "./features/category/model";
+import { categories as categoryTable } from "./features/category/model";
 import {
   groupBannedMembers,
   groupMembers,
@@ -182,6 +182,26 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     );
     expect(registerVerify.status).toBe(200);
     await expect(registerVerify.json()).resolves.toEqual({ data: null });
+
+    const [registeredUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    if (!registeredUser) {
+      throw new Error("登録済みユーザーが見つかりません");
+    }
+
+    const defaultCategories = await db
+      .select()
+      .from(categoryTable)
+      .where(eq(categoryTable.userId, registeredUser.id));
+    expect(defaultCategories).toHaveLength(2);
+    expect(defaultCategories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "予定1", color: "gray", icon: "tag" }),
+        expect.objectContaining({ name: "予定2", color: "blue", icon: "tag" }),
+      ]),
+    );
 
     const firstLoginOptions = await post(app, "/auth/passkey/login/options", {
       email,
@@ -379,7 +399,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     ).rejects.toThrow();
 
     const [category] = await db
-      .insert(categories)
+      .insert(categoryTable)
       .values({
         userId: owner.id,
         name: "統合テストカテゴリー",
@@ -557,7 +577,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       { groupId: group.id, userId: idleMember.id, role: "member" },
     ]);
     const [category] = await db
-      .insert(categories)
+      .insert(categoryTable)
       .values({
         userId: scheduledMember.id,
         name: "非公開カテゴリー",

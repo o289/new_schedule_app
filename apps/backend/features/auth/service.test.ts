@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
     getByUser: vi.fn(),
     updateSignCount: vi.fn(),
   },
+  category: {
+    create: vi.fn(),
+  },
   challenge: {
     create: vi.fn(),
     getByChallenge: vi.fn(),
@@ -55,6 +58,12 @@ vi.mock("../passkey/repository", () => ({
     getByCredentialId = mocks.passkey.getByCredentialId;
     getByUser = mocks.passkey.getByUser;
     updateSignCount = mocks.passkey.updateSignCount;
+  },
+}));
+
+vi.mock("../category/repository", () => ({
+  CategoryRepository: class {
+    create = mocks.category.create;
   },
 }));
 
@@ -261,7 +270,7 @@ describe("AuthService", () => {
     );
   });
 
-  it("registerVerifyでPasskeyを保存し対象Challengeだけを削除する", async () => {
+  it("registerVerifyでPasskeyと初期カテゴリーを保存し対象Challengeだけを削除する", async () => {
     mocks.passkey.getByCredentialId.mockResolvedValue(null);
     mocks.challenge.getByChallenge.mockResolvedValue(registerChallenge);
     mocks.verifyRegistration.mockResolvedValue({
@@ -289,6 +298,16 @@ describe("AuthService", () => {
       name: "テストユーザー",
       avatar: null,
     });
+    expect(mocks.category.create).toHaveBeenNthCalledWith(
+      1,
+      { name: "予定1", color: "gray", icon: "tag" },
+      user.id,
+    );
+    expect(mocks.category.create).toHaveBeenNthCalledWith(
+      2,
+      { name: "予定2", color: "blue", icon: "tag" },
+      user.id,
+    );
     expect(mocks.challenge.deleteById).toHaveBeenCalledWith(
       registerChallenge.id,
     );
