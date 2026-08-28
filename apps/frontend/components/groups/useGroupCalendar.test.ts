@@ -1,17 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiClientError } from "#frontend/lib/apiError";
+import {
+  fetchGroupCalendar,
+  shouldRetryGroupCalendar,
+} from "#frontend/lib/queryOptions";
 
 const groupApiMock = vi.hoisted(() => ({ calendar: vi.fn() }));
 
 vi.mock("#frontend/lib/api", () => ({
   groupApi: groupApiMock,
 }));
-
-import {
-  fetchGroupCalendar,
-  shouldRetryGroupCalendar,
-} from "./useGroupCalendar";
 
 describe("useGroupCalendar", () => {
   it("QueryのAbortSignalをグループカレンダーAPIへ渡す", async () => {

@@ -21,6 +21,8 @@ export const groupKeys = {
   details: () => [...groupKeys.all, "detail"] as const,
   detail: (groupId: string) => [...groupKeys.details(), groupId] as const,
   calendars: () => [...groupKeys.all, "calendar"] as const,
+  calendarGroup: (groupId: string) =>
+    [...groupKeys.calendars(), groupId] as const,
   calendar: (groupId: string, startDate: string, endDate: string) =>
-    [...groupKeys.calendars(), groupId, startDate, endDate] as const,
+    [...groupKeys.calendarGroup(groupId), startDate, endDate] as const,
 };

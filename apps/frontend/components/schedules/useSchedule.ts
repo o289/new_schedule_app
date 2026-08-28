@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAlert } from "#frontend/context/AlertContext";
 import { scheduleApi } from "#frontend/lib/api";
 import { getApiErrorCode } from "#frontend/lib/apiError";
+import { scheduleQueries } from "#frontend/lib/queryOptions";
 import { scheduleKeys } from "#frontend/lib/queryKeys";
 import { useScheduleForm } from "./useScheduleForm";
 
@@ -14,10 +15,7 @@ export function useSchedule() {
   const { draftSchedule, setDraftSchedule, resetDraft, handleChange } =
     useScheduleForm();
 
-  const schedulesQuery = useQuery({
-    queryKey: scheduleKeys.lists(),
-    queryFn: ({ signal }) => scheduleApi.list(signal),
-  });
+  const schedulesQuery = useQuery(scheduleQueries.list());
 
   const createSchedule = useMutation({
     mutationFn: () => scheduleApi.create(draftSchedule),
@@ -46,13 +44,17 @@ export function useSchedule() {
   }, [schedulesQuery.error, showAlert]);
 
   const fetchSchedules = () =>
-    queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+    queryClient.invalidateQueries({
+      queryKey: scheduleQueries.list().queryKey,
+    });
 
   const handleScheduleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     await createSchedule.mutateAsync();
-    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+    await queryClient.invalidateQueries({
+      queryKey: scheduleQueries.list().queryKey,
+    });
 
     resetDraft();
     showAlert("CREATE_SUCCESS");
@@ -74,7 +76,9 @@ export function useSchedule() {
       id: draftSchedule.id,
       schedule: payload,
     });
-    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+    await queryClient.invalidateQueries({
+      queryKey: scheduleQueries.list().queryKey,
+    });
     showAlert("UPDATE_SUCCESS");
   };
 
@@ -85,7 +89,9 @@ export function useSchedule() {
     if (scheduleId) {
       queryClient.removeQueries({ queryKey: scheduleKeys.detail(scheduleId) });
     }
-    await queryClient.invalidateQueries({ queryKey: scheduleKeys.lists() });
+    await queryClient.invalidateQueries({
+      queryKey: scheduleQueries.list().queryKey,
+    });
     showAlert("DELETE_SUCCESS");
   };
 
