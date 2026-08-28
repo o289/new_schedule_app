@@ -105,7 +105,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CalendarContext.Provider
+    <CalendarContext
       value={{
         calendarRef,
         selectedDate,
@@ -130,7 +130,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </CalendarContext.Provider>
+    </CalendarContext>
   );
 }
 

@@ -8,6 +8,11 @@ export interface LocalDateTimeParts {
   time: string;
 }
 
+/** DB由来の空白区切りを、APIで扱うT区切りのローカル日時へ統一する。 */
+export function normalizeLocalDateTime(value: string): string {
+  return value.replace(" ", "T");
+}
+
 /** 日時文字列を日付（YYYY-MM-DD）と時刻（HH:mm）に分ける。 */
 export function getLocalDateTimeParts(value: string): LocalDateTimeParts {
   return {

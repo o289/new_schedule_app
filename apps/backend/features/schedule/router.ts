@@ -8,6 +8,7 @@ import {
 import { ValidationError } from "#backend/core/api-error";
 import { requireCurrentUser } from "#backend/core/current-user";
 import { parseJsonBody, parseUuidParam } from "#backend/core/request";
+import { normalizeLocalDateTime } from "#utils/local-datetime";
 import type { Schedule } from "./repository";
 import { ScheduleService } from "./service";
 
@@ -22,8 +23,8 @@ function serializeSchedule(schedule: Schedule) {
     category: schedule.category,
     dates: schedule.dates.map((date) => ({
       id: date.id,
-      startDate: date.startDate.replace(" ", "T"),
-      endDate: date.endDate.replace(" ", "T"),
+      startDate: normalizeLocalDateTime(date.startDate),
+      endDate: normalizeLocalDateTime(date.endDate),
     })),
   });
 }
