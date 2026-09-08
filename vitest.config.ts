@@ -30,6 +30,13 @@ export default defineConfig({
     projects: [
       {
         test: {
+          name: "tools",
+          include: ["tools/**/*.test.ts"],
+          environment: "node",
+        },
+      },
+      {
+        test: {
           name: "frontend",
           include: [
             "apps/frontend/**/*.test.ts",
