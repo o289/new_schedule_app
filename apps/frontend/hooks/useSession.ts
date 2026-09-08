@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAlert } from "../context/AlertContext";
 import { authApi } from "../lib/api";
 import { getApiErrorCode } from "../lib/apiError";
+import { authQueries } from "../lib/queryOptions";
 import { authKeys } from "../lib/queryKeys";
 import {
   clearSession,
@@ -20,8 +21,7 @@ export function useSession() {
     hasStoredSession,
   );
   const sessionQuery = useQuery({
-    queryKey: authKeys.me(),
-    queryFn: ({ signal }) => authApi.me(signal),
+    ...authQueries.me(),
     enabled: hasSession,
   });
   const logoutMutation = useMutation({

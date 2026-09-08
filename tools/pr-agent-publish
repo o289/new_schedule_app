@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+if [ "$#" -ne 0 ]; then
+  echo 'STOP: pr-agent-publish accepts no arguments.' >&2
+  exit 1
+fi
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+cd "$repo_root"
+exec pnpm exec tsx tools/pr-agent-publish.ts

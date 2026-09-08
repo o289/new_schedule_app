@@ -1,0 +1,57 @@
+# 正本: new_schedule_app/codx/rules/pr-agent.rules
+# 自動読込ではない。codx/README.mdの導入手順を参照する。
+prefix_rule(
+    pattern = ["git", ["status", "diff", "log", "show", "merge-base", "rev-parse", "ls-files", "ls-remote", "symbolic-ref", "for-each-ref", "check-ref-format"]],
+    decision = "allow",
+    justification = "PR対象の読み取りとref形式確認。",
+)
+prefix_rule(
+    pattern = ["git", "remote", "get-url"],
+    decision = "allow",
+    justification = "remoteの参照先を読み取る。",
+)
+prefix_rule(
+    pattern = ["gh", "auth", "status"],
+    decision = "allow",
+    justification = "認証状態だけを確認する。",
+)
+prefix_rule(
+    pattern = ["gh", "pr", ["list", "view", "diff"]],
+    decision = "allow",
+    justification = "既存PRを読み取る。",
+)
+prefix_rule(
+    pattern = ["gh", "run", ["list", "view"]],
+    decision = "allow",
+    justification = "CIの対象SHAと状態を読み取る。",
+)
+prefix_rule(
+    pattern = ["./tools/pr-agent-publish"],
+    decision = "allow",
+    justification = "引数を拒否し、branch・宛先・証跡を検証する専用入口。",
+)
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "直接pushは禁止。専用のpr-agent-publishを使う。",
+)
+prefix_rule(
+    pattern = ["gh", "pr", "create"],
+    decision = "forbidden",
+    justification = "直接PR作成は禁止。専用のpr-agent-publishを使う。",
+)
+prefix_rule(
+    pattern = ["gh", "pr", ["merge", "close", "reopen", "ready", "review"]],
+    decision = "forbidden",
+    justification = "PR作成後の判断と状態変更は人間が行う。",
+)
+prefix_rule(
+    pattern = ["git", ["reset", "rebase", "clean"]],
+    decision = "forbidden",
+    justification = "作業内容・履歴を破壊する操作はPR作成の権限外。",
+)
+prefix_rule(
+    pattern = ["git", "branch", ["-d", "-D", "--delete"]],
+    decision = "forbidden",
+    justification = "PR作成エージェントはbranchを削除しない。",
+)

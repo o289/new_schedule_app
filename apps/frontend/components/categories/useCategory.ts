@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAlert } from "#frontend/context/AlertContext";
 import { categoryApi } from "#frontend/lib/api";
 import { getApiErrorCode } from "#frontend/lib/apiError";
+import { categoryQueries } from "#frontend/lib/queryOptions";
 import { categoryKeys, scheduleKeys } from "#frontend/lib/queryKeys";
 import type {
   CategoryColor,
@@ -20,10 +21,7 @@ export function useCategory() {
   const { showAlert } = useAlert();
   const queryClient = useQueryClient();
 
-  const categoriesQuery = useQuery({
-    queryKey: categoryKeys.lists(),
-    queryFn: ({ signal }) => categoryApi.list(signal),
-  });
+  const categoriesQuery = useQuery(categoryQueries.list());
 
   const createCategory = useMutation({
     mutationFn: categoryApi.create,
@@ -106,7 +104,9 @@ export function useCategory() {
       return;
     } else {
       await createCategory.mutateAsync(form);
-      await queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: categoryQueries.list().queryKey,
+      });
     }
 
     setForm({ name: "", color: "gray", icon: "tag" });

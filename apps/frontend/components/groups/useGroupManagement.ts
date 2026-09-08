@@ -5,15 +5,13 @@ import type { GroupCreate, GroupJoin } from "#schemas/group";
 import { useAlert } from "#frontend/context/AlertContext";
 import { groupApi } from "#frontend/lib/api";
 import { ApiClientError, getApiErrorCode } from "#frontend/lib/apiError";
+import { groupQueries } from "#frontend/lib/queryOptions";
 import { groupKeys } from "#frontend/lib/queryKeys";
 
 export function useGroupList() {
   const { showAlert } = useAlert();
   const queryClient = useQueryClient();
-  const listQuery = useQuery({
-    queryKey: groupKeys.lists(),
-    queryFn: ({ signal }) => groupApi.list(signal),
-  });
+  const listQuery = useQuery(groupQueries.list());
 
   useEffect(() => {
     if (!listQuery.error) return;
@@ -24,14 +22,18 @@ export function useGroupList() {
     mutationFn: (input: GroupCreate) => groupApi.create(input),
     retry: false,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: groupQueries.list().queryKey,
+      });
     },
   });
   const joinMutation = useMutation({
     mutationFn: (input: GroupJoin) => groupApi.join(input),
     retry: false,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: groupQueries.list().queryKey,
+      });
     },
     onError: (error) => {
       if (
@@ -52,10 +54,7 @@ export function useGroupList() {
 export function useGroupDetail(groupId: string) {
   const { showAlert } = useAlert();
   const queryClient = useQueryClient();
-  const detailQuery = useQuery({
-    queryKey: groupKeys.detail(groupId),
-    queryFn: ({ signal }) => groupApi.detail(groupId, signal),
-  });
+  const detailQuery = useQuery(groupQueries.detail(groupId));
 
   useEffect(() => {
     if (!detailQuery.error) return;
@@ -63,11 +62,15 @@ export function useGroupDetail(groupId: string) {
   }, [detailQuery.error, showAlert]);
 
   const invalidateDetail = () =>
-    queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+    queryClient.invalidateQueries({
+      queryKey: groupQueries.detail(groupId).queryKey,
+    });
   const removeGroupCache = () => {
-    queryClient.removeQueries({ queryKey: groupKeys.detail(groupId) });
     queryClient.removeQueries({
-      queryKey: [...groupKeys.calendars(), groupId],
+      queryKey: groupQueries.detail(groupId).queryKey,
+    });
+    queryClient.removeQueries({
+      queryKey: groupKeys.calendarGroup(groupId),
     });
   };
 
@@ -76,7 +79,9 @@ export function useGroupDetail(groupId: string) {
     retry: false,
     onSuccess: async () => {
       removeGroupCache();
-      await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: groupQueries.list().queryKey,
+      });
     },
   });
   const kickMutation = useMutation({
@@ -85,7 +90,7 @@ export function useGroupDetail(groupId: string) {
     onSuccess: async () => {
       await invalidateDetail();
       await queryClient.invalidateQueries({
-        queryKey: [...groupKeys.calendars(), groupId],
+        queryKey: groupKeys.calendarGroup(groupId),
       });
     },
   });
@@ -94,7 +99,9 @@ export function useGroupDetail(groupId: string) {
     retry: false,
     onSuccess: async () => {
       removeGroupCache();
-      await queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
+      await queryClient.invalidateQueries({
+        queryKey: groupQueries.list().queryKey,
+      });
     },
   });
   const regenerateInvitationMutation = useMutation({

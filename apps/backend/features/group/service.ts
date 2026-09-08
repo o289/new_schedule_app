@@ -15,6 +15,7 @@ import type {
   GroupResponse,
 } from "#schemas/group";
 import type { User } from "../user/repository";
+import { normalizeLocalDateTime } from "#utils/local-datetime";
 import { GroupCalendarRepository } from "./calendar-repository";
 import {
   digestJoinCode,
@@ -29,10 +30,6 @@ const maxCalendarRangeMilliseconds = 31 * 24 * 60 * 60 * 1000;
 
 function serializeDate(value: Date): string {
   return value.toISOString();
-}
-
-function serializeLocalDateTime(value: string): string {
-  return value.replace(" ", "T");
 }
 
 function groupResponse(
@@ -228,8 +225,8 @@ export class GroupService {
           name: event.name,
           avatar: event.avatar,
         },
-        startDate: serializeLocalDateTime(event.startDate),
-        endDate: serializeLocalDateTime(event.endDate),
+        startDate: normalizeLocalDateTime(event.startDate),
+        endDate: normalizeLocalDateTime(event.endDate),
       })),
     };
   }

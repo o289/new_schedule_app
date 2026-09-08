@@ -10,6 +10,7 @@ import {
   NotFoundError,
 } from "#backend/core/api-error";
 import { hasDatabaseErrorCode } from "#backend/core/database-error";
+import { normalizeLocalDateTime } from "#utils/local-datetime";
 import type { User } from "../user/repository";
 import { CategoryRepository } from "../category/repository";
 import {
@@ -49,10 +50,6 @@ export class ScheduleService {
     }
   }
 
-  private normalizeDateTime(value: string): string {
-    return value.replace(" ", "T");
-  }
-
   private resolveUpdateDates(
     existingDates: ScheduleDate[],
     inputDates: ScheduleDateUpdate[],
@@ -69,8 +66,8 @@ export class ScheduleService {
       }
 
       return {
-        startDate: this.normalizeDateTime(startDate),
-        endDate: this.normalizeDateTime(endDate),
+        startDate: normalizeLocalDateTime(startDate),
+        endDate: normalizeLocalDateTime(endDate),
       };
     });
   }

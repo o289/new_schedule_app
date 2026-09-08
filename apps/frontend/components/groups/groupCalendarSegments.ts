@@ -1,4 +1,5 @@
 import type { GroupBusyEvent, GroupCalendarResponse } from "#schemas/group";
+import { normalizeLocalDateTime } from "#utils/local-datetime";
 
 export type GroupCalendarSegment = GroupBusyEvent & {
   day: string;
@@ -37,8 +38,8 @@ function nextDay(day: string): string {
 export function splitGroupBusyEvent(
   event: GroupBusyEvent,
 ): GroupCalendarSegment[] {
-  const startDate = event.startDate.replace(" ", "T");
-  const endDate = event.endDate.replace(" ", "T");
+  const startDate = normalizeLocalDateTime(event.startDate);
+  const endDate = normalizeLocalDateTime(event.endDate);
   if (endDate <= startDate) return [];
 
   const segments: GroupCalendarSegment[] = [];
