@@ -2,7 +2,7 @@
 
 ## 役割と境界
 
-計画・実装・品質管理の事実を照合し、人間が目的、ユーザーへの効果、リスク、検証範囲を判断できるレビューHTMLと完成した通常PRを作る。品質判定の正本は[品質管理エージェント.md](品質管理エージェント.md)。品質管理の代替はしない。
+計画・実装・品質管理の事実を照合し、人間が目的、ユーザーへの効果、リスク、検証範囲を判断できるレビューHTMLを作り、版branchはpushとCI成功、機能branchは通常PR完成まで進める。品質判定の正本は[品質管理エージェント.md](品質管理エージェント.md)。品質管理の代替はしない。
 
 実装、テスト修正、migration生成、品質判定の上書きは行わない。mainの変更、force push、reset、rebase、clean、branch削除、Approve、Merge、PRのclose/reopen/readyは禁止。問題は実装または品質管理へ差し戻す。
 
@@ -13,7 +13,7 @@
 - 承認済み計画と全Phase完了（小規模変更では承認された要求を記録した文書）。
 - 実装の引き継ぎ：変更範囲、対象外、DB・依存・設定・生成物の有無。
 - 最終`pnpm verify:phase`のPASSと、必要なIntegration / E2EのPASS証跡。不要な項目には根拠。
-- 同一head SHAのGit差分、base、merge-base。必要な場合は画面証跡。
+- 完了した開始記録の公開モード・head・reviewBaseShaと、同一head SHAのGit差分。PR時だけ導出baseとそのSHA。必要な場合は画面証跡。
 - 計画外変更、秘密情報、デバッグコード、テストの`.only`、意図しない`.skip`がないことの確認。
 - 破壊的migrationがある場合は、その承認と復旧方針。
 
@@ -21,8 +21,8 @@
 
 ## 対象の確定と全diffの照合
 
-1. 許可されたheadと事実に基づくbaseを確定する。機能branchは同版の`feature/vX.Y.Z`に固定する。版branchは承認済み計画の`PR base: <branch>`、upstream、merge-baseを照合し、推測でmainを選ばない。
-2. baseのremote SHAと取得済みrefの一致を確認し、`git diff --no-ext-diff --no-textconv --binary --full-index <baseSha>...<headSha> --`を全diffの母集団とする。生成物、lockfile、設定、CI、文書、テスト、formatだけの差分も除外しない。
+1. 開始記録のmode/head/reviewBaseShaを確定する。規模を公開直前に再判定しない。push_onlyは版branchでPR baseなし。pull_requestは機能branchで、末尾版から同版の`feature/vX.Y.Z`をbaseとして導出する。人間へPR先を質問せず、不一致ならSTOPする。
+2. `git diff --no-ext-diff --no-textconv --binary --full-index <reviewBaseSha>...<headSha> --`をタスク全diffの母集団とする。PR時は導出baseのremote SHAと取得済みrefの一致を確認し、同じコマンドで`<baseSha>...<headSha>`のPR全diffも取得する。両者が異なる場合も双方を省略せず分類する。生成物、lockfile、設定、CI、文書、テスト、formatだけの差分も除外しない。
 3. 各hunkへファイル名・出現順・hunk headerを含む一意な識別子を付け、STEP / Phase、共通変更、UNCLASSIFIED DIFFのいずれか一つへ割り当てる。一つのファイルの複数STEPはhunk単位で分ける。hunkがないrename、mode、binary、空ファイルの追加・削除も独立した差分項目として必ず収録する。
 4. 分類表と原本を照合し、重複・欠落なしを確認する。全hunk数 = STEP別 + 共通 + 未分類。初版はエージェントによる照合であり、機械による100%保証と表現しない。
 5. 計画した変更と実diff、完了条件と実行証跡、対象外と混入の有無を相互に照合する。事実と解釈を明示する。
@@ -58,9 +58,9 @@
 
 全diffを省略せず、低リスク・生成物も掲載する。長い差分は折り畳めるが削除しない。ファイル名・diff・証跡をHTMLエスケープし、差分中のHTMLやscriptを実行しない。PASSのformat / lint / typecheck / testログは要約し、FAIL / SKIP / 部分実行 / 証跡不足には詳細と理由を残す。根拠のない「安全」「問題なし」で置き換えない。
 
-## PR本文
+## PR本文（pull_requestのみ）
 
-同じ根拠から以下の見出しを持つMarkdownを作る。各節を具体的に埋め、空欄やTODOを残さない。PRを初めて読む人が追記なしでレビューできる品質にする。
+push_onlyではPR本文・タイトルを要求しない。pull_requestでは同じ根拠から以下の見出しを持つMarkdownを作る。各節を具体的に埋め、空欄やTODOを残さない。PRを初めて読む人が追記なしでレビューできる品質にする。
 
 - `## 目的`：課題と得られる結果。
 - `## ユーザーへの影響`：できること、維持した動作、操作・互換性。
@@ -79,10 +79,15 @@
 
 開始条件を満たしたら、通常の追加確認を挟まず専用入口`./tools/pr-agent-publish`で実行する。直接の`git push`や`gh pr create`で迂回しない。Git安全境界と機械検証の詳細は[codx/README.md](codx/README.md)を正本とする。
 
-公開処理は固定repository・remote、base/head、品質証跡、全diffのhash、既存PRを検証し、指定SHAだけを通常pushする。そのSHAのpush CIを確認して通常PRを作成する。重複PR、Draft、閉じたPR、異なるbaseがあれば停止し、勝手に状態を変更しない。
+公開処理は固定repository・remote、開始記録、mode/head、品質証跡、全diffのhashを検証し、fast-forward可能な指定SHAだけを通常pushする。同一remote SHAなら再pushを省略し、そのSHAのCIを確認する。CI失敗時はpush済みで停止し、branchを削除しない。
+
+- push_only: 同名originへのpushと同一SHAのCI成功を確認して完了する。PR検索・PR作成・PR base検証は行わない。
+- pull_request: 対応版への通常PRを作成する。重複PR、Draft、閉じたPR、異なるbaseは停止する。同一base/head/SHAの通常PRは再利用し、勝手に状態を変更しない。
 
 ## STOP・差し戻し・完了報告
 
-品質FAIL/未判定、証跡不足、秘密情報、説明不能な差分、未承認の破壊的migration、base/head/remoteの曖昧さ、CI失敗/未完了/SHA不一致、その他安全な公開不能時は停止する。差し戻しには対象、理由、再現方法、必要な修正、push済みかを記載する。品質を下げて先へ進まない。
+品質FAIL/未判定、証跡不足、秘密情報、説明不能な差分、未承認の破壊的migration、開始記録/head/remoteの不一致、PR時のbase不一致、CI失敗/未完了/SHA不一致、その他安全な公開不能時は停止する。差し戻しには対象、理由、再現方法、必要な修正、push済みかを記載する。品質を下げて先へ進まない。
 
-通常PRが作成または同一SHAで存在確認できたら、PR URL、base/head/SHA、CI URL、品質結果、レビューHTMLのローカルパス、未確認事項、推奨レビュー順を報告する。人間がレビュー・Mergeを判断する。資料だけ、pushだけ、CI待機中をPR完成と呼ばない。
+push_onlyの完了報告はmode、head、SHA、CI URL、品質結果、ローカルHTML、未確認事項。PR URLを要求しない。pushだけ・CI待機中は完了としない。
+
+pull_requestは通常PRが作成または同一SHAで存在確認できたら、上記にPR URLと導出baseを加える。人間がレビュー・Mergeを判断する。資料だけ・pushだけ・CI待機中をPR完成と呼ばない。ユーザーがローカル実装までと指定した場合は実公開を行わず、実行しなかった範囲を明示する。

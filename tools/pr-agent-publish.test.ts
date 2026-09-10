@@ -4,6 +4,8 @@ import {
   publish,
   sha256,
   validateBranches,
+  verifyInputs,
+  ensureFastForward,
 } from "./pr-agent-publish.js";
 import type { Handoff, PublishIO } from "./pr-agent-publish.js";
 
@@ -24,14 +26,48 @@ function fixture() {
     "docs/quality.md",
     `${headSha}\npnpm verify:phase PASS`,
   );
-  const input: Handoff = {
-    schemaVersion: 1,
+  const plan = artifact("docs/plan.md", "Approved plan");
+  const input: Extract<Handoff, { mode: "pull_request" }> = {
+    schemaVersion: 2,
+    mode: "pull_request",
+    start: artifact(
+      "docs/start.json",
+      JSON.stringify({
+        schemaVersion: 1,
+        completed: true,
+        approved: true,
+        size: "large",
+        mode: "pull_request",
+        sourceBranch: base,
+        head,
+        slug: "pr-agent",
+        reviewBaseSha: mergeSha,
+        plan,
+        assessment: {
+          phaseCount: 5,
+          plannedFiles: ["example"],
+          authenticationChanged: false,
+          dbModels: [],
+          dependentDbModels: false,
+          directImplementation: false,
+        },
+      }),
+    ),
     head,
     headSha,
     base,
     baseSha,
-    mergeBaseSha: mergeSha,
-    plan: artifact("docs/plan.md", `Approved\nPR base: ${base}`),
+    reviewBaseSha: mergeSha,
+    plan,
+    prReview: {
+      diffSha256: sha256(diff),
+      classification: artifact(
+        "docs/pr-classification.md",
+        "All PR diff: example#1",
+      ),
+      allDiffClassified: true,
+      unclassified: 0,
+    },
     implementation: artifact("docs/implementation.md", headSha),
     allPhasesComplete: true,
     quality: {
@@ -103,7 +139,10 @@ function fixture() {
     dirty: false,
     currentSha: headSha,
     remoteBase: baseSha,
-    remoteHead: headSha,
+    remoteHead: undefined as string | undefined,
+    ancestor: mergeSha,
+    changedPaths: "example\0",
+    reports: [] as string[],
     remoteUrl: "https://github.com/o289/new_schedule_app.git",
     upstream: `origin/${head}`,
     runs: [run],
@@ -144,7 +183,9 @@ function fixture() {
       state.sleeps += 1;
       state.onSleep();
     },
-    report: () => {},
+    report: (message) => {
+      state.reports.push(message);
+    },
     run: async (program, args) => {
       commands.push([program, ...args]);
       if (program === "git") {
@@ -153,16 +194,23 @@ function fixture() {
         if (args[0] === "symbolic-ref") return input.head;
         if (args[0] === "remote") return state.remoteUrl;
         if (args[0] === "for-each-ref") return state.upstream;
-        if (args[0] === "merge-base") return mergeSha;
-        if (args[0] === "diff") return diff;
+        if (args[0] === "merge-base") return state.ancestor;
+        if (args[0] === "diff")
+          return args.includes("--name-only") ? state.changedPaths : diff;
         if (args[0] === "rev-parse") {
           if (args[1] === "--show-toplevel") return process.cwd();
           return args[1] === "HEAD" ? state.currentSha : baseSha;
         }
-        if (args[0] === "ls-remote")
-          return `${args[3] === `refs/heads/${input.base}` ? state.remoteBase : state.remoteHead}\t${args[3]}\n`;
+        if (args[0] === "ls-remote") {
+          const commit =
+            args[3] === `refs/heads/${input.head}`
+              ? state.remoteHead
+              : state.remoteBase;
+          return commit === undefined ? "" : `${commit}\t${args[3]}\n`;
+        }
         if (args.includes("push")) {
           if (state.failPush) throw new Error("push rejected");
+          state.remoteHead = headSha;
           state.onPush();
           return "ok";
         }
@@ -202,13 +250,15 @@ describe("PR publish safety", () => {
     "feature/a/v3.2.2",
     "",
   ])("rejects forbidden head %s", (branch) => {
-    expect(() => validateBranches(branch, base)).toThrow();
+    expect(() => validateBranches("pull_request", branch, base)).toThrow();
   });
   it("accepts both allowed branch forms and enforces matching feature base", () => {
-    expect(() => validateBranches(head, base)).not.toThrow();
-    expect(() => validateBranches(base, "main")).not.toThrow();
-    expect(() => validateBranches(head, "feature/v3.2.1")).toThrow();
-    expect(() => validateBranches(base, base)).toThrow();
+    expect(() => validateBranches("pull_request", head, base)).not.toThrow();
+    expect(() => validateBranches("push_only", base)).not.toThrow();
+    expect(() =>
+      validateBranches("pull_request", head, "feature/v3.2.1"),
+    ).toThrow();
+    expect(() => validateBranches("push_only", base, base)).toThrow();
   });
   it.each([
     "quality",
@@ -260,7 +310,7 @@ describe("PR publish safety", () => {
       }
       case "plan":
         f.files.set("docs/plan.md", "No base");
-        f.input.plan.sha256 = sha256("No base");
+
         break;
     }
     await expect(
@@ -291,7 +341,11 @@ describe("PR publish safety", () => {
   });
   it("pushes one explicit SHA without force then creates a normal PR with CI evidence", async () => {
     const f = fixture();
-    expect(await publish(f.input, f.io)).toBe(url);
+    expect(await publish(f.input, f.io)).toMatchObject({
+      mode: "pull_request",
+      prUrl: url,
+      ciUrl: f.run.url,
+    });
     const actualWrites = writes(f.commands);
     expect(actualWrites).toHaveLength(2);
     expect(actualWrites[0]).toEqual([
@@ -401,7 +455,11 @@ describe("PR publish safety", () => {
   it("reuses a matching normal PR", async () => {
     const f = fixture();
     f.state.prs = [f.pr];
-    expect(await publish(f.input, f.io)).toBe(url);
+    expect(await publish(f.input, f.io)).toMatchObject({
+      mode: "pull_request",
+      prUrl: url,
+      ciUrl: f.run.url,
+    });
     expect(writes(f.commands)).toHaveLength(1);
   });
   it("recovers an uncertain create response without creating twice", async () => {
@@ -409,7 +467,11 @@ describe("PR publish safety", () => {
     f.state.failCreate = true;
     await expect(publish(f.input, f.io)).rejects.toThrow();
     f.state.failCreate = false;
-    expect(await publish(f.input, f.io)).toBe(url);
+    expect(await publish(f.input, f.io)).toMatchObject({
+      mode: "pull_request",
+      prUrl: url,
+      ciUrl: f.run.url,
+    });
     expect(
       f.commands.filter((c) => c[0] === "gh" && c[2] === "create"),
     ).toHaveLength(1);
@@ -419,5 +481,214 @@ describe("PR publish safety", () => {
     f.state.failPush = true;
     await expect(publish(f.input, f.io)).rejects.toThrow();
     expect(f.commands.some((c) => c[0] === "gh" && c[1] === "run")).toBe(false);
+  });
+});
+
+function pushOnlyFixture() {
+  const f = fixture();
+  const {
+    base: _base,
+    baseSha: _baseSha,
+    prReview: _prReview,
+    title: _title,
+    body: _body,
+    ...common
+  } = f.input;
+  const input: Extract<Handoff, { mode: "push_only" }> = {
+    ...common,
+    mode: "push_only",
+    head: base,
+  };
+  const record = JSON.stringify({
+    schemaVersion: 1,
+    completed: true,
+    approved: true,
+    size: "medium",
+    mode: "push_only",
+    sourceBranch: base,
+    head: base,
+    reviewBaseSha: mergeSha,
+    plan: f.input.plan,
+    assessment: {
+      phaseCount: 3,
+      plannedFiles: ["example"],
+      authenticationChanged: false,
+      dbModels: [],
+      dependentDbModels: false,
+      directImplementation: false,
+    },
+  });
+  f.files.set("docs/start.json", record);
+  input.start = { path: "docs/start.json", sha256: sha256(record) };
+  // 外部境界の現在branchも版branchへ合わせる。
+  f.input.head = base;
+  f.state.upstream = `origin/${base}`;
+  f.run.headBranch = base;
+  return { ...f, input };
+}
+describe("handoff version 2", () => {
+  it("derives PR base without a plan PR base line", () => {
+    const { base: _base, ...input } = fixture().input;
+    const parsed = handoffSchema.parse(input);
+    expect(parsed.mode === "pull_request" && parsed.base).toBe(base);
+  });
+  it("verifies push-only without PR fields or PR commands", async () => {
+    const f = pushOnlyFixture();
+    expect(handoffSchema.safeParse(f.input).success).toBe(true);
+    await verifyInputs(f.io, f.input);
+    expect(f.commands.some((args) => args[0] === "gh")).toBe(false);
+    expect(f.commands.some((args) => args.includes("ls-remote"))).toBe(false);
+  });
+  it.each(["wrong-mode", "old-version", "wrong-base", "push-base"])(
+    "rejects %s",
+    (problem) => {
+      const pr = fixture().input;
+      const input =
+        problem === "wrong-mode"
+          ? { ...pr, mode: "push_only" }
+          : problem === "old-version"
+            ? { ...pr, schemaVersion: 1 }
+            : problem === "wrong-base"
+              ? { ...pr, base: "main" }
+              : { ...pushOnlyFixture().input, base };
+      expect(handoffSchema.safeParse(input).success).toBe(false);
+    },
+  );
+  it("rejects a review start that differs from the start record", async () => {
+    const f = fixture();
+    f.input.reviewBaseSha = headSha;
+    await expect(publish(f.input, f.io)).rejects.toThrow("開始記録");
+    expect(writes(f.commands)).toEqual([]);
+  });
+  it("rejects a different complete PR diff even when task diff matches", async () => {
+    const f = fixture();
+    f.input.prReview.diffSha256 = "0".repeat(64);
+    await expect(publish(f.input, f.io)).rejects.toThrow("PR全diff");
+    expect(writes(f.commands)).toEqual([]);
+  });
+});
+
+describe("push-only publication", () => {
+  it("pushes and checks CI without ever querying PRs", async () => {
+    const f = pushOnlyFixture();
+    expect(await publish(f.input, f.io)).toEqual({
+      mode: "push_only",
+      head: base,
+      headSha,
+      ciUrl: f.run.url,
+    });
+    expect(writes(f.commands)).toHaveLength(1);
+    expect(f.commands.some((c) => c[0] === "gh" && c[1] === "pr")).toBe(false);
+    expect(f.state.body).toBe("");
+  });
+  it("retries the same SHA without pushing again and still checks CI", async () => {
+    const f = pushOnlyFixture();
+    await publish(f.input, f.io);
+    await publish(f.input, f.io);
+    expect(writes(f.commands)).toHaveLength(1);
+    expect(
+      f.commands.filter((c) => c[0] === "gh" && c[2] === "list").length,
+    ).toBeGreaterThanOrEqual(4);
+  });
+  it("fails after push if CI fails, and reports push completion", async () => {
+    const f = pushOnlyFixture();
+    f.run.conclusion = "failure";
+    await expect(publish(f.input, f.io)).rejects.toThrow("CI");
+    expect(f.state.reports).toContain(
+      "push完了。以降の失敗時もbranchを削除しません。",
+    );
+    expect(f.commands.some((c) => c[0] === "gh" && c[1] === "pr")).toBe(false);
+  });
+  it("does not treat an identical remote SHA as successful when CI fails", async () => {
+    const f = pushOnlyFixture();
+    f.state.remoteHead = headSha;
+    f.run.conclusion = "failure";
+    await expect(publish(f.input, f.io)).rejects.toThrow("CI");
+    expect(writes(f.commands)).toHaveLength(0);
+  });
+  it("rejects a remote ahead of or divergent from head", async () => {
+    const f = pushOnlyFixture();
+    f.state.remoteHead = baseSha;
+    await expect(publish(f.input, f.io)).rejects.toThrow("先行または分岐");
+    expect(writes(f.commands)).toHaveLength(0);
+  });
+  it("rejects changed paths outside the start plan", async () => {
+    const f = pushOnlyFixture();
+    f.state.changedPaths = "unexpected.ts\0";
+    await expect(publish(f.input, f.io)).rejects.toThrow("予定にない");
+    expect(writes(f.commands)).toHaveLength(0);
+  });
+  it("rejects a nonancestor review base", async () => {
+    const f = pushOnlyFixture();
+    f.state.ancestor = baseSha;
+    await expect(publish(f.input, f.io)).rejects.toThrow("祖先");
+    expect(writes(f.commands)).toHaveLength(0);
+  });
+});
+describe("fast-forward check", () => {
+  it("accepts only missing, identical, or ancestor remote commits", async () => {
+    const io = { run: async () => baseSha };
+    expect(await ensureFastForward(io, undefined, headSha)).toBe(true);
+    expect(await ensureFastForward(io, headSha, headSha)).toBe(false);
+    expect(await ensureFastForward(io, baseSha, headSha)).toBe(true);
+    await expect(ensureFastForward(io, mergeSha, headSha)).rejects.toThrow(
+      "先行または分岐",
+    );
+  });
+  it("does not assume missing local commit objects are safe", async () => {
+    const io = {
+      run: async (): Promise<string> => {
+        throw new Error("bad object");
+      },
+    };
+    await expect(ensureFastForward(io, baseSha, headSha)).rejects.toThrow(
+      "remote commit",
+    );
+  });
+});
+
+describe("publication state changes", () => {
+  it("rejects detached HEAD before push", async () => {
+    const f = pushOnlyFixture();
+    const run = f.io.run;
+    f.io.run = async (program, args) => {
+      if (program === "git" && args[0] === "symbolic-ref")
+        throw new Error("detached HEAD");
+      return run(program, args);
+    };
+    await expect(publish(f.input, f.io)).rejects.toThrow();
+    expect(writes(f.commands)).toHaveLength(0);
+  });
+  it.each(["in_progress", "wrong-sha", "missing-check", "skipped-check"])(
+    "does not complete push-only on CI %s",
+    async (problem) => {
+      const f = pushOnlyFixture();
+      if (problem === "in_progress") f.run.status = "in_progress";
+      if (problem === "wrong-sha") f.run.headSha = baseSha;
+      if (problem === "missing-check") f.state.jobs = [];
+      if (problem === "skipped-check")
+        f.state.jobs = [
+          {
+            name: "型・テスト・書式の確認",
+            status: "completed",
+            conclusion: "skipped",
+          },
+        ];
+      await expect(publish(f.input, f.io)).rejects.toThrow();
+      expect(f.commands.some((c) => c[0] === "gh" && c[1] === "pr")).toBe(
+        false,
+      );
+    },
+  );
+  it("rejects a different latest CI run before completion", async () => {
+    const f = pushOnlyFixture();
+    const run = f.io.run;
+    f.io.run = async (program, args) => {
+      const output = await run(program, args);
+      if (program === "gh" && args[0] === "run" && args[1] === "view")
+        f.run.databaseId += 1;
+      return output;
+    };
+    await expect(publish(f.input, f.io)).rejects.toThrow("CIが再実行");
   });
 });
