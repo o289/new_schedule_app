@@ -22,6 +22,7 @@
     "runtime:check": "node tools/check-runtime.mjs",
     "rules:check": "tsx tools/check-project-rules.ts",
     "agent:plan:generate": "tsx tools/agent-plan-generate.ts",
+    "agent:run": "./tools/agent-run-command",
     "dev": "concurrently \"pnpm dev:frontend\" \"pnpm dev:backend\"",
     "dev:frontend": "vite --config vite.config.ts",
     "dev:backend": "tsx watch apps/backend/index.ts",

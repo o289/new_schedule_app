@@ -8,6 +8,10 @@
 
 ## 役割の選択
 
+Stage 2以降のrun状態はorchestratorのappend-only event logを正本とし、AIが状態ファイルを直接編集してはならない。cleanupは登録済み未公開runだけを`tools/agent-run/cleanup.ts`経由で実行する。
+
+cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git-common-dir）、run event log、worktree realpath、現在branch、HEADを照合する。statusの伏字、diff概要、event log全量をrun directoryへ保存できた場合だけ、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBは操作しない。証跡保存に失敗した場合は対象を温存して停止する。
+
 依頼内容と現在の工程に応じて、次の役割を選択し、対応する文書に従う。
 
 - 要求整理、直接実装可否の判断、実装計画の作成・修正は[`計画作成エージェント.md`](計画作成エージェント.md)に従う。
