@@ -1,5 +1,9 @@
 # 実装計画
 
+> 新規計画では、この文書の項目をcanonical `plan.json`へ構造化し、`tools/agent-plan-generate`でHTML／Markdownを生成する。生成物の手編集は禁止する。承認可能条件は`openDecisions`が空で、各変更単位が`APPROVED`または`NOT_APPLICABLE`、planHash・approvedBy・approvedAt・expiresAtが一致し、有効期間が最大7日であること。新規開始はschemaVersion 2のみとし、completed v1 recordは履歴互換として保持する。
+
+既存のMarkdown計画書は履歴・移行前資料として保持する。このテンプレートはcanonical JSON入力の項目設計用referenceであり、手作業で生成Markdownを作成しない。新規計画では`docs/agent-plan-input.json`を作成し、generator出力の`agent-plan.md`を承認snapshotとして扱う。
+
 ## 概要
 
 - 解決する課題と実装の目的を記載する。

@@ -1,5 +1,11 @@
 # AIエージェント開発フロー
 
+## Canonical plan契約（新規計画）
+
+新規計画の正本はZod検証済み`plan.json`とし、`agent:plan:generate`で`plan-review.html`と`agent-plan.md`を生成する。生成物の手編集は禁止し、修正は入力planへ戻して再生成する。承認は変更単位ごとの`APPROVED`/`NOT_APPLICABLE`、`openDecisions`ゼロ、planHash、approvedBy、approvedAt、expiresAt（最大7日）を確認する。
+
+新規開始はschemaVersion 2のcanonical plan／approval／agent-plan.md参照だけを受理し、v1入力へ暗黙変換しない。既存completed v1開始recordは履歴互換のため保持する。Stage 2導入までは版branch上で実装し、worktree隔離・state machine・trusted runnerは未実装である。
+
 ## 役割の選択
 
 依頼内容と現在の工程に応じて、次の役割を選択し、対応する文書に従う。

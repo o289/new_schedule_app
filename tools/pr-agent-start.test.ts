@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { classifyWork, startTask, startInputSchema } from "./pr-agent-start.js";
+import {
+  classifyWork,
+  startTask,
+  startTaskV2,
+  validateStart,
+  startInputSchema,
+  startInputV2Schema,
+  startRecordSchema,
+} from "./pr-agent-start.js";
+import { hashPlan, normalizePlan } from "./agent-run/plan-hash.js";
+import { renderPlanMarkdown } from "./agent-run/plan-render.js";
+import { parsePlan } from "./agent-run/plan-schema.js";
 import type { StartInput, StartIO } from "./pr-agent-start.js";
 const sha = "a".repeat(40);
 const files = (count: number) =>
@@ -70,6 +81,161 @@ function fixture(large = false) {
   };
   return { input, state, calls, io };
 }
+function fixtureV2() {
+  const plan = {
+    schemaVersion: 1,
+    planId: "v2-plan",
+    runId: "v2-run",
+    objective: "v2",
+    assumptions: [],
+    openDecisions: [],
+    phases: [
+      {
+        id: "phase-1",
+        name: "v2",
+        objective: "v2",
+        allowedPaths: ["tools/**"],
+        qualityGates: ["unit"],
+        acceptanceCriteria: ["ok"],
+        stopConditions: ["stop"],
+      },
+    ],
+    allowedPaths: ["tools/**"],
+    forbiddenPaths: [".git/**", ".env*", "docs/agent-runs/**"],
+    apiChanges: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        method: "none",
+        path: "none",
+        request: "none",
+        response: "none",
+        compatibility: "none",
+      },
+    ],
+    dbChanges: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        model: "none",
+        migration: "none",
+        dataImpact: "none",
+        rollback: "none",
+      },
+    ],
+    dependencyChanges: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        name: "none",
+        version: "none",
+        reason: "none",
+        license: "none",
+      },
+    ],
+    permissionChanges: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        target: "none",
+        boundary: "none",
+        mitigation: "none",
+      },
+    ],
+    secretChanges: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        target: "none",
+        boundary: "none",
+        mitigation: "none",
+      },
+    ],
+    externalSideEffects: [
+      {
+        status: "NOT_APPLICABLE",
+        description: "none",
+        target: "none",
+        boundary: "none",
+        mitigation: "none",
+      },
+    ],
+    qualityGates: ["unit"],
+    failurePolicy: "stop",
+    limits: { maxRetries: 3, maxDurationMinutes: 120, maxCostYen: 0 },
+    branch: { source: "feature/v3.2.3", worktree: "run", mode: "push_only" },
+    acceptanceCriteria: ["ok"],
+  };
+  const parsed = parsePlan(plan);
+  const planText = normalizePlan(parsed);
+  const planHash = hashPlan(parsed);
+  const implementation = renderPlanMarkdown({ plan: parsed, planHash });
+  const digest = (value: string) =>
+    createHash("sha256").update(value).digest("hex");
+  const approval = {
+    schemaVersion: 1,
+    runId: parsed.runId,
+    plan: { path: "docs/v2-run/plan.json", sha256: digest(planText) },
+    planHash,
+    approvedBy: "owner",
+    approvedAt: "2026-01-01T00:00:00Z",
+    expiresAt: "2026-01-03T00:00:00Z",
+    completed: true,
+  };
+  const input = {
+    schemaVersion: 2 as const,
+    approved: true as const,
+    assessment,
+    size: "medium" as const,
+    mode: "push_only" as const,
+    sourceBranch: "feature/v3.2.3",
+    head: "feature/v3.2.3",
+    reviewBaseSha: sha,
+    plan: {
+      path: "docs/v2-run/plan.json",
+      sha256: digest(planText),
+      runId: parsed.runId,
+      planHash,
+    },
+    approval: {
+      path: "docs/v2-run/approval.json",
+      sha256: digest(JSON.stringify(approval)),
+      runId: parsed.runId,
+      planHash,
+    },
+    implementation: {
+      path: "docs/v2-run/agent-plan.md",
+      sha256: digest(implementation),
+    },
+  };
+  const calls: string[][] = [];
+  const state = { branch: input.sourceBranch };
+  const texts: Record<string, string> = {
+    [input.plan.path]: planText,
+    [input.approval.path]: JSON.stringify(approval),
+    [input.implementation.path]: implementation,
+  };
+  const io: StartIO = {
+    read: async (path) => texts[path] ?? "",
+    run: async (args) => {
+      calls.push(args);
+      if (args[0] === "rev-parse" && args[1] === "--show-toplevel")
+        return process.cwd();
+      if (args[0] === "rev-parse") return sha;
+      if (args[0] === "remote")
+        return "https://github.com/o289/new_schedule_app.git";
+      if (args[0] === "symbolic-ref") return state.branch;
+      if (args[0] === "status" || args[0] === "check-ref-format") return "";
+      if (args[0] === "switch") {
+        state.branch = input.head;
+        return "";
+      }
+      throw new Error(`unexpected ${args.join(" ")}`);
+    },
+  };
+  return { input, texts, calls, io, planHash, approval };
+}
+
 describe("work size", () => {
   it.each([
     [4, 99, false, [], false, "medium"],
@@ -124,6 +290,77 @@ describe("work size", () => {
   });
 });
 describe("task start", () => {
+  it("starts a valid v2 medium record without switching", async () => {
+    const f = fixtureV2();
+    const result = await startTaskV2(
+      f.input,
+      f.io,
+      new Date("2026-01-02T00:00:00Z"),
+    );
+    expect(result.completed).toBe(true);
+    expect(f.calls.some((args) => args[0] === "switch")).toBe(false);
+  });
+  it.each([
+    "plan-ref-hash",
+    "canonical-hash",
+    "plan-runId",
+    "approval-ref-hash",
+    "approval-runId",
+    "approval-planHash",
+    "expired",
+    "implementation-ref-hash",
+    "implementation-content",
+    "args",
+    "path-traversal",
+  ])("v2 rejects %s before switch", async (problem) => {
+    const f = fixtureV2();
+    if (problem === "plan-ref-hash") f.input.plan.sha256 = "0".repeat(64);
+    if (problem === "canonical-hash") f.input.plan.planHash = "0".repeat(64);
+    if (problem === "plan-runId") f.input.plan.runId = "other";
+    if (problem === "approval-ref-hash")
+      f.input.approval.sha256 = "0".repeat(64);
+    if (problem === "approval-runId") f.input.approval.runId = "other";
+    if (problem === "approval-planHash")
+      f.input.approval.planHash = "0".repeat(64);
+    if (problem === "expired") {
+      const approvalPath = f.input.approval.path;
+      const approval = JSON.parse(f.texts[approvalPath] ?? "") as Record<
+        string,
+        unknown
+      >;
+      approval.expiresAt = "2026-01-01T00:00:01Z";
+      f.texts[approvalPath] = JSON.stringify(approval);
+      f.input.approval.sha256 = createHash("sha256")
+        .update(f.texts[approvalPath] ?? "")
+        .digest("hex");
+    }
+    if (problem === "implementation-ref-hash")
+      f.input.implementation.sha256 = "0".repeat(64);
+    if (problem === "implementation-content")
+      f.texts[f.input.implementation.path] = "changed";
+    if (problem === "path-traversal") f.input.plan.path = "docs/../plan.json";
+    await expect(
+      startTaskV2(
+        f.input,
+        f.io,
+        new Date("2026-01-02T00:00:00Z"),
+        problem === "args" ? ["extra"] : [],
+      ),
+    ).rejects.toThrow();
+    expect(f.calls.some((args) => args[0] === "switch")).toBe(false);
+  });
+  it("accepts only v2 for new input while retaining v1 record compatibility", () => {
+    expect(startInputV2Schema.safeParse(fixture().input).success).toBe(false);
+    expect(
+      startRecordSchema.safeParse({ ...fixture().input, completed: true })
+        .success,
+    ).toBe(true);
+    const v2 = fixtureV2();
+    expect(
+      startRecordSchema.safeParse({ ...v2.input, completed: true }).success,
+    ).toBe(true);
+    expect(() => validateStart(v2.input)).not.toThrow();
+  });
   it("records medium work without switching branches", async () => {
     const f = fixture();
     expect(await startTask(f.input, f.io)).toEqual({

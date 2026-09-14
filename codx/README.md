@@ -1,5 +1,9 @@
 # PR作成エージェントの運用
 
+## Canonical planとの境界
+
+新規計画の正本はZod検証済み`plan.json`、生成物は`docs/agent-runs/<runId>/plan-review.html`と`agent-plan.md`である。生成物の手編集は禁止し、planHashと承認record（approvedBy、approvedAt、expiresAt、最大7日）を開始・公開時に再検証する。新規開始はschemaVersion 2のみを受理し、completed済みschemaVersion 1の開始recordだけは履歴互換として読み取る。Stage 2導入前は版branch上の暫定運用で、worktree／state machine／trusted runnerは未実装である。
+
 ## 配置とRules
 
 ユーザー指定により正本はリポジトリルートの`codx/rules/pr-agent.rules`。ホーム配下は変更しない。
@@ -19,11 +23,11 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 ## 実装開始の記録
 
-規模の正本は[判断フロー](../IMPLEMENTATION_DECISION_FLOW.md)。開始処理は`./tools/pr-agent-start`（引数なし）。入力は`docs/pr-agent-start-input.json`、出力は`docs/pr-agent-start-record.json`。開始時点の承認済み計画または小規模の要求文書を変更しないスナップショットとして保存し、そのpath/hashを入力にする。進捗更新用の計画書と分け、開始後にsnapshotを上書きしない。
+規模の正本は[判断フロー](../IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`docs/agent-plan-input.json`を入力に`./tools/agent-plan-generate`で生成し、`docs/agent-runs/<runId>/`へ`plan.json`、`plan-review.html`、`agent-plan.md`、最後にmanifestを保存する。`./tools/agent-plan-approve`はapproval inputを検証してapproval recordを作成する。開始処理は`./tools/pr-agent-start`（引数なし）で、入力は`docs/pr-agent-start-input.json`、出力は`docs/pr-agent-start-record.json`である。
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "approved": true,
   "assessment": {
     "phaseCount": 3,
@@ -38,7 +42,22 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
   "sourceBranch": "feature/v3.2.3",
   "head": "feature/v3.2.3",
   "reviewBaseSha": "実装開始前の40桁SHA",
-  "plan": { "path": "docs/approved-plan.md", "sha256": "64桁hash" }
+  "plan": {
+    "path": "docs/agent-runs/run-001/plan.json",
+    "sha256": "64桁hash",
+    "runId": "run-001",
+    "planHash": "64桁hash"
+  },
+  "approval": {
+    "path": "docs/agent-runs/run-001/approval.json",
+    "sha256": "64桁hash",
+    "runId": "run-001",
+    "planHash": "64桁hash"
+  },
+  "implementation": {
+    "path": "docs/agent-runs/run-001/agent-plan.md",
+    "sha256": "64桁hash"
+  }
 }
 ```
 
@@ -46,11 +65,11 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 開始処理はclean、版branch、開始SHA、固定origin、承認snapshotのhashを検証し、大規模のみ同名local/remote不存在を確認してローカルbranchを作る。結果は入力にcompleted=trueを加えた開始記録。同名記録は上書きしない。失敗時に空の記録が残ることがあるため、現在branchと入力SHAを確認して復旧し、タスク途中のHEADを新しい開始点にしない。記録保存前にbranch作成が成功していた場合も自動削除しない。
 
-開始処理はRulesへ自動allowを追加しない。通常の実行権限に従う。公開時はこの開始記録のpath/hashをhandoffへ渡す。
+新規inputはschemaVersion 2だけを受理し、v1へ暗黙変換しない。completed済みv1開始recordは現行publisher互換のため読取のみ保持する。開始v2と公開handoff v2は別schemaである。開始処理はRulesへ自動allowを追加しない。通常の実行権限に従う。公開時はこの開始記録のpath/hashをhandoffへ渡す。
 
 ## 公開入力（schemaVersion 2）
 
-正本は[公開処理のhandoffSchema](../tools/pr-agent-publish.ts)。旧version 1は暗黙変換せずSTOPする。開始処理のversionは引き続き1であり、公開入力のversionとは別。
+正本は[公開処理のhandoffSchema](../tools/pr-agent-publish.ts)。旧version 1は暗黙変換せずSTOPする。開始v2と公開v2は別schemaとして検証する。
 
 入力は`docs/pr-agent-handoff.json`。品質管理PASS後、実装引き継ぎ・品質証跡には同じhead SHAを記録する。開始記録のmode/head/reviewBaseSha/plan参照が公開入力と一致することを確認する。承認済み計画snapshotのhashを変えない。artifactは非空のUTF-8ファイルをdocs内へ置き、hashを`shasum -a 256 <file>`で取得する。docs外へのsymlinkは拒否する。これらのhashは改変検出であり、品質判定の真正性や分類の意味を保証する署名ではない。
 

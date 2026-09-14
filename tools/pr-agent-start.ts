@@ -5,6 +5,10 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { hashPlan } from "./agent-run/plan-hash";
+import { approvalRecordSchema, validateApproval } from "./agent-run/approval";
+import { parsePlan } from "./agent-run/plan-schema";
+import { renderPlanMarkdown } from "./agent-run/plan-render";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -49,6 +53,32 @@ export function classifyWork(
 const planRef = z
   .object({ path: nonempty, sha256: z.string().regex(/^[a-f0-9]{64}$/) })
   .strict();
+const canonicalRef = planRef
+  .extend({ runId: nonempty, planHash: z.string().regex(/^[a-f0-9]{64}$/) })
+  .strict();
+export const startInputV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    approved: z.literal(true),
+    assessment: assessmentSchema,
+    size: z.enum(["small", "medium", "large"]),
+    mode: z.enum(["push_only", "pull_request"]),
+    sourceBranch: z.string().regex(/^feature\/v\d+\.\d+\.\d+$/),
+    head: nonempty,
+    slug: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)
+      .optional(),
+    reviewBaseSha: sha,
+    plan: canonicalRef,
+    approval: canonicalRef,
+    implementation: planRef,
+  })
+  .strict();
+export const startRecordV2Schema = startInputV2Schema
+  .extend({ completed: z.literal(true) })
+  .strict();
+export type StartInputV2 = z.infer<typeof startInputV2Schema>;
 export const startInputSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -66,9 +96,13 @@ export const startInputSchema = z
     plan: planRef,
   })
   .strict();
-export const startRecordSchema = startInputSchema.extend({
+export const startRecordV1Schema = startInputSchema.extend({
   completed: z.literal(true),
 });
+export const startRecordSchema = z.union([
+  startRecordV1Schema,
+  startRecordV2Schema,
+]);
 export type StartInput = z.infer<typeof startInputSchema>;
 export interface StartIO {
   run: (args: string[]) => Promise<string>;
@@ -77,7 +111,7 @@ export interface StartIO {
 function check(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`STOP: ${message}`);
 }
-export function validateStart(input: StartInput): void {
+export function validateStart(input: StartInput | StartInputV2): void {
   const size = classifyWork(input.assessment);
   check(input.size === size, "規模と判定材料が一致しません");
   const expectedMode = size === "large" ? "pull_request" : "push_only";
@@ -184,6 +218,85 @@ export async function startTask(
   return startRecordSchema.parse({ ...input, completed: true });
 }
 
+export async function startTaskV2(
+  raw: unknown,
+  io: StartIO,
+  now = new Date(),
+  args: string[] = [],
+) {
+  check(args.length === 0, "引数は受け付けません");
+  const input = startInputV2Schema.parse(raw);
+  validateStart(input);
+  const planText = await io.read(input.plan.path);
+  check(
+    input.plan.path.startsWith("docs/") &&
+      !input.plan.path.split("/").includes(".."),
+    "計画pathが不正です",
+  );
+  check(
+    createHash("sha256").update(planText).digest("hex") === input.plan.sha256,
+    "計画ファイルのhashが不一致です",
+  );
+  const plan = parsePlan(JSON.parse(planText) as unknown);
+  check(plan.runId === input.plan.runId, "planのrunIdが不一致です");
+  check(
+    hashPlan(plan) === input.plan.planHash,
+    "canonical planのhashが不一致です",
+  );
+  check(
+    input.approval.path.startsWith("docs/") &&
+      !input.approval.path.split("/").includes(".."),
+    "承認pathが不正です",
+  );
+  const approvalText = await io.read(input.approval.path);
+  check(
+    createHash("sha256").update(approvalText).digest("hex") ===
+      input.approval.sha256,
+    "承認ファイルのhashが不一致です",
+  );
+  const approval = approvalRecordSchema.parse(
+    JSON.parse(approvalText) as unknown,
+  );
+  check(
+    approval.runId === input.plan.runId &&
+      approval.planHash === input.plan.planHash &&
+      approval.runId === input.approval.runId &&
+      approval.planHash === input.approval.planHash,
+    "承認recordの計画整合性が不一致です",
+  );
+  validateApproval(approval, planText, now);
+  const implementation = await io.read(input.implementation.path);
+  check(
+    input.implementation.path.startsWith("docs/") &&
+      !input.implementation.path.split("/").includes(".."),
+    "実装計画pathが不正です",
+  );
+  check(
+    createHash("sha256").update(implementation).digest("hex") ===
+      input.implementation.sha256,
+    "agent-plan.mdのhashが不一致です",
+  );
+  check(
+    implementation ===
+      renderPlanMarkdown({ plan, planHash: input.plan.planHash }),
+    "agent-plan.mdの内容がcanonical planと一致しません",
+  );
+  const legacy: StartInput = {
+    schemaVersion: 1,
+    approved: true,
+    assessment: input.assessment,
+    size: input.size,
+    mode: input.mode,
+    sourceBranch: input.sourceBranch,
+    head: input.head,
+    ...(input.slug === undefined ? {} : { slug: input.slug }),
+    reviewBaseSha: input.reviewBaseSha,
+    plan: { path: input.plan.path, sha256: input.plan.sha256 },
+  };
+  const result = await startTask(legacy, io);
+  return startRecordV2Schema.parse({ ...input, completed: result.completed });
+}
+
 const execute = promisify(execFile);
 async function main() {
   check(process.argv.length === 2, "引数は受け付けません");
@@ -209,7 +322,7 @@ async function main() {
     "wx",
   );
   try {
-    const result = await startTask(input, {
+    const result = await startTaskV2(input, {
       read,
       run: async (args) => {
         const env = Object.fromEntries(
