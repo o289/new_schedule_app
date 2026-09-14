@@ -258,3 +258,7 @@ CIはci.ymlのpushイベント、branch、head SHA、workflow名CI、必須job�
 push後のCI失敗・待機・PR応答不明時はpush済み状態を残して停止する。同じ入力で再実行するとremote SHAとCIを再確認し、既存PRを再利用して重複を防ぐ。失敗の解消に実装修正が必要なら新しいhead SHAに対して品質検証とartifact生成をやり直す。異なるSHAの既存PRは自動更新しない。
 
 公開直前に開始記録、品質証跡、差分、headとremote SHAを再確認する。CI成功を本文へ追加し一時ファイルから通常PRを作る。同時起動はdocs/pr-agent-publish.lockで拒否する。異常終了でlockが残った場合は実行中processがないことを確認してそのlockのみ取り除く。品質PASSへの書換え、履歴改変、Mergeは行わない。
+
+## Stage 2の状態管理とcleanup
+
+`tools/agent-run/cleanup.ts`は固定された`.agent-runs/<runId>`のevent logとworktree markerを読み、Gitの実体（repository realpath、git-common-dir、task branch、開始SHA、HEAD）を再確認する。公開済み・終端・安全隔離中、登録外またはsymlink/path escapeの対象は停止する。statusを伏字化した証跡、diff概要、event log全量をrun directoryへ保存できた後に限り、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBには書き込まない。

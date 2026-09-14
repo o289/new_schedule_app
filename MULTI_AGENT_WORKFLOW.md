@@ -79,3 +79,7 @@ PASS?
 - 未解決事項と計画外変更の必要性
 
 サブエージェントはpush、PR作成、Merge、branch削除を行わない。
+
+## Stage 2 cleanupの引き継ぎ
+
+Phase 5のcleanupはメインが品質判定する。実装サブエージェントはcleanup本体と一時Git repositoryの拒否系テストを実装し、メインはhost Nodeで対象テスト、続いて正式Composeのformat:checkとverify:phaseを実行する。証跡保存より先の削除、primary/remoteへの操作、入力値だけによる未公開判定をPASSにしてはならない。
