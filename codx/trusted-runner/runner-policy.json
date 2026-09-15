@@ -23,6 +23,13 @@
     "ALL_PROXY",
     "NODE_OPTIONS"
   ],
+  "publication": {
+    "remote": "origin",
+    "repository": "github.com/o289/new_schedule_app",
+    "remoteUrl": "https://github.com/o289/new_schedule_app.git",
+    "branch": "feature/v3.2.3",
+    "fastForwardOnly": true
+  },
   "capabilities": {
     "prepare_run": true,
     "verify_phase": true,
@@ -30,8 +37,8 @@
     "run_e2e": true,
     "checkpoint": true,
     "quarantine_run": true,
-    "promote_ff_only": false,
-    "publish_approved_sha": false
+    "promote_ff_only": true,
+    "publish_approved_sha": true
   },
-  "policyHash": "0000000000000000000000000000000000000000000000000000000000000000"
+  "policyHash": "c2ab5145d126662dab80db1e80e91767f8fc3788dac6fe57da1303c6c20299dd"
 }

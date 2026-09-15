@@ -2,11 +2,17 @@
 
 ## Trusted runner端末導入
 
-導入前に管理者レビューを行い、plistとpolicyのplaceholderを端末固有の専用user/group、固定socket、repository read-only、run-root writeへ置換する。専用アカウントとディレクトリの権限を設定し、read-only検査（repository）とwrite検査（run-root）を行った後、管理者手順でlaunchdへ導入する。`pnpm trusted-runner:check`で実socket、所有者、policy hashを確認してからrunnerを起動する。停止時はlaunchd jobとsocketを停止し、撤去時は専用資源だけを削除する。
+導入前に管理者レビューを行い、plistとpolicyのplaceholderを端末固有の専用user/group、固定socket、repository read-only、run-root writeへ置換する。専用アカウントとディレクトリの権限を設定し、read-only検査（repository）とwrite検査（run-root）を行った後、管理者手順でlaunchdへ導入する。`pnpm trusted-runner:check`で実socket、所有者、policy hash、Gitのfetch/push origin、現在branchを確認してからrunnerを起動する。停止時はlaunchd jobとsocketを停止し、撤去時は専用資源だけを削除する。
 
-placeholder置換後、いったん`pnpm trusted-runner:check`を実行し、出力された`policyHash`をpolicyへ反映して再検査する。checkerはpolicy記載のsocket、repository、run-rootを入力として読むため、CLI引数を固定値で与えない。launchdの操作や権限変更は管理者がレビュー済みの手順で行い、checkerが自動実行することはない。
+`runner-policy.json`は`origin`、`github.com/o289/new_schedule_app`、`https://github.com/o289/new_schedule_app.git`、`feature/v3.2.3`、fast-forward only、publish capabilityを固定する。公開requestからremote、refspec、shell、env、pathを受け取らない。placeholderは導入未完了を表すため、Git管理されたテンプレートのままではcheckerは必ず`trustedMode: false`となる。管理者はレビュー済みの端末導入手順でplaceholderを解決し、credentialを含まないpolicy hashを更新する。checkerはpolicy記載のsocket、repository、run-rootを入力として読むため、CLI引数を固定値で与えない。launchdの操作や権限変更は管理者がレビュー済みの手順で行い、checkerが自動実行することはない。
 
-credential、token、個人名、個人絶対pathをenv、plist、Gitへ保存しない。CIのPASSやpolicyファイル存在だけでは端末管理者導入完了とみなさない。
+導入の端末条件は、専用UID/GID、symlinkでない0660 socket、policy hash、repository/run-rootのrealpathと権限、固定originのfetch/push URL、固定branchのすべてである。CIのPASS、policyファイルの存在、socketファイルだけでは導入完了とみなさない。credential、token、個人名、個人絶対pathをenv、plist、Gitへ保存しない。
+
+## Publishの停止・復旧・rollback
+
+credential失効、socket切断、checker failure、remote/branch不一致では公開を停止する。runnerへcredentialやproxyを渡さず、管理者が端末側のcredentialを復旧した後にcheckerを再実行する。再試行は同一canonical intentだけを使い、応答不明時は再送前にremoteの実SHAを照合する。retry上限はcanonical planの3回であり、CI失敗・SHA不一致・禁止操作は再試行せず隔離して実装または品質管理へ差し戻す。
+
+停止時は新規publishを受け付けず、既存remote branch、PR、credentialを自動変更・削除しない。rollbackにforce push、branch削除、Merge、PR状態変更は使わない。公開済みの変更を戻す必要がある場合は、人間が承認したrevert commitを新しいcanonical plan、品質証跡、fast-forward publishとして扱う。OS、launchd、credential、GitHub権限の実変更はこのリポジトリの自動処理の対象外である。
 
 ## Canonical planとの境界
 
@@ -244,7 +250,7 @@ pull_requestではbaseをheadの末尾から自動導出する。次のheadな�
 - PR全diffは導出baseのbaseSha...headSha。タスク差分と異なることがあるため別のhashと分類証跡を用意し、双方とも全hunkを省略しない。PR baseのremote SHAと取得済みrefが違えば停止する。
 - 機密・デバッグ・未分類・計画外変更の有無、破壊的migrationの承認・復旧は担当役割が照合して記録する。該当なしも安全確認文書へ記載する。未実行テストをPASSにしない。
 - 固定origin、現在branchとhead SHA、clean（未追跡ファイルを含む）、artifactのhashを確認する。対象外branchやdetached HEADは停止する。
-- originはhttps://github.com/o289/new_schedule_app.gitまたはgit@github.com:o289/new_schedule_app.gitの単一URL。取得先・push先とも検証する。追跡先は未設定または同名origin、PR時だけ対応版originも許容する。
+- trusted publishのoriginはpolicy固定の`https://github.com/o289/new_schedule_app.git`だけである。取得先・push先とも検証する。追跡先は未設定または同名origin、PR時だけ対応版originも許容する。
 
 ```sh
 git diff --no-ext-diff --no-textconv --binary --full-index '<reviewBaseSha>...<headSha>' -- > docs/task-full.diff
@@ -256,16 +262,16 @@ shasum -a 256 docs/pr-full.diff
 
 ## 公開と再実行
 
-公開入口は`./tools/pr-agent-publish`（引数なし）。許可された同名originの単一refへ指定SHAだけを送る。remoteが先行・分岐していたらforceせずSTOP。remote commitがローカルに未取得で祖先性を確認できない場合もSTOPし、実装側で取得してから再検証する。branchが未作成なら新規push、同一SHAなら再pushを省略する。tag追随・mirror・削除は行わない。
+公開mutationはorchestratorがtrusted runnerへ渡すcanonical requestだけで行う。`./tools/pr-agent-publish`はhandoff schemaのモジュールであり、直接起動はSTOPする。runnerはpolicy固定のorigin・repository・branchだけを使い、callerからremote、refspec、shell、env、pathを受け取らない。remoteが先行・分岐していたらforceせずSTOPする。remote commitがローカルに未取得で祖先性を確認できない場合もSTOPし、実装側で取得してから再検証する。branchが未作成なら新規push、同一SHAなら再pushを省略する。tag追随・mirror・削除は行わない。
 
 - push_onlyはPR一覧取得もPR作成も呼ばない。remoteの同一SHAとCI成功で完了する。結果はmode/head/headSha/ciUrl。
 - pull_requestはheadから導出した版branchへ通常PRを作る。結果は上記にbase/prUrlを追加。同一base/head/SHAの通常PRを再利用し、Draft・閉じたPR・異なるbase/head・重複はSTOPする。既存PRの本文・状態は変更しない。
 
 CIはci.ymlのpushイベント、branch、head SHA、workflow名CI、必須job「型・テスト・書式の確認」の成功を照合する。10秒間隔で最大60回待つ。各外部コマンドにもtimeoutがあるため全体は10分を超える場合がある。main限定E2Eのskipは許容するが必須checkのskipは許容しない。必要なローカルE2Eをbranch CIの代わりに省略しない。
 
-push後のCI失敗・待機・PR応答不明時はpush済み状態を残して停止する。同じ入力で再実行するとremote SHAとCIを再確認し、既存PRを再利用して重複を防ぐ。失敗の解消に実装修正が必要なら新しいhead SHAに対して品質検証とartifact生成をやり直す。異なるSHAの既存PRは自動更新しない。
+push後のCI失敗・待機・PR応答不明時はpush済み状態を残して停止する。同じcanonical intentで再実行するとremote SHAとCIを再確認し、既存PRを再利用して重複を防ぐ。応答不明はremote実体が一致するまで推測で再送しない。失敗の解消に実装修正が必要なら新しいhead SHAに対して品質検証とartifact生成をやり直す。異なるSHAの既存PRは自動更新しない。
 
-公開直前に開始記録、品質証跡、差分、headとremote SHAを再確認する。CI成功を本文へ追加し一時ファイルから通常PRを作る。同時起動はdocs/pr-agent-publish.lockで拒否する。異常終了でlockが残った場合は実行中processがないことを確認してそのlockのみ取り除く。品質PASSへの書換え、履歴改変、Mergeは行わない。
+公開直前とrunner応答後に、開始記録、品質証跡、差分、headとremote SHAを再確認する。CI成功を本文へ追加し通常PRを作る。同時起動、retry、quarantineはorchestratorのappend-only event logで扱い、lock fileを手編集しない。品質PASSへの書換え、履歴改変、Mergeは行わない。
 
 ## Stage 2の状態管理とcleanup
 

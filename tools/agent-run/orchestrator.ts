@@ -26,11 +26,16 @@ import {
 } from "./failure-classifier.js";
 import type { RunEvent } from "./state-schema";
 import type {
+  PublicationRequest,
   TrustedRunnerRequest,
   TrustedRunnerResponse,
 } from "../trusted-runner/protocol.js";
 import { TrustedRunnerClient } from "../trusted-runner/client.js";
 import { sanitizeString } from "../trusted-runner/redaction.js";
+import {
+  validatePublicationIntent,
+  type PublicationEvidence,
+} from "../trusted-runner/publication-policy.js";
 
 const actor = z.enum(["planner", "runner", "verifier", "publisher"]);
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -119,6 +124,13 @@ export const actionSchema = z.discriminatedUnion("action", [
     .strict(),
   z
     .object({
+      action: z.literal("publish"),
+      expectedRevision: actionBase.expectedRevision,
+      actor: z.literal("publisher"),
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal("quarantine"),
       expectedRevision: actionBase.expectedRevision,
       actor: z.enum(["runner", "verifier"]),
@@ -180,6 +192,7 @@ async function parseEvidenceLog<T>(
 }
 export interface VerifiedContext {
   plan: Plan;
+  repositoryRoot: string;
   startSha: string;
   taskBranch: string;
   worktree: string;
@@ -302,6 +315,7 @@ export async function verifyCanonicalContext(
   );
   return {
     plan,
+    repositoryRoot: canonicalRoot,
     startSha: start.reviewBaseSha,
     taskBranch: marker.taskBranch,
     worktree,
@@ -364,6 +378,83 @@ export class TrustedOrchestrator {
     if (!this.io.context)
       throw new Error("STOP: canonical contextが未検証です");
     return currentHead(context, this.io.context);
+  }
+  private async publicationRequest(
+    context: VerifiedContext,
+    snapshot: Snapshot,
+  ): Promise<{
+    request: PublicationRequest;
+    targetSha: string;
+    branch: string;
+  }> {
+    const trustedIO = this.io.context;
+    stop(trustedIO !== undefined, "canonical contextが未検証です");
+    const base = resolve(
+      context.repositoryRoot,
+      "docs",
+      "agent-runs",
+      snapshot.runId,
+    );
+    const [plan, approval, startRecord, handoff] = await Promise.all([
+      trustedIO.read(resolve(base, "plan.json")),
+      trustedIO.read(resolve(base, "approval.json")),
+      trustedIO.read(
+        resolve(context.repositoryRoot, "docs/pr-agent-start-record.json"),
+      ),
+      trustedIO.read(
+        resolve(context.repositoryRoot, "docs/pr-agent-handoff.json"),
+      ),
+    ]);
+    const targetSha = (await this.head(context)).trim();
+    const evidence: PublicationEvidence = {
+      plan,
+      approval,
+      startRecord,
+      handoff,
+      revision: snapshot.revision,
+    };
+    const request: PublicationRequest = {
+      protocolVersion: "1",
+      runId: snapshot.runId,
+      planHash: snapshot.planHash,
+      revision: snapshot.revision,
+      capability: "publish_approved_sha",
+      args: {
+        targetSha,
+        canonicalContext: {
+          startRecordSha256: contentHash(startRecord),
+          approvalSha256: contentHash(approval),
+          handoffSha256: contentHash(handoff),
+          headSha: targetSha,
+        },
+      },
+      nonce: TrustedRunnerClient.createNonce(),
+    };
+    const intent = validatePublicationIntent(
+      request,
+      evidence,
+      (this.io.now ?? (() => new Date()))(),
+    );
+    return { request, targetSha, branch: intent.branch };
+  }
+  private async verifyPublishedRemote(
+    context: VerifiedContext,
+    branch: string,
+    targetSha: string,
+  ): Promise<void> {
+    const trustedIO = this.io.context;
+    stop(trustedIO?.git !== undefined, "trusted git IOが未注入です");
+    const output = await trustedIO.git(
+      ["ls-remote", "--heads", "origin", `refs/heads/${branch}`],
+      context.worktree,
+    );
+    const fields = output.trim().split(/\s+/);
+    stop(
+      fields.length === 2 &&
+        fields[0] === targetSha &&
+        fields[1] === `refs/heads/${branch}`,
+      "runner公開後のremote SHAが不一致です",
+    );
   }
   private validateTrustedIO(): void {
     const context = this.io.context;
@@ -553,7 +644,9 @@ export class TrustedOrchestrator {
         : failure.classification === "REPLAN_REQUIRED"
           ? "REPLAN_REQUIRED"
           : "INFRA_FAIL";
-    if (!["PHASE_RUNNING", "VERIFYING"].includes(snapshot.state))
+    if (
+      !["PHASE_RUNNING", "VERIFYING", "PUBLISH_READY"].includes(snapshot.state)
+    )
       throw new Error("failure state is not active");
     return this.store.append(
       makeEvent(
@@ -754,6 +847,52 @@ export class TrustedOrchestrator {
         )
       )
         stop(phase !== undefined, "current Phaseがありません");
+      if (action.action === "publish") {
+        stop(
+          snapshot.state === "PUBLISH_READY" || snapshot.state === "INFRA_FAIL",
+          "公開できる状態ではありません",
+        );
+        let active = snapshot;
+        if (snapshot.state === "INFRA_FAIL") {
+          const resumed = await this.store.append(
+            makeEvent(
+              snapshot,
+              action,
+              "INFRA_FAIL",
+              "PUBLISH_READY",
+              (await this.head(context)).trim(),
+              now().toISOString(),
+            ),
+          );
+          active = {
+            ...snapshot,
+            state: "PUBLISH_READY",
+            revision: resumed.sequence,
+            eventHash: resumed.eventHash,
+          };
+        }
+        const publication = await this.publicationRequest(context, active);
+        const outcome = await this.executeTrustedCapability(
+          publication.request,
+          publication.targetSha,
+        );
+        if ("ok" in outcome && outcome.ok) {
+          try {
+            await this.verifyPublishedRemote(
+              context,
+              publication.branch,
+              publication.targetSha,
+            );
+          } catch (error: unknown) {
+            return this.handleClassifiedFailure(
+              classifyFailure({ kind: "policy", code: "RUNNER_BYPASS" }),
+              publication.targetSha,
+              error instanceof Error ? error.message : "remote mismatch",
+            );
+          }
+        }
+        return outcome;
+      }
       if (action.action === "record_implementation") {
         stop(
           snapshot.state === "PHASE_RUNNING",

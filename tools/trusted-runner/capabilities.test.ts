@@ -22,6 +22,15 @@ const request: TrustedRunnerRequest = {
   args: { phaseId: "phase-1" },
   nonce: "b".repeat(32),
 };
+const publicationArgs = {
+  targetSha: "a".repeat(40),
+  canonicalContext: {
+    startRecordSha256: "b".repeat(64),
+    approvalSha256: "c".repeat(64),
+    handoffSha256: "d".repeat(64),
+    headSha: "a".repeat(40),
+  },
+};
 
 describe("trusted runner capabilities", () => {
   it("defines fixed ordered commands and a restricted environment", () => {
@@ -126,7 +135,7 @@ describe("trusted runner capabilities", () => {
         {
           ...request,
           capability: "promote_ff_only",
-          args: { targetSha: "a".repeat(40) },
+          args: publicationArgs,
         },
         context,
       ),
@@ -279,7 +288,7 @@ describe("trusted runner capabilities", () => {
     async (capability) => {
       await expect(
         executeCapability(
-          { ...request, capability, args: { targetSha: "a".repeat(40) } },
+          { ...request, capability, args: publicationArgs },
           { ...context, authorizedCapabilities: new Set([capability]) },
         ),
       ).rejects.toThrow("NOT_IMPLEMENTED");

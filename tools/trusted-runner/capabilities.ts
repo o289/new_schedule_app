@@ -1,15 +1,29 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import type { TrustedRunnerRequest } from "./protocol.js";
+import {
+  validatePublicationIntent,
+  type PublicationEvidence,
+} from "./publication-policy.js";
+import {
+  executePublication,
+  type PublicationExecutorIO,
+} from "./publication-executor.js";
+import type { PublicationRequest, TrustedRunnerRequest } from "./protocol.js";
 
 const maxOutputBytes = 64 * 1024;
 type Capability = TrustedRunnerRequest["capability"];
+export type PublicationRunnerContext = {
+  evidence: PublicationEvidence;
+  executor: PublicationExecutorIO;
+  now?: () => Date;
+};
 export type RunnerContext = {
   runId: string;
   planHash: string;
   revision: number;
   worktreePath: string;
   authorizedCapabilities: ReadonlySet<Capability>;
+  publication?: PublicationRunnerContext;
 };
 export type CapabilityResult = {
   exitCode: number;
@@ -53,6 +67,15 @@ function isNoOpCapability(
     capability === "prepare_run" ||
     capability === "checkpoint" ||
     capability === "quarantine_run"
+  );
+}
+
+function isPublicationRequest(
+  request: TrustedRunnerRequest,
+): request is PublicationRequest {
+  return (
+    request.capability === "promote_ff_only" ||
+    request.capability === "publish_approved_sha"
   );
 }
 
@@ -221,11 +244,25 @@ export async function executeCapability(
     throw new Error("runner context mismatch");
   if (!context.authorizedCapabilities.has(request.capability))
     throw new Error("capability is not authorized");
-  if (
-    request.capability === "promote_ff_only" ||
-    request.capability === "publish_approved_sha"
-  )
-    throw new Error("NOT_IMPLEMENTED");
+  if (isPublicationRequest(request)) {
+    const publication = context.publication;
+    if (!publication) throw new Error("NOT_IMPLEMENTED");
+    const started = io.now?.() ?? Date.now();
+    const intent = validatePublicationIntent(
+      request,
+      publication.evidence,
+      publication.now?.() ?? new Date(),
+    );
+    const execution = await executePublication(intent, publication.executor);
+    const output = JSON.stringify(execution);
+    return {
+      exitCode: 0,
+      durationMs: (io.now?.() ?? Date.now()) - started,
+      truncated: false,
+      stdoutHash: hash(output),
+      stderrHash: hash(""),
+    };
+  }
   const steps = capabilitySteps(request.capability);
   if (steps === undefined) throw new Error("NOT_IMPLEMENTED");
   if (steps.length === 0) {

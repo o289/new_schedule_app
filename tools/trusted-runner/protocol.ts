@@ -22,6 +22,20 @@ const revisionSchema = z.number().int().nonnegative();
 const phaseIdSchema = z.string().regex(/^phase-[1-9][0-9]*$/);
 const shaSchema = z.string().regex(/^[a-f0-9]{40}$/);
 const textFactSchema = z.string().min(1).max(128);
+const publicationContextSchema = z
+  .object({
+    startRecordSha256: planHashSchema,
+    approvalSha256: planHashSchema,
+    handoffSha256: planHashSchema,
+    headSha: shaSchema,
+  })
+  .strict();
+const publicationArgsSchema = z
+  .object({
+    targetSha: shaSchema,
+    canonicalContext: publicationContextSchema,
+  })
+  .strict();
 const argsByCapability = {
   prepare_run: z.object({ phaseId: phaseIdSchema }).strict(),
   verify_phase: z.object({ phaseId: phaseIdSchema }).strict(),
@@ -36,8 +50,8 @@ const argsByCapability = {
     .strict(),
   run_e2e: z.object({ phaseId: phaseIdSchema }).strict(),
   checkpoint: z.object({ phaseId: phaseIdSchema }).strict(),
-  promote_ff_only: z.object({ targetSha: shaSchema }).strict(),
-  publish_approved_sha: z.object({ targetSha: shaSchema }).strict(),
+  promote_ff_only: publicationArgsSchema,
+  publish_approved_sha: publicationArgsSchema,
   quarantine_run: z
     .object({
       reasonCode: z.enum([
@@ -121,6 +135,15 @@ export const trustedRunnerRequestSchema = z.discriminatedUnion(
   requestSchemas,
 );
 export type TrustedRunnerRequest = z.infer<typeof trustedRunnerRequestSchema>;
+export type PublicationRequest = Extract<
+  TrustedRunnerRequest,
+  {
+    capability: "promote_ff_only" | "publish_approved_sha";
+  }
+>;
+export type PublicationCanonicalContext = z.infer<
+  typeof publicationContextSchema
+>;
 
 const resultSchema = z
   .object({

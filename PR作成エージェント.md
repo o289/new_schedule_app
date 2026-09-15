@@ -77,9 +77,9 @@ push_onlyではPR本文・タイトルを要求しない。pull_requestでは同
 
 ## push・CI・通常PR
 
-開始条件を満たしたら、通常の追加確認を挟まず専用入口`./tools/pr-agent-publish`で実行する。直接の`git push`や`gh pr create`で迂回しない。Git安全境界と機械検証の詳細は[codx/README.md](codx/README.md)を正本とする。
+開始条件を満たしたら、公開actionをorchestratorからtrusted runnerへ要求する。`tools/pr-agent-publish.ts`はhandoffのschema検証だけを担い、直接起動は停止する。直接の`git push`、`gh pr create`、任意remote/refspec/shell/env/pathを渡す迂回はしない。trusted runnerの端末条件は[codx/README.md](codx/README.md)を正本とし、CIのPASSだけでrunner導入済みとは扱わない。
 
-公開処理は固定repository・remote、開始記録、mode/head、品質証跡、全diffのhashを検証し、fast-forward可能な指定SHAだけを通常pushする。同一remote SHAなら再pushを省略し、そのSHAのCIを確認する。CI失敗時はpush済みで停止し、branchを削除しない。
+公開処理はcheckerで実socket・UID/GID・policy hash・repository/run-root・固定origin・固定branchを確認したtrusted runnerだけが行う。runnerは開始記録、mode/head、品質証跡、全diff、canonical contextのhashを検証し、fast-forward可能な指定SHAだけを通常pushする。同一remote SHAなら再pushを省略し、そのSHAのCIを確認する。CI失敗時はpush済みで停止し、branchを削除しない。
 
 - push_only: 同名originへのpushと同一SHAのCI成功を確認して完了する。PR検索・PR作成・PR base検証は行わない。
 - pull_request: 対応版への通常PRを作成する。重複PR、Draft、閉じたPR、異なるbaseは停止する。同一base/head/SHAの通常PRは再利用し、勝手に状態を変更しない。
@@ -87,6 +87,8 @@ push_onlyではPR本文・タイトルを要求しない。pull_requestでは同
 ## STOP・差し戻し・完了報告
 
 品質FAIL/未判定、証跡不足、秘密情報、説明不能な差分、未承認の破壊的migration、開始記録/head/remoteの不一致、PR時のbase不一致、CI失敗/未完了/SHA不一致、その他安全な公開不能時は停止する。差し戻しには対象、理由、再現方法、必要な修正、push済みかを記載する。品質を下げて先へ進まない。
+
+checker failure、credential失効、socket未接続、runner timeoutでは公開を推測で続けない。応答不明時は同じcanonical intentとremote実SHAを照合してから、planのretry上限内で再開する。禁止remote/refspec、force/delete、SHA不一致、runner迂回はSAFETYとして隔離する。rollbackはforce pushやPR状態変更ではなく、人間が承認したrevert commitを新しい品質済みcanonical publishとして実施する。
 
 push_onlyの完了報告はmode、head、SHA、CI URL、品質結果、ローカルHTML、未確認事項。PR URLを要求しない。pushだけ・CI待機中は完了としない。
 

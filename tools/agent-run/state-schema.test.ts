@@ -263,6 +263,41 @@ describe("state event chain", () => {
       ]),
     ).toThrow();
   });
+  it("records publication failures and permits only an explicit retry", () => {
+    const events: RunEvent[] = [];
+    let previous: string | null = null;
+    const add = (from: RunState | null, to: RunState) => {
+      const next = event(
+        events.length + 1,
+        from,
+        to,
+        previous,
+        [
+          "PHASE_RUNNING",
+          "VERIFYING",
+          "PHASE_PASSED",
+          "CHECKPOINTED",
+          "PUBLISH_READY",
+          "INFRA_FAIL",
+        ].includes(to)
+          ? "phase-1"
+          : null,
+      );
+      events.push(next);
+      previous = next.eventHash;
+    };
+    add(null, "PREPARED");
+    add("PREPARED", "PLAN_APPROVED");
+    add("PLAN_APPROVED", "WORKTREE_READY");
+    add("WORKTREE_READY", "PHASE_RUNNING");
+    add("PHASE_RUNNING", "VERIFYING");
+    add("VERIFYING", "PHASE_PASSED");
+    add("PHASE_PASSED", "CHECKPOINTED");
+    add("CHECKPOINTED", "PUBLISH_READY");
+    add("PUBLISH_READY", "INFRA_FAIL");
+    add("INFRA_FAIL", "PUBLISH_READY");
+    expect(replayEvents(events).state).toBe("PUBLISH_READY");
+  });
   it("hashes the exact event body", () => {
     const first = event(1, null, "PREPARED", null);
     expect(first.eventHash).toBe(hashEvent(first));

@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
+import { promisify } from "node:util";
 import { z } from "zod";
 
 const capabilityNames = [
@@ -35,6 +37,15 @@ const policySchema = z
     repositoryAccess: z.literal("read-only"),
     runRootAccess: z.literal("write"),
     forbiddenEnv: z.array(z.string()).min(1),
+    publication: z
+      .object({
+        remote: z.literal("origin"),
+        repository: z.literal("github.com/o289/new_schedule_app"),
+        remoteUrl: z.literal("https://github.com/o289/new_schedule_app.git"),
+        branch: z.string().regex(/^feature\/v\d+\.\d+\.\d+$/),
+        fastForwardOnly: z.literal(true),
+      })
+      .strict(),
     capabilities: z
       .object(
         Object.fromEntries(
@@ -49,6 +60,8 @@ const policySchema = z
   })
   .strict();
 export type RunnerPolicy = z.infer<typeof policySchema>;
+export const parseRunnerPolicy = (value: unknown): RunnerPolicy =>
+  policySchema.parse(value);
 export type CheckerInput = {
   policyPath: string;
   socketPath: string;
@@ -73,6 +86,7 @@ export type CheckerIO = {
     group?: string;
   }>;
   env: () => NodeJS.ProcessEnv;
+  git: (repositoryRoot: string, args: readonly string[]) => Promise<string>;
 };
 export type CheckerResult = {
   trustedMode: boolean;
@@ -81,6 +95,7 @@ export type CheckerResult = {
 };
 const digest = (value: string): string =>
   createHash("sha256").update(value, "utf8").digest("hex");
+const execFileAsync = promisify(execFile);
 const withoutHash = (
   policy: RunnerPolicy,
 ): Omit<RunnerPolicy, "policyHash"> => {
@@ -108,7 +123,69 @@ const defaults: CheckerIO = {
     user: userInfo().username,
   }),
   env: () => process.env,
+  git: async (repositoryRoot, args) => {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["-C", repositoryRoot, ...args],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH ?? "" },
+      },
+    );
+    return stdout;
+  },
 };
+
+function lines(value: string): string[] {
+  return value
+    .trim()
+    .split("\n")
+    .filter((line) => line.length > 0);
+}
+
+async function checkPublicationTarget(
+  policy: RunnerPolicy,
+  repositoryRoot: string,
+  io: CheckerIO,
+  failures: string[],
+): Promise<void> {
+  if (
+    policy.capabilities.promote_ff_only !== true ||
+    policy.capabilities.publish_approved_sha !== true
+  ) {
+    failures.push("publication capability disabled");
+  }
+  try {
+    const [fetchUrls, pushUrls, branch] = await Promise.all([
+      io.git(repositoryRoot, [
+        "remote",
+        "get-url",
+        "--all",
+        policy.publication.remote,
+      ]),
+      io.git(repositoryRoot, [
+        "remote",
+        "get-url",
+        "--push",
+        "--all",
+        policy.publication.remote,
+      ]),
+      io.git(repositoryRoot, ["branch", "--show-current"]),
+    ]);
+    if (
+      lines(fetchUrls).length !== 1 ||
+      lines(fetchUrls)[0] !== policy.publication.remoteUrl ||
+      lines(pushUrls).length !== 1 ||
+      lines(pushUrls)[0] !== policy.publication.remoteUrl
+    ) {
+      failures.push("publication remote mismatch");
+    }
+    if (branch.trim() !== policy.publication.branch)
+      failures.push("publication branch mismatch");
+  } catch {
+    failures.push("publication repository unavailable");
+  }
+}
 export async function checkTrustedRunner(
   input: CheckerInput,
   io: CheckerIO = defaults,
@@ -118,7 +195,7 @@ export async function checkTrustedRunner(
   let policyHash = "";
   try {
     const parsed: unknown = JSON.parse(await io.read(input.policyPath));
-    policy = policySchema.parse(parsed);
+    policy = parseRunnerPolicy(parsed);
     policyHash = canonicalPolicyHash(policy);
     if (policy.policyHash !== policyHash) failures.push("policy hash mismatch");
   } catch {
@@ -197,11 +274,7 @@ export async function checkTrustedRunner(
   for (const name of policy.forbiddenEnv)
     if (environment[name] !== undefined)
       failures.push(`forbidden env: ${name}`);
-  if (
-    policy.capabilities.promote_ff_only !== false ||
-    policy.capabilities.publish_approved_sha !== false
-  )
-    failures.push("promotion capability enabled");
+  await checkPublicationTarget(policy, input.repositoryRoot, io, failures);
   return { trustedMode: failures.length === 0, failures, policyHash };
 }
 export async function main(): Promise<number> {
@@ -215,7 +288,7 @@ export async function main(): Promise<number> {
   };
   try {
     const parsed: unknown = JSON.parse(await readFile(policyPath, "utf8"));
-    const policy = policySchema.parse(parsed);
+    const policy = parseRunnerPolicy(parsed);
     paths = {
       policyPath,
       socketPath: policy.socket.path,

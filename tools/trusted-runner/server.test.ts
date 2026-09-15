@@ -29,6 +29,15 @@ const request: TrustedRunnerRequest = {
   args: { phaseId: "phase-1" },
   nonce: "b".repeat(32),
 };
+const publicationArgs = {
+  targetSha: "a".repeat(40),
+  canonicalContext: {
+    startRecordSha256: "b".repeat(64),
+    approvalSha256: "c".repeat(64),
+    handoffSha256: "d".repeat(64),
+    headSha: "a".repeat(40),
+  },
+};
 async function roundTrip(path: string, payload: Buffer): Promise<string> {
   return new Promise((resolve, reject) => {
     const socket = connect(path);
@@ -333,7 +342,7 @@ describe("TrustedRunnerServer", () => {
           encodeTrustedRunnerFrame({
             ...request,
             capability: "promote_ff_only",
-            args: { targetSha: "a".repeat(40) },
+            args: publicationArgs,
             nonce: "d".repeat(32),
           }),
         ),

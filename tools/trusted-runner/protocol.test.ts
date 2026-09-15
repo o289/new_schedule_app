@@ -16,6 +16,15 @@ const request = {
   args: { phaseId: "phase-1" },
   nonce: "b".repeat(32),
 };
+const publicationArgs = {
+  targetSha: "a".repeat(40),
+  canonicalContext: {
+    startRecordSha256: "b".repeat(64),
+    approvalSha256: "c".repeat(64),
+    handoffSha256: "d".repeat(64),
+    headSha: "a".repeat(40),
+  },
+};
 
 describe("trusted runner protocol", () => {
   it("encodes and parses one newline-delimited request", () => {
@@ -73,8 +82,8 @@ describe("trusted runner protocol", () => {
       ],
       ["run_e2e", { phaseId: "phase-1" }],
       ["checkpoint", { phaseId: "phase-1" }],
-      ["promote_ff_only", { targetSha: "a".repeat(40) }],
-      ["publish_approved_sha", { targetSha: "a".repeat(40) }],
+      ["promote_ff_only", publicationArgs],
+      ["publish_approved_sha", publicationArgs],
       ["quarantine_run", { reasonCode: "SAFETY_VIOLATION" }],
     ] as const;
     for (const [capability, args] of cases) {
@@ -95,6 +104,43 @@ describe("trusted runner protocol", () => {
     }
   });
 
+  it.each([
+    ["remote", "fork"],
+    ["refspec", "HEAD:refs/heads/main"],
+    ["command", "git push"],
+    ["shell", "sh"],
+    ["env", { GIT_CONFIG_GLOBAL: "/tmp/config" }],
+    ["path", "/tmp/repository"],
+  ])("rejects publication %s input", (field, value) => {
+    expect(() =>
+      parseTrustedRunnerRequest(
+        JSON.stringify({
+          ...request,
+          capability: "publish_approved_sha",
+          args: { ...publicationArgs, [field]: value },
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("rejects arbitrary values nested in publication canonical context", () => {
+    expect(() =>
+      parseTrustedRunnerRequest(
+        JSON.stringify({
+          ...request,
+          capability: "publish_approved_sha",
+          args: {
+            ...publicationArgs,
+            canonicalContext: {
+              ...publicationArgs.canonicalContext,
+              path: "/tmp/repository",
+            },
+          },
+        }),
+      ),
+    ).toThrow();
+  });
+
   it.each(trustedRunnerCapabilities)(
     "accepts valid %s arguments",
     (capability) => {
@@ -110,8 +156,8 @@ describe("trusted runner protocol", () => {
         },
         run_e2e: { phaseId: "phase-1" },
         checkpoint: { phaseId: "phase-1" },
-        promote_ff_only: { targetSha: "a".repeat(40) },
-        publish_approved_sha: { targetSha: "a".repeat(40) },
+        promote_ff_only: publicationArgs,
+        publish_approved_sha: publicationArgs,
         quarantine_run: { reasonCode: "SAFETY_VIOLATION" },
       }[capability];
       expect(

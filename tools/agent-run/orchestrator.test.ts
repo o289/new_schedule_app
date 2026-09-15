@@ -898,7 +898,7 @@ describe("trusted orchestrator", () => {
       actor: "runner",
       phaseId: "phase-1",
     });
-    return { f, store, orchestrator, calls };
+    return { f, store, orchestrator, calls, context };
   }
   const violation = (
     classification: "REPLAN_REQUIRED" | "SAFETY_VIOLATION",
@@ -1109,6 +1109,145 @@ describe("trusted orchestrator", () => {
       commitSha: sha,
     });
     expect((await store.snapshot()).state).toBe("PUBLISH_READY");
+  });
+  it("routes publication mutation only through the trusted runner and retries after timeout", async () => {
+    const { f, store, context } = await phaseSetup();
+    const add = async (
+      from: "PHASE_RUNNING" | "VERIFYING" | "PHASE_PASSED" | "CHECKPOINTED",
+      to: "VERIFYING" | "PHASE_PASSED" | "CHECKPOINTED" | "PUBLISH_READY",
+      actor: "runner" | "verifier" | "publisher",
+    ) =>
+      store.append({
+        schemaVersion: 1,
+        runId: "run-001",
+        planHash: f.planHash,
+        actor,
+        occurredAt: f.now.toISOString(),
+        targetSha: sha,
+        from,
+        to,
+        phaseId: "phase-1",
+        retryCount: 0,
+      });
+    await add("PHASE_RUNNING", "VERIFYING", "runner");
+    await add("VERIFYING", "PHASE_PASSED", "verifier");
+    await add("PHASE_PASSED", "CHECKPOINTED", "publisher");
+    await add("CHECKPOINTED", "PUBLISH_READY", "publisher");
+    const planText = f.files.get(f.root + "/docs/agent-runs/run-001/plan.json");
+    const startText = f.files.get(f.root + "/docs/pr-agent-start-record.json");
+    if (!planText || !startText) throw new Error("missing canonical fixture");
+    f.files.set(
+      f.root + "/docs/pr-agent-handoff.json",
+      JSON.stringify({
+        schemaVersion: 2,
+        mode: "push_only",
+        head: "feature/v3.2.3",
+        headSha: sha,
+        reviewBaseSha: sha,
+        start: {
+          path: "docs/pr-agent-start-record.json",
+          sha256: digest(startText),
+        },
+        plan: {
+          path: "docs/agent-runs/run-001/plan.json",
+          sha256: digest(planText),
+        },
+        implementation: {
+          path: "docs/implementation.md",
+          sha256: "b".repeat(64),
+        },
+        allPhasesComplete: true,
+        quality: {
+          final: "PASS",
+          verifyPhase: {
+            status: "PASS",
+            evidence: { path: "docs/quality.md", sha256: "c".repeat(64) },
+          },
+          integration: { status: "NOT_REQUIRED", reason: "none" },
+          e2e: { status: "NOT_REQUIRED", reason: "none" },
+        },
+        changes: {
+          db: false,
+          dependencies: false,
+          configuration: false,
+          generated: false,
+        },
+        review: {
+          diffSha256: "d".repeat(64),
+          classification: {
+            path: "docs/classification.md",
+            sha256: "e".repeat(64),
+          },
+          allDiffClassified: true,
+          unclassified: 0,
+          safetyReview: { path: "docs/safety.md", sha256: "f".repeat(64) },
+          noSecretsOrDebug: true,
+          noUnapprovedChanges: true,
+          destructiveMigrationApproved: true,
+          html: { path: "docs/review.html", sha256: "1".repeat(64) },
+        },
+      }),
+    );
+    const requests: unknown[] = [];
+    let timeout = true;
+    const publisher = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        now: () => f.now,
+        context: {
+          ...context,
+          git: async (args: string[]) =>
+            args[0] === "ls-remote"
+              ? `${sha}\trefs/heads/feature/v3.2.3\n`
+              : f.root + "/.git",
+        },
+        runner: {
+          request: async (request) => {
+            requests.push(request);
+            if (timeout) {
+              timeout = false;
+              return {
+                ok: false as const,
+                ...request,
+                error: { code: "TIMEOUT" as const, message: "timeout" },
+              };
+            }
+            return {
+              ok: true as const,
+              ...request,
+              result: {
+                exitCode: 0,
+                durationMs: 1,
+                truncated: false,
+                stdoutHash: "2".repeat(64),
+                stderrHash: "3".repeat(64),
+              },
+            };
+          },
+        },
+      },
+    );
+    await expect(
+      publisher.execute({
+        action: "publish",
+        expectedRevision: 8,
+        actor: "publisher",
+      }),
+    ).resolves.toMatchObject({ to: "INFRA_FAIL" });
+    await expect(
+      publisher.execute({
+        action: "publish",
+        expectedRevision: 9,
+        actor: "publisher",
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(requests).toHaveLength(2);
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ capability: "publish_approved_sha" }),
+      ]),
+    );
   });
   it("reworks the same phase three times and rejects the fourth retry", async () => {
     const { orchestrator, store } = await phaseSetup();
