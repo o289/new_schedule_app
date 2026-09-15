@@ -504,6 +504,357 @@ describe("trusted orchestrator", () => {
     }).execute({ action: "prepare", expectedRevision: 0, actor: "planner" });
     expect(result).toMatchObject({ revision: 3 });
   });
+  it("routes trusted runner success and nonzero result into state", async () => {
+    const { f, store } = await phaseSetup();
+    expect((await store.snapshot()).state).toBe("PHASE_RUNNING");
+    const request = {
+      protocolVersion: "1" as const,
+      runId: "run-001",
+      planHash: f.planHash,
+      revision: 4,
+      capability: "run_e2e" as const,
+      args: { phaseId: "phase-1" },
+      nonce: "b".repeat(32),
+    };
+    const success = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        runner: {
+          request: async (input) => ({
+            ok: true,
+            ...input,
+            result: {
+              exitCode: 0,
+              durationMs: 1,
+              truncated: false,
+              stdoutHash: "c".repeat(64),
+              stderrHash: "d".repeat(64),
+            },
+          }),
+        },
+      },
+    );
+    await expect(
+      success.executeTrustedCapability(request, sha),
+    ).resolves.toMatchObject({ ok: true });
+    const failing = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        runner: {
+          request: async (input) => ({
+            ok: true,
+            ...input,
+            result: {
+              exitCode: 7,
+              durationMs: 1,
+              truncated: false,
+              stdoutHash: "c".repeat(64),
+              stderrHash: "d".repeat(64),
+            },
+          }),
+        },
+      },
+    );
+    await expect(
+      failing.executeTrustedCapability(
+        { ...request, nonce: "c".repeat(32) },
+        sha,
+      ),
+    ).resolves.toMatchObject({ to: "REWORK" });
+  });
+  it("requires a trusted runner client before execution", async () => {
+    const { store } = await phaseSetup();
+    const orchestrator = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {},
+    );
+    await expect(
+      orchestrator.executeTrustedCapability(
+        {
+          protocolVersion: "1",
+          runId: "run-001",
+          planHash: "a".repeat(64),
+          revision: 4,
+          capability: "run_e2e",
+          args: { phaseId: "phase-1" },
+          nonce: "e".repeat(32),
+        },
+        sha,
+      ),
+    ).rejects.toThrow("client");
+  });
+  it.each(["runId", "planHash", "revision", "nonce", "capability"] as const)(
+    "maps runner response %s mismatch to INFRA_FAIL",
+    async (field) => {
+      const { f, store } = await phaseSetup();
+      const request = {
+        protocolVersion: "1" as const,
+        runId: "run-001",
+        planHash: f.planHash,
+        revision: 4,
+        capability: "run_e2e" as const,
+        args: { phaseId: "phase-1" },
+        nonce: "f".repeat(32),
+      };
+      const response = {
+        ok: true as const,
+        ...request,
+        result: {
+          exitCode: 0,
+          durationMs: 1,
+          truncated: false,
+          stdoutHash: "c".repeat(64),
+          stderrHash: "d".repeat(64),
+        },
+      };
+      const changes = {
+        runId: "other",
+        planHash: "b".repeat(64),
+        revision: 5,
+        nonce: "0".repeat(32),
+        capability: "verify_phase" as const,
+      };
+      const runner = new TrustedOrchestrator(
+        "/tmp/repo/.agent-runs/run-001",
+        store,
+        {
+          runner: {
+            request: async () => ({ ...response, [field]: changes[field] }),
+          },
+        },
+      );
+      await expect(
+        runner.executeTrustedCapability(request, sha),
+      ).resolves.toMatchObject({ to: "INFRA_FAIL" });
+    },
+  );
+  it.each([
+    "TIMEOUT",
+    "PROTOCOL_MISMATCH",
+    "CONNECTION_ERROR",
+    "INTERNAL_ERROR",
+  ] as const)("maps runner error %s to INFRA_FAIL", async (code) => {
+    const { f, store } = await phaseSetup();
+    const request = {
+      protocolVersion: "1" as const,
+      runId: "run-001",
+      planHash: f.planHash,
+      revision: 4,
+      capability: "run_e2e" as const,
+      args: { phaseId: "phase-1" },
+      nonce: "1".repeat(32),
+    };
+    const runner = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        runner: {
+          request: async () => ({
+            ok: false as const,
+            ...request,
+            error: { code, message: "safe" },
+          }),
+        },
+      },
+    );
+    await expect(
+      runner.executeTrustedCapability(request, sha),
+    ).resolves.toMatchObject({ to: "INFRA_FAIL" });
+  });
+  it("maps UNKNOWN_CAPABILITY to REPLAN_REQUIRED and clears phase", async () => {
+    const { f, store } = await phaseSetup();
+    const request = {
+      protocolVersion: "1" as const,
+      runId: "run-001",
+      planHash: f.planHash,
+      revision: 4,
+      capability: "run_e2e" as const,
+      args: { phaseId: "phase-1" },
+      nonce: "2".repeat(32),
+    };
+    const runner = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        runner: {
+          request: async () => ({
+            ok: false as const,
+            ...request,
+            error: { code: "UNKNOWN_CAPABILITY" as const, message: "unknown" },
+          }),
+        },
+      },
+    );
+    await expect(
+      runner.executeTrustedCapability(request, sha),
+    ).resolves.toMatchObject({ to: "REPLAN_REQUIRED", phaseId: null });
+  });
+  it.each([
+    "SECRET_DETECTED",
+    "FORBIDDEN_DB_CONNECTION",
+    "PATH_VIOLATION",
+    "RUNNER_BYPASS",
+  ] as const)("runs safety %s through quarantine", async (code) => {
+    const { store } = await phaseSetup();
+    await unlink("/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl").catch(
+      () => undefined,
+    );
+    const calls: string[] = [];
+    const runner = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        revokeCapabilities: async () => {
+          calls.push("revoke");
+        },
+        abortChildren: async () => {
+          calls.push("abort");
+        },
+        runner: {
+          request: async (input) => {
+            calls.push(input.capability);
+            return {
+              ok: true as const,
+              ...input,
+              result: {
+                exitCode: 0,
+                durationMs: 1,
+                truncated: false,
+                stdoutHash: "c".repeat(64),
+                stderrHash: "d".repeat(64),
+              },
+            };
+          },
+        },
+      },
+    );
+    await expect(
+      runner.reportTrustedFailure(
+        { kind: "policy", code, message: "token=raw-secret" },
+        sha,
+      ),
+    ).resolves.toMatchObject({ to: "QUARANTINED" });
+    expect(calls).toEqual(["revoke", "abort", "quarantine_run"]);
+    expect(
+      await readFile(
+        "/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl",
+        "utf8",
+      ),
+    ).not.toContain("raw-secret");
+  });
+  it("retains SAFETY_VIOLATION when quarantine runner rejects", async () => {
+    const { store } = await phaseSetup();
+    await unlink("/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl").catch(
+      () => undefined,
+    );
+    const runner = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        revokeCapabilities: async () => {},
+        abortChildren: async () => {},
+        runner: {
+          request: async (input) => ({
+            ok: false as const,
+            ...input,
+            error: { code: "INTERNAL_ERROR" as const, message: "rejected" },
+          }),
+        },
+      },
+    );
+    await expect(
+      runner.reportTrustedFailure(
+        { kind: "policy", code: "SECRET_DETECTED", message: "token=raw" },
+        sha,
+      ),
+    ).rejects.toThrow("quarantine response");
+    expect((await store.snapshot()).state).toBe("SAFETY_VIOLATION");
+  });
+  it.each(["revoke", "abort"] as const)(
+    "retains SAFETY_VIOLATION when %s fails",
+    async (failure) => {
+      const { store } = await phaseSetup();
+      await unlink("/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl").catch(
+        () => undefined,
+      );
+      const runner = new TrustedOrchestrator(
+        "/tmp/repo/.agent-runs/run-001",
+        store,
+        {
+          revokeCapabilities:
+            failure === "revoke"
+              ? async () => {
+                  throw new Error("failed");
+                }
+              : async () => {},
+          abortChildren:
+            failure === "abort"
+              ? async () => {
+                  throw new Error("failed");
+                }
+              : async () => {},
+        },
+      );
+      await expect(
+        runner.reportTrustedFailure(
+          { kind: "policy", code: "PATH_VIOLATION", message: "path" },
+          sha,
+        ),
+      ).rejects.toThrow();
+      expect((await store.snapshot()).state).toBe("SAFETY_VIOLATION");
+    },
+  );
+  it("handles typed safety failure in fail-closed order and uses runner quarantine", async () => {
+    const { store } = await phaseSetup();
+    await unlink("/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl").catch(
+      () => undefined,
+    );
+    const order: string[] = [];
+    const orchestrator = new TrustedOrchestrator(
+      "/tmp/repo/.agent-runs/run-001",
+      store,
+      {
+        runner: {
+          request: async (input) => {
+            order.push(input.capability);
+            return {
+              ok: true,
+              ...input,
+              result: {
+                exitCode: 0,
+                durationMs: 1,
+                truncated: false,
+                stdoutHash: "c".repeat(64),
+                stderrHash: "d".repeat(64),
+              },
+            };
+          },
+        },
+        revokeCapabilities: async () => {
+          order.push("revoke");
+        },
+        abortChildren: async () => {
+          order.push("abort");
+        },
+      },
+    );
+    await expect(
+      orchestrator.reportTrustedFailure(
+        { kind: "policy", code: "SECRET_DETECTED", message: "token=secret" },
+        sha,
+      ),
+    ).resolves.toMatchObject({ to: "QUARANTINED" });
+    expect(order).toEqual(["revoke", "abort", "quarantine_run"]);
+    expect(
+      await readFile(
+        "/tmp/repo/.agent-runs/run-001/safety-evidence.jsonl",
+        "utf8",
+      ),
+    ).not.toContain("secret");
+  });
   async function phaseSetup(overrides: Record<string, unknown> = {}) {
     const { f, io } = contextFixture();
     await mkdir("/tmp/repo/.agent-runs", { recursive: true });

@@ -1,0 +1,37 @@
+{
+  "protocolVersion": "1",
+  "uid": "REPLACE_WITH_RUNNER_UID",
+  "gid": "REPLACE_WITH_RUNNER_GID",
+  "user": "REPLACE_WITH_RUNNER_USER",
+  "group": "REPLACE_WITH_RUNNER_GROUP",
+  "socket": {
+    "path": "REPLACE_WITH_RUNNER_SOCKET",
+    "owner": "REPLACE_WITH_RUNNER_USER",
+    "group": "REPLACE_WITH_RUNNER_GROUP",
+    "uid": "REPLACE_WITH_RUNNER_UID",
+    "gid": "REPLACE_WITH_RUNNER_GID",
+    "mode": "0660"
+  },
+  "repositoryRoot": "REPLACE_WITH_REPOSITORY",
+  "runRoot": "REPLACE_WITH_RUN_ROOT",
+  "repositoryAccess": "read-only",
+  "runRootAccess": "write",
+  "forbiddenEnv": [
+    "SSH_AUTH_SOCK",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NODE_OPTIONS"
+  ],
+  "capabilities": {
+    "prepare_run": true,
+    "verify_phase": true,
+    "apply_migration_local": true,
+    "run_e2e": true,
+    "checkpoint": true,
+    "quarantine_run": true,
+    "promote_ff_only": false,
+    "publish_approved_sha": false
+  },
+  "policyHash": "0000000000000000000000000000000000000000000000000000000000000000"
+}

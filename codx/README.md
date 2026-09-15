@@ -1,5 +1,13 @@
 # PR作成エージェントの運用
 
+## Trusted runner端末導入
+
+導入前に管理者レビューを行い、plistとpolicyのplaceholderを端末固有の専用user/group、固定socket、repository read-only、run-root writeへ置換する。専用アカウントとディレクトリの権限を設定し、read-only検査（repository）とwrite検査（run-root）を行った後、管理者手順でlaunchdへ導入する。`pnpm trusted-runner:check`で実socket、所有者、policy hashを確認してからrunnerを起動する。停止時はlaunchd jobとsocketを停止し、撤去時は専用資源だけを削除する。
+
+placeholder置換後、いったん`pnpm trusted-runner:check`を実行し、出力された`policyHash`をpolicyへ反映して再検査する。checkerはpolicy記載のsocket、repository、run-rootを入力として読むため、CLI引数を固定値で与えない。launchdの操作や権限変更は管理者がレビュー済みの手順で行い、checkerが自動実行することはない。
+
+credential、token、個人名、個人絶対pathをenv、plist、Gitへ保存しない。CIのPASSやpolicyファイル存在だけでは端末管理者導入完了とみなさない。
+
 ## Canonical planとの境界
 
 新規計画の正本はZod検証済み`plan.json`、生成物は`docs/agent-runs/<runId>/plan-review.html`と`agent-plan.md`である。生成物の手編集は禁止し、planHashと承認record（approvedBy、approvedAt、expiresAt、最大7日）を開始・公開時に再検証する。新規開始はschemaVersion 2のみを受理し、completed済みschemaVersion 1の開始recordだけは履歴互換として読み取る。Stage 2導入前は版branch上の暫定運用で、worktree／state machine／trusted runnerは未実装である。
