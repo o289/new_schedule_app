@@ -36,7 +36,7 @@ const dependencyResult = (
   ...value,
 });
 const basePlan = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   planId: "safe-plan",
   runId: "run-001",
   objective: "test",
@@ -139,7 +139,7 @@ function fixture() {
     planHash = hashPlan(plan),
     now = new Date("2026-01-01T00:00:00.000Z"),
     approval = approvalRecordSchema.parse({
-      schemaVersion: 1,
+      schemaVersion: 2,
       runId: "run-001",
       plan: {
         path: "docs/agent-runs/run-001/plan.json",

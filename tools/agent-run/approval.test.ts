@@ -5,7 +5,7 @@ import { hashPlan } from "./plan-hash";
 import { parsePlan } from "./plan-schema";
 
 const plan = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   planId: "approval-plan",
   runId: "approval-run",
   objective: "test",
@@ -92,7 +92,7 @@ const content = JSON.stringify(plan);
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const input = {
-  schemaVersion: 1 as const,
+  schemaVersion: 2 as const,
   runId: plan.runId,
   plan: { path: "plan.json", sha256: digest(content) },
   planHash: hashPlan(parsePlan(plan)),
@@ -102,6 +102,15 @@ const input = {
 };
 
 describe("approval", () => {
+  it("rejects legacy schemaVersion 1 without implicit conversion", async () => {
+    await expect(
+      createApproval(
+        { ...input, schemaVersion: 1 },
+        { read: async () => content, writeExclusive: async () => undefined },
+        new Date("2026-01-02T00:00:00Z"),
+      ),
+    ).rejects.toThrow();
+  });
   it("creates a valid record and rejects exclusive second write", async () => {
     const writes: string[] = [];
     const io = {

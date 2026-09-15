@@ -10,7 +10,7 @@ import {
 } from "./plan-render";
 
 const input = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   planId: "render-plan",
   runId: "run-render",
   objective: "<script>alert(1)</script>",

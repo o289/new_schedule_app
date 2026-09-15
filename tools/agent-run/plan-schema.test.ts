@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assertPlanApprovable, parsePlan } from "./plan-schema";
 
 const basePlan = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   planId: "safe-plan",
   runId: "run-001",
   objective: "canonical planを導入する",
@@ -93,6 +93,8 @@ const basePlan = {
 describe("planSchema", () => {
   it("accepts a complete canonical plan", () =>
     expect(parsePlan(basePlan)).toEqual(basePlan));
+  it("rejects legacy schemaVersion 1 without implicit conversion", () =>
+    expect(() => parsePlan({ ...basePlan, schemaVersion: 1 })).toThrow());
   it("rejects unsafe and duplicate paths", () => {
     expect(() =>
       parsePlan({ ...basePlan, allowedPaths: ["/tmp", "tools/agent-run/**"] }),

@@ -104,7 +104,7 @@ const limitsSchema = z
 
 export const planSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     planId: identifier,
     runId: identifier,
     objective: nonEmpty,

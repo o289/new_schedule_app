@@ -3,7 +3,7 @@ import { hashPlan, normalizePlan } from "./plan-hash";
 import { parsePlan } from "./plan-schema";
 
 const plan = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   planId: "hash-plan",
   runId: "run-002",
   objective: "hash",

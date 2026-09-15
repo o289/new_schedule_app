@@ -8,7 +8,7 @@ const nonempty = z.string().trim().min(1);
 const ref = z.object({ path: nonempty, sha256: digest }).strict();
 export const approvalInputSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     runId: nonempty,
     plan: ref,
     planHash: digest,

@@ -83,7 +83,7 @@ function fixture(large = false) {
 }
 function fixtureV2() {
   const plan = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     planId: "v2-plan",
     runId: "v2-run",
     objective: "v2",
@@ -173,7 +173,7 @@ function fixtureV2() {
   const digest = (value: string) =>
     createHash("sha256").update(value).digest("hex");
   const approval = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: parsed.runId,
     plan: { path: "docs/v2-run/plan.json", sha256: digest(planText) },
     planHash,
@@ -310,6 +310,8 @@ describe("task start", () => {
     "expired",
     "implementation-ref-hash",
     "implementation-content",
+    "plan-schema-version",
+    "approval-schema-version",
     "args",
     "path-traversal",
   ])("v2 rejects %s before switch", async (problem) => {
@@ -338,6 +340,30 @@ describe("task start", () => {
       f.input.implementation.sha256 = "0".repeat(64);
     if (problem === "implementation-content")
       f.texts[f.input.implementation.path] = "changed";
+    if (problem === "plan-schema-version") {
+      const planPath = f.input.plan.path;
+      const plan = JSON.parse(f.texts[planPath] ?? "") as Record<
+        string,
+        unknown
+      >;
+      plan.schemaVersion = 1;
+      f.texts[planPath] = JSON.stringify(plan);
+      f.input.plan.sha256 = createHash("sha256")
+        .update(f.texts[planPath] ?? "")
+        .digest("hex");
+    }
+    if (problem === "approval-schema-version") {
+      const approvalPath = f.input.approval.path;
+      const approval = JSON.parse(f.texts[approvalPath] ?? "") as Record<
+        string,
+        unknown
+      >;
+      approval.schemaVersion = 1;
+      f.texts[approvalPath] = JSON.stringify(approval);
+      f.input.approval.sha256 = createHash("sha256")
+        .update(f.texts[approvalPath] ?? "")
+        .digest("hex");
+    }
     if (problem === "path-traversal") f.input.plan.path = "docs/../plan.json";
     await expect(
       startTaskV2(
