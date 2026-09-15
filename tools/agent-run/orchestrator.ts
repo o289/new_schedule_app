@@ -1,4 +1,5 @@
 import {
+  appendFile,
   mkdir,
   open,
   readFile,
@@ -18,6 +19,18 @@ import { worktreeMarkerSchema } from "./worktree";
 import { inspectDependencies } from "./dependency-guard";
 import { inspectPaths } from "./path-guard";
 import { startRecordV2Schema } from "../pr-agent-start.js";
+import {
+  classifyFailure,
+  type ClassifiedFailure,
+  type FailureInput,
+} from "./failure-classifier.js";
+import type { RunEvent } from "./state-schema";
+import type {
+  TrustedRunnerRequest,
+  TrustedRunnerResponse,
+} from "../trusted-runner/protocol.js";
+import { TrustedRunnerClient } from "../trusted-runner/client.js";
+import { sanitizeString } from "../trusted-runner/redaction.js";
 
 const actor = z.enum(["planner", "runner", "verifier", "publisher"]);
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -41,6 +54,13 @@ const gateEvidenceSchema = z
     exitCode: z.number().int(),
     startedAt: z.string().datetime({ offset: true }),
     completedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+const safetyEvidenceSchema = z
+  .object({
+    reasonCode: z.string().min(1).max(128),
+    message: z.string().max(256),
+    targetSha: sha,
   })
   .strict();
 const actionBase = { expectedRevision: z.number().int().nonnegative(), actor };
@@ -290,7 +310,14 @@ export async function verifyCanonicalContext(
 export interface OrchestratorIO {
   now?: () => Date;
   context?: ContextIO;
+  runner?: {
+    request(input: TrustedRunnerRequest): Promise<TrustedRunnerResponse>;
+  };
+  abortChildren?: () => Promise<void>;
+  revokeCapabilities?: () => Promise<void>;
 }
+export type TrustedCapabilityOutcome =
+  TrustedRunnerResponse | ClassifiedFailure | RunEvent;
 function requirePhase(
   phase: Plan["phases"][number] | undefined,
 ): Plan["phases"][number] {
@@ -312,7 +339,7 @@ const makeEvent = (
   to: Snapshot["state"],
   targetSha: string,
   occurredAt: string,
-  phaseId = snapshot.phaseId,
+  phaseId: string | null = snapshot.phaseId,
   retryCount = snapshot.retryCount,
 ) => ({
   schemaVersion: 1 as const,
@@ -351,6 +378,198 @@ export class TrustedOrchestrator {
         this.io.now,
       ),
       "trusted IOが未注入です",
+    );
+  }
+  public async executeTrustedCapability(
+    request: TrustedRunnerRequest,
+    targetSha: string,
+  ): Promise<TrustedCapabilityOutcome> {
+    stop(this.io.runner !== undefined, "trusted runner clientが未注入です");
+    const snapshot = await this.store.snapshot();
+    stop(
+      request.runId === snapshot.runId &&
+        request.planHash === snapshot.planHash &&
+        request.revision === snapshot.revision,
+      "runner response context mismatch",
+    );
+    let runnerCallDone = false;
+    try {
+      const response = await this.io.runner.request(request);
+      runnerCallDone = true;
+      if (!(
+        response.runId === request.runId &&
+        response.planHash === request.planHash &&
+        response.revision === request.revision &&
+        response.nonce === request.nonce &&
+        response.capability === request.capability
+      ))
+        return this.handleClassifiedFailure(
+          classifyFailure({ kind: "runner", code: "PROTOCOL_MISMATCH" }),
+          targetSha,
+        );
+      if (response.ok)
+        return response.result.exitCode === 0
+          ? response
+          : await this.handleClassifiedFailure(
+              classifyFailure({ kind: "runner", code: "NONZERO" }),
+              targetSha,
+            );
+      if (response.error.code === "UNKNOWN_CAPABILITY")
+        return this.handleClassifiedFailure(
+          classifyFailure({
+            kind: "policy",
+            code: "CAPABILITY_UNAVAILABLE",
+          }),
+          targetSha,
+        );
+      const code =
+        response.error.code === "TIMEOUT"
+          ? "TIMEOUT"
+          : response.error.code === "PROTOCOL_MISMATCH"
+            ? "PROTOCOL_MISMATCH"
+            : "CONNECTION_ERROR";
+      const classified = classifyFailure({ kind: "runner", code });
+      return await this.handleClassifiedFailure(classified, targetSha);
+    } catch (error: unknown) {
+      if (runnerCallDone) throw error;
+      const message = error instanceof Error ? error.message : "runner error";
+      const classified = classifyFailure({
+        kind: "runner",
+        code: /timed out/i.test(message)
+          ? "TIMEOUT"
+          : /protocol|context mismatch/i.test(message)
+            ? "PROTOCOL_MISMATCH"
+            : "CONNECTION_ERROR",
+      });
+      return await this.handleClassifiedFailure(classified, targetSha);
+    }
+  }
+  public async reportTrustedFailure(
+    input: FailureInput,
+    targetSha: string,
+  ): Promise<TrustedCapabilityOutcome> {
+    return this.handleClassifiedFailure(
+      classifyFailure(input),
+      targetSha,
+      input.message,
+    );
+  }
+  public async handleClassifiedFailure(
+    failure: ClassifiedFailure,
+    targetSha: string,
+    rawMessage?: string,
+  ): Promise<RunEvent> {
+    const snapshot = await this.store.snapshot();
+    const occurredAt = (this.io.now ?? (() => new Date()))().toISOString();
+    if (failure.classification === "SAFETY_VIOLATION") {
+      const safety = await this.store.append(
+        makeEvent(
+          snapshot,
+          {
+            action: "quarantine",
+            expectedRevision: snapshot.revision,
+            actor: "runner",
+            reason: failure.reasonCode,
+          },
+          snapshot.state,
+          "SAFETY_VIOLATION",
+          targetSha,
+          occurredAt,
+        ),
+      );
+      if (this.io.revokeCapabilities) await this.io.revokeCapabilities();
+      else throw new Error("SAFETY_VIOLATION: capability revoke unavailable");
+      if (this.io.abortChildren) await this.io.abortChildren();
+      else throw new Error("SAFETY_VIOLATION: child abort unavailable");
+      const message = sanitizeString(rawMessage ?? failure.safeMessage);
+      const evidence = safetyEvidenceSchema.parse({
+        reasonCode: failure.reasonCode,
+        message,
+        targetSha,
+      });
+      await appendFile(
+        join(this.runDirectory, "safety-evidence.jsonl"),
+        `${JSON.stringify(evidence)}\n`,
+        { encoding: "utf8", flag: "a" },
+      );
+      if (!this.io.runner)
+        throw new Error("SAFETY_VIOLATION: quarantine runner unavailable");
+      const reasonCode = [
+        "SAFETY_VIOLATION",
+        "SECRET_DETECTED",
+        "PATH_VIOLATION",
+        "RUNNER_BYPASS",
+      ].includes(failure.reasonCode)
+        ? (failure.reasonCode as
+            | "SAFETY_VIOLATION"
+            | "SECRET_DETECTED"
+            | "PATH_VIOLATION"
+            | "RUNNER_BYPASS")
+        : "RUNNER_BYPASS";
+      const quarantineRequest = {
+        protocolVersion: "1",
+        runId: snapshot.runId,
+        planHash: snapshot.planHash,
+        revision: safety.sequence,
+        capability: "quarantine_run",
+        args: { reasonCode },
+        nonce: TrustedRunnerClient.createNonce(),
+      } as const;
+      const quarantineResponse =
+        await this.io.runner.request(quarantineRequest);
+      if (
+        !quarantineResponse.ok ||
+        quarantineResponse.runId !== quarantineRequest.runId ||
+        quarantineResponse.planHash !== quarantineRequest.planHash ||
+        quarantineResponse.revision !== quarantineRequest.revision ||
+        quarantineResponse.nonce !== quarantineRequest.nonce ||
+        quarantineResponse.capability !== quarantineRequest.capability
+      )
+        throw new Error("SAFETY_VIOLATION: quarantine response mismatch");
+      return this.store.append(
+        makeEvent(
+          {
+            ...snapshot,
+            state: "SAFETY_VIOLATION",
+            revision: safety.sequence,
+            eventHash: safety.eventHash,
+          },
+          {
+            action: "quarantine",
+            expectedRevision: safety.sequence,
+            actor: "runner",
+            reason: failure.reasonCode,
+          },
+          "SAFETY_VIOLATION",
+          "QUARANTINED",
+          targetSha,
+          occurredAt,
+        ),
+      );
+    }
+    const to =
+      failure.classification === "REWORK"
+        ? "REWORK"
+        : failure.classification === "REPLAN_REQUIRED"
+          ? "REPLAN_REQUIRED"
+          : "INFRA_FAIL";
+    if (!["PHASE_RUNNING", "VERIFYING"].includes(snapshot.state))
+      throw new Error("failure state is not active");
+    return this.store.append(
+      makeEvent(
+        snapshot,
+        {
+          action: "quarantine",
+          expectedRevision: snapshot.revision,
+          actor: "runner",
+          reason: failure.reasonCode,
+        },
+        snapshot.state,
+        to,
+        targetSha,
+        occurredAt,
+        to === "REPLAN_REQUIRED" ? null : snapshot.phaseId,
+      ),
     );
   }
   private async context(action: Action): Promise<VerifiedContext> {
