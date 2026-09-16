@@ -44,6 +44,8 @@ export interface RunCommandIO {
   };
   statusExecutor?: typeof executeStatus;
 }
+export const RUN_GIT_MAX_BUFFER = 64 * 1024 * 1024;
+export const RUN_GIT_TIMEOUT_MS = 120_000;
 
 export type StatusDeps = {
   plan: unknown;
@@ -159,6 +161,8 @@ export async function runCommand(
         await execFile("git", args, {
           cwd: root,
           shell: false,
+          maxBuffer: RUN_GIT_MAX_BUFFER,
+          timeout: RUN_GIT_TIMEOUT_MS,
         })
       ).stdout.toString();
     });
