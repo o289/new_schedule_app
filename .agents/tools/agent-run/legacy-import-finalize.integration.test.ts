@@ -13,6 +13,7 @@ describe("legacy finalize integration", () => {
     const runId = "agent-workflow-slim-v323-20260916-r3";
     const root = await mkdtemp(join(tmpdir(), "legacy-finalize-"));
     const sourceRoot = resolve(".");
+    const startSha = "a".repeat(40);
     const paths = runPaths(runId);
     const files = new Map<string, string>();
     for (const path of [
@@ -21,11 +22,17 @@ describe("legacy finalize integration", () => {
       paths.ai + "/agent-plan.md",
       paths.ai + "/legacy-import-input.json",
     ]) {
-      files.set(path, await readFile(join(sourceRoot, path), "utf8"));
+      const content = await readFile(join(sourceRoot, path), "utf8");
+      files.set(
+        path,
+        path.endsWith("legacy-import-input.json")
+          ? content.replace(
+              /"reviewBaseSha":\s*"[a-f0-9]{40}"/,
+              `"reviewBaseSha": "${startSha}"`,
+            )
+          : content,
+      );
     }
-    const startSha = JSON.parse(
-      await readFile(join(sourceRoot, ".agent-run-marker.json"), "utf8"),
-    ).startSha as string;
     const marker = JSON.stringify({
       schemaVersion: 1,
       runId,
