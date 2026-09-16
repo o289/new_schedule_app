@@ -4,6 +4,10 @@ import {
   isCanonicalTransition,
   type CanonicalState,
 } from "./canonical-state";
+import {
+  publicationStateSchema,
+  type PublicationState,
+} from "./canonical-state";
 
 export const canonicalActionSchema = z.enum([
   "prepare",
@@ -30,9 +34,104 @@ export const canonicalSnapshotSchema = z
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
       .nullable(),
     retryCount: z.number().int().min(0).max(3),
+    publicationState: publicationStateSchema.default("NOT_STARTED"),
   })
   .strict();
 export type CanonicalSnapshot = z.infer<typeof canonicalSnapshotSchema>;
+
+export const publicationTransitionSchema = z
+  .object({
+    from: publicationStateSchema,
+    to: publicationStateSchema,
+  })
+  .strict();
+
+const publicationTransitions: Readonly<
+  Record<PublicationState, readonly PublicationState[]>
+> = {
+  NOT_STARTED: ["PENDING"],
+  PENDING: ["BRANCH_PUSHED", "BLOCKED"],
+  BRANCH_PUSHED: ["CI_PASSED", "BLOCKED"],
+  CI_PASSED: ["PR_CREATED", "BLOCKED"],
+  PR_CREATED: [],
+  BLOCKED: [],
+};
+
+export function resolvePublicationTransition(
+  from: unknown,
+  to: unknown,
+): PublicationState {
+  const transition = publicationTransitionSchema.parse({ from, to });
+  if (!publicationTransitions[transition.from].includes(transition.to)) {
+    throw new Error("許可されない公開状態遷移です");
+  }
+  return transition.to;
+}
+
+export const publicationTransitionContextSchema = z
+  .object({
+    implementationState: canonicalStateSchema,
+    publicationState: publicationStateSchema,
+  })
+  .strict();
+
+export function resolvePublicationTransitionForSnapshot(
+  snapshot: unknown,
+  to: unknown,
+): PublicationState {
+  const current = publicationTransitionContextSchema.parse(snapshot);
+  if (to === "PENDING" && current.implementationState !== "COMPLETED") {
+    throw new Error("実装完了前に公開処理を開始できません");
+  }
+  return resolvePublicationTransition(current.publicationState, to);
+}
+
+export const publicationCompletionInputSchema = z
+  .object({
+    mode: z.enum(["push_only", "pull_request"]),
+    implementationState: canonicalStateSchema,
+    publicationState: publicationStateSchema,
+    targetSha: z.string().regex(/^[a-f0-9]{40}$/),
+    verifiedSha: z.string().regex(/^[a-f0-9]{40}$/),
+    head: z.string().min(1),
+    base: z.string().min(1).optional(),
+    prHead: z.string().min(1).optional(),
+    prBase: z.string().min(1).optional(),
+    prSha: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/)
+      .optional(),
+    prUrl: z
+      .string()
+      .url()
+      .refine((value) => {
+        const url = new URL(value);
+        return url.protocol === "https:" && url.hostname === "github.com";
+      }, "GitHubのHTTPS URLが必要です")
+      .optional(),
+    prState: z.enum(["OPEN", "CLOSED", "MERGED"]).optional(),
+    isDraft: z.boolean().optional(),
+  })
+  .strict();
+
+export function isFinalResponseAllowed(input: unknown): boolean {
+  const value = publicationCompletionInputSchema.parse(input);
+  if (value.implementationState !== "COMPLETED") return false;
+  if (value.targetSha !== value.verifiedSha) return false;
+  if (value.mode === "push_only") {
+    return value.publicationState === "CI_PASSED";
+  }
+  return (
+    value.publicationState === "PR_CREATED" &&
+    value.base !== undefined &&
+    value.prHead === value.head &&
+    value.prBase === value.base &&
+    value.prSha === value.targetSha &&
+    value.prUrl !== undefined &&
+    value.prState === "OPEN" &&
+    value.isDraft === false
+  );
+}
 
 export function resolveCanonicalTransition(
   snapshot: CanonicalSnapshot,
@@ -107,6 +206,7 @@ export function resolveCanonicalTransition(
         ? nextPhaseId
         : current.phaseId,
     retryCount: current.retryCount,
+    publicationState: current.publicationState,
   };
 }
 

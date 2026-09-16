@@ -43,7 +43,7 @@ cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git
                                            PR作成エージェント
                                                   ↓
                                 ├─ 版branch → push・CI成功で完了
-                                └─ 機能branch → 通常PR完成 → 人間レビュー
+                                └─ 機能branch → push・CI・通常PR完成 → 人間レビュー・Merge
 ```
 
 - 中規模以上の変更は、ユーザーが実装計画を承認するまで実装へ進まない。

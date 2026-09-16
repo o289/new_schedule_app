@@ -92,4 +92,4 @@ checker failure、credential失効、socket未接続、runner timeoutでは公�
 
 push_onlyの完了報告はmode、head、SHA、CI URL、品質結果、ローカルHTML、未確認事項。PR URLを要求しない。pushだけ・CI待機中は完了としない。
 
-pull_requestは通常PRが作成または同一SHAで存在確認できたら、上記にPR URLと導出baseを加える。人間がレビュー・Mergeを判断する。資料だけ・pushだけ・CI待機中をPR完成と呼ばない。ユーザーがローカル実装までと指定した場合は実公開を行わず、実行しなかった範囲を明示する。
+pull_requestは通常PRが作成または同一SHAで存在確認できたら、上記にPR URLと導出baseを加える。ここがAIの最終責務であり、人間がレビュー・Mergeを判断する。Merge前は正式branch反映完了と呼ばない。資料だけ・pushだけ・CI待機中をPR完成と呼ばない。ユーザーがローカル実装までと指定した場合は実公開を行わず、実行しなかった範囲を明示する。

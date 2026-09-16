@@ -31,6 +31,7 @@ const initialSnapshot: CanonicalSnapshot = {
   state: "DRAFT",
   phaseId: null,
   retryCount: 0,
+  publicationState: "NOT_STARTED",
 };
 
 export class CanonicalOrchestrator {
@@ -57,6 +58,7 @@ export class CanonicalOrchestrator {
       state: canonicalStateSchema.parse(event.to),
       phaseId: event.phaseId,
       retryCount: event.retryCount,
+      publicationState: event.publicationState ?? "NOT_STARTED",
     };
   }
 
@@ -73,6 +75,7 @@ export class CanonicalOrchestrator {
           state: last.to,
           phaseId: last.phaseId,
           retryCount: last.retryCount,
+          publicationState: last.publicationState ?? "NOT_STARTED",
         }
       : initialSnapshot;
     const next = resolveCanonicalTransition(current, action, phaseId, outcome);

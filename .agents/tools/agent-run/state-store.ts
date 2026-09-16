@@ -118,6 +118,7 @@ export class CanonicalStateStore {
       state: last?.to ?? null,
       phaseId: last?.phaseId ?? null,
       retryCount: last?.retryCount ?? 0,
+      publicationState: last?.publicationState ?? "NOT_STARTED",
       revision: last?.sequence ?? 0,
       eventHash: last?.eventHash ?? null,
       passedPhaseIds: Object.keys(evidenceByPhase),

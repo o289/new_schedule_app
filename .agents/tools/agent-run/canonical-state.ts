@@ -16,6 +16,17 @@ export const canonicalStates = [
 export const canonicalStateSchema = z.enum(canonicalStates);
 export type CanonicalState = z.infer<typeof canonicalStateSchema>;
 
+export const publicationStates = [
+  "NOT_STARTED",
+  "PENDING",
+  "BRANCH_PUSHED",
+  "CI_PASSED",
+  "PR_CREATED",
+  "BLOCKED",
+] as const;
+export const publicationStateSchema = z.enum(publicationStates);
+export type PublicationState = z.infer<typeof publicationStateSchema>;
+
 export const canonicalTransitions: Readonly<
   Record<CanonicalState, readonly CanonicalState[]>
 > = {
@@ -117,6 +128,7 @@ export const canonicalEventSchema = z
       })
       .strict()
       .optional(),
+    publicationState: publicationStateSchema.optional(),
   })
   .strict();
 export type CanonicalEvent = z.infer<typeof canonicalEventSchema>;

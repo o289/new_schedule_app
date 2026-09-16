@@ -3,9 +3,17 @@ import {
   canonicalActionSchema,
   canonicalSnapshotSchema,
   isPublicationEligible,
+  isFinalResponseAllowed,
+  resolvePublicationTransition,
+  resolvePublicationTransitionForSnapshot,
   resolveCanonicalTransition,
 } from "./canonical-orchestration";
-const base = { state: "DRAFT" as const, phaseId: null, retryCount: 0 };
+const base = {
+  state: "DRAFT" as const,
+  phaseId: null,
+  retryCount: 0,
+  publicationState: "NOT_STARTED" as const,
+};
 const sha = "a".repeat(40);
 describe("canonical orchestration", () => {
   it("accepts only the declared canonical actions", () => {
@@ -73,7 +81,12 @@ describe("canonical orchestration", () => {
 
   it.each([0, 1, 2])("increments retry count from %s", (retryCount) => {
     const next = resolveCanonicalTransition(
-      { state: "VERIFYING", phaseId: "phase-1", retryCount },
+      {
+        state: "VERIFYING",
+        phaseId: "phase-1",
+        retryCount,
+        publicationState: "NOT_STARTED",
+      },
       "verify_fail",
     );
     expect(next.state).toBe("RUNNING");
@@ -82,13 +95,19 @@ describe("canonical orchestration", () => {
 
   it("moves retry count 3 to FAILED", () => {
     const next = resolveCanonicalTransition(
-      { state: "VERIFYING", phaseId: "phase-1", retryCount: 3 },
+      {
+        state: "VERIFYING",
+        phaseId: "phase-1",
+        retryCount: 3,
+        publicationState: "NOT_STARTED",
+      },
       "verify_fail",
     );
     expect(next).toEqual({
       state: "FAILED",
       phaseId: "phase-1",
       retryCount: 3,
+      publicationState: "NOT_STARTED",
     });
   });
   it.each(["replan", "fail", "safety_stop"])(
@@ -140,5 +159,116 @@ describe("canonical orchestration", () => {
     expect(() =>
       isPublicationEligible({ ...valid, legacyProjection: true }),
     ).toThrow();
+  });
+
+  it("allows only the declared publication transitions", () => {
+    expect(resolvePublicationTransition("NOT_STARTED", "PENDING")).toBe(
+      "PENDING",
+    );
+    expect(resolvePublicationTransition("PENDING", "BRANCH_PUSHED")).toBe(
+      "BRANCH_PUSHED",
+    );
+    expect(resolvePublicationTransition("BRANCH_PUSHED", "CI_PASSED")).toBe(
+      "CI_PASSED",
+    );
+    expect(resolvePublicationTransition("CI_PASSED", "PR_CREATED")).toBe(
+      "PR_CREATED",
+    );
+    expect(() =>
+      resolvePublicationTransition("PR_CREATED", "BLOCKED"),
+    ).toThrow();
+    expect(() =>
+      resolvePublicationTransition("NOT_STARTED", "PR_CREATED"),
+    ).toThrow();
+  });
+
+  it("requires CI for push-only final responses", () => {
+    const common = {
+      mode: "push_only" as const,
+      implementationState: "COMPLETED" as const,
+      targetSha: sha,
+      verifiedSha: sha,
+      head: "feature/v3.2.3",
+    };
+    expect(
+      isFinalResponseAllowed({ ...common, publicationState: "CI_PASSED" }),
+    ).toBe(true);
+    expect(
+      isFinalResponseAllowed({ ...common, publicationState: "BRANCH_PUSHED" }),
+    ).toBe(false);
+    expect(
+      isFinalResponseAllowed({
+        ...common,
+        implementationState: "VERIFYING",
+        publicationState: "CI_PASSED",
+      }),
+    ).toBe(false);
+  });
+
+  it("requires an exact normal PR for pull-request final responses", () => {
+    const common = {
+      mode: "pull_request" as const,
+      implementationState: "COMPLETED" as const,
+      publicationState: "PR_CREATED" as const,
+      targetSha: sha,
+      verifiedSha: sha,
+      head: "feature/task-v3.2.3",
+      base: "feature/v3.2.3",
+      prUrl: "https://github.com/o289/new_schedule_app/pull/1",
+      prState: "OPEN" as const,
+      isDraft: false as const,
+    };
+    expect(
+      isFinalResponseAllowed({
+        ...common,
+        prHead: common.head,
+        prBase: common.base,
+        prSha: sha,
+      }),
+    ).toBe(true);
+    expect(
+      isFinalResponseAllowed({
+        ...common,
+        prHead: common.head,
+        prBase: "main",
+        prSha: sha,
+      }),
+    ).toBe(false);
+    expect(
+      isFinalResponseAllowed({
+        ...common,
+        prHead: common.head,
+        prBase: common.base,
+        prSha: sha,
+        prState: "CLOSED",
+      }),
+    ).toBe(false);
+    expect(
+      isFinalResponseAllowed({
+        ...common,
+        prHead: common.head,
+        prBase: common.base,
+        prSha: sha,
+        isDraft: true,
+      }),
+    ).toBe(false);
+    expect(
+      isFinalResponseAllowed({ ...common, publicationState: "CI_PASSED" }),
+    ).toBe(false);
+  });
+
+  it("does not start publication before implementation is complete", () => {
+    expect(() =>
+      resolvePublicationTransitionForSnapshot(
+        { implementationState: "VERIFYING", publicationState: "NOT_STARTED" },
+        "PENDING",
+      ),
+    ).toThrow();
+    expect(
+      resolvePublicationTransitionForSnapshot(
+        { implementationState: "COMPLETED", publicationState: "NOT_STARTED" },
+        "PENDING",
+      ),
+    ).toBe("PENDING");
   });
 });

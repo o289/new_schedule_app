@@ -265,7 +265,7 @@ shasum -a 256 docs/pr-full.diff
 公開mutationはorchestratorがtrusted runnerへ渡すcanonical requestだけで行う。`./.agents/tools/pr-agent-publish`はhandoff schemaのモジュールであり、直接起動はSTOPする。runnerはpolicy固定のorigin・repository・branchだけを使い、callerからremote、refspec、shell、env、pathを受け取らない。remoteが先行・分岐していたらforceせずSTOPする。remote commitがローカルに未取得で祖先性を確認できない場合もSTOPし、実装側で取得してから再検証する。branchが未作成なら新規push、同一SHAなら再pushを省略する。tag追随・mirror・削除は行わない。
 
 - push_onlyはPR一覧取得もPR作成も呼ばない。remoteの同一SHAとCI成功で完了する。結果はmode/head/headSha/ciUrl。
-- pull_requestはheadから導出した版branchへ通常PRを作る。結果は上記にbase/prUrlを追加。同一base/head/SHAの通常PRを再利用し、Draft・閉じたPR・異なるbase/head・重複はSTOPする。既存PRの本文・状態は変更しない。
+- pull_requestはheadから導出した版branchへ通常PRを作る。結果は上記にbase/prUrlを追加。同一base/head/SHAの通常PRを再利用し、Draft・閉じたPR・異なるbase/head・重複はSTOPする。既存PRの本文・状態は変更しない。PR作成・head/base/SHA照合までがAIの最終責務であり、レビューとMergeは人間が行う。
 
 CIはci.ymlのpushイベント、branch、head SHA、workflow名CI、必須job「型・テスト・書式の確認」の成功を照合する。10秒間隔で最大60回待つ。各外部コマンドにもtimeoutがあるため全体は10分を超える場合がある。main限定E2Eのskipは許容するが必須checkのskipは許容しない。必要なローカルE2Eをbranch CIの代わりに省略しない。
 
