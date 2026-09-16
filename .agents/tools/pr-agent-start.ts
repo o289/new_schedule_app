@@ -116,8 +116,12 @@ function check(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`STOP: ${message}`);
 }
 const isPlanPath = (path: string): boolean =>
+  path.startsWith("ai/") && !path.split("/").includes("..");
+const isLegacyPlanPath = (path: string): boolean =>
   (path.startsWith("ai/") || path.startsWith("docs/")) &&
   !path.split("/").includes("..");
+const isRunArtifactPath = (path: string, runId: string): boolean =>
+  path.startsWith(`ai/runs/${runId}/`) && isPlanPath(path);
 export function validateStart(input: StartInput | StartInputV2): void {
   const size = classifyWork(input.assessment);
   check(input.size === size, "規模と判定材料が一致しません");
@@ -179,7 +183,7 @@ export async function startTask(
     );
   };
   await beforeStart();
-  check(isPlanPath(input.plan.path), "計画pathが不正です");
+  check(isLegacyPlanPath(input.plan.path), "計画pathが不正です");
   const plan = await io.read(input.plan.path);
   check(
     plan.trim().length > 0 &&
@@ -230,12 +234,16 @@ export async function startTaskV2(
   check(args.length === 0, "引数は受け付けません");
   const input = startInputV2Schema.parse(raw);
   validateStart(input);
-  const planText = await io.read(input.plan.path);
   check(
-    input.plan.path.startsWith("docs/") &&
-      !input.plan.path.split("/").includes(".."),
+    isRunArtifactPath(input.plan.path, input.plan.runId),
     "計画pathが不正です",
   );
+  check(
+    isRunArtifactPath(input.approval.path, input.plan.runId) &&
+      isRunArtifactPath(input.implementation.path, input.plan.runId),
+    "run専用artifact pathが不正です",
+  );
+  const planText = await io.read(input.plan.path);
   check(
     createHash("sha256").update(planText).digest("hex") === input.plan.sha256,
     "計画ファイルのhashが不一致です",
@@ -246,7 +254,6 @@ export async function startTaskV2(
     hashPlan(plan) === input.plan.planHash,
     "canonical planのhashが不一致です",
   );
-  check(isPlanPath(input.approval.path), "承認pathが不正です");
   const approvalText = await io.read(input.approval.path);
   check(
     createHash("sha256").update(approvalText).digest("hex") ===
@@ -265,7 +272,6 @@ export async function startTaskV2(
   );
   validateApproval(approval, planText, now);
   const implementation = await io.read(input.implementation.path);
-  check(isPlanPath(input.implementation.path), "実装計画pathが不正です");
   check(
     createHash("sha256").update(implementation).digest("hex") ===
       input.implementation.sha256,

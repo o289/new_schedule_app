@@ -1,9 +1,4 @@
 #!/bin/sh
 set -eu
-if [ "$#" -ne 0 ]; then
-  echo 'STOP: pr-agent-start accepts no arguments.' >&2
-  exit 1
-fi
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
-cd "$repo_root"
-exec pnpm exec tsx .agents/tools/pr-agent-start.ts
+echo 'STOP: 旧start入口は使用できません。pnpm agent:run start <runId>を使用してください。' >&2
+exit 1

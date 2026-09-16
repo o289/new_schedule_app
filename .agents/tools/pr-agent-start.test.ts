@@ -176,7 +176,7 @@ function fixtureV2() {
   const approval = {
     schemaVersion: 2,
     runId: parsed.runId,
-    plan: { path: "docs/v2-run/plan.json", sha256: digest(planText) },
+    plan: { path: "ai/runs/v2-run/plan.json", sha256: digest(planText) },
     planHash,
     approvedBy: "owner",
     approvedAt: "2026-01-01T00:00:00Z",
@@ -193,19 +193,19 @@ function fixtureV2() {
     head: "feature/v3.2.3",
     reviewBaseSha: sha,
     plan: {
-      path: "docs/v2-run/plan.json",
+      path: "ai/runs/v2-run/plan.json",
       sha256: digest(planText),
       runId: parsed.runId,
       planHash,
     },
     approval: {
-      path: "docs/v2-run/approval.json",
+      path: "ai/runs/v2-run/approval.json",
       sha256: digest(JSON.stringify(approval)),
       runId: parsed.runId,
       planHash,
     },
     implementation: {
-      path: "docs/v2-run/agent-plan.md",
+      path: "ai/runs/v2-run/agent-plan.md",
       sha256: digest(implementation),
     },
   };
@@ -387,7 +387,8 @@ describe("task start", () => {
         .update(f.texts[approvalPath] ?? "")
         .digest("hex");
     }
-    if (problem === "path-traversal") f.input.plan.path = "docs/../plan.json";
+    if (problem === "path-traversal")
+      f.input.plan.path = "ai/runs/v2-run/../plan.json";
     await expect(
       startTaskV2(
         f.input,

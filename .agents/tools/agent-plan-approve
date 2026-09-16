@@ -1,6 +1,4 @@
 #!/bin/sh
 set -eu
-[ "$#" -ne 0 ] && { echo "STOP: 引数は受け付けません" >&2; exit 1; }
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-cd "$repo_root"
-exec pnpm exec tsx .agents/tools/agent-plan-approve.ts
+echo "STOP: 旧approval入口は使用できません。pnpm agent:run approve <runId>を使用してください。" >&2
+exit 1

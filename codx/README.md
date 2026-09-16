@@ -37,7 +37,7 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 ## 実装開始の記録
 
-規模の正本は[判断フロー](../.agents/instructions/IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`ai/runs/<runId>/plan.source.json`を入力に`agent:run create <runId>`で生成し、`ai/runs/<runId>/`へcanonical plan・agent-plan・manifest、`human/runs/<runId>/`へ人間向けreview HTMLを保存する。承認は`agent:run approve <runId>`、開始は`agent:run start <runId>`で行い、いずれもrunIdから固定pathを導出する。旧`docs/pr-agent-start-record.json`などのglobal JSONはlegacy read-onlyであり、新runでは使用しない。
+規模の正本は[判断フロー](../.agents/instructions/IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`ai/runs/<runId>/plan.source.json`を入力に`agent:run create <runId>`で生成し、`ai/runs/<runId>/`へcanonical plan・agent-plan・manifest、`human/runs/<runId>/`へ人間向けreview HTMLを保存する。承認は`agent:run approve <runId>`、開始は`agent:run start <runId>`で行い、いずれもrunIdから固定pathを導出する。旧generator・approval・start wrapperは新規書込を行わずsingle CLIへ案内する。旧`docs/pr-agent-start-record.json`などのglobal JSONはlegacy read-onlyであり、新runでは使用しない。
 
 ```json
 {
