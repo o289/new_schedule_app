@@ -227,4 +227,20 @@ describe("plan renderer", () => {
       expect(markdown).toContain(value);
     }
   });
+
+  it("shows NOT_APPLICABLE presentation without mutating empty JSON lists", () => {
+    const empty = {
+      ...input,
+      apiChanges: [],
+      dbChanges: [],
+      dependencyChanges: [],
+      permissionChanges: [],
+      secretChanges: [],
+      externalSideEffects: [],
+    };
+    const view = createPlanViewModel(empty);
+    expect(view.plan.apiChanges).toEqual([]);
+    expect(renderPlanHtml(view)).toContain("NOT_APPLICABLE: 変更なし");
+    expect(renderPlanMarkdown(view)).toContain("NOT_APPLICABLE: 変更なし");
+  });
 });

@@ -80,7 +80,7 @@ const boundaryChange = changeBase
   .extend({ target: nonEmpty, boundary: nonEmpty, mitigation: nonEmpty })
   .strict();
 
-const changeList = <T extends z.ZodType>(schema: T) => z.array(schema).min(1);
+const changeList = <T extends z.ZodType>(schema: T) => z.array(schema);
 
 const phaseSchema = z
   .object({

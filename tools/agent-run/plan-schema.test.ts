@@ -136,4 +136,22 @@ describe("planSchema", () => {
     });
     expect(() => assertPlanApprovable(rejected)).toThrow();
   });
+
+  it("accepts empty change lists without inserting dummy records", () => {
+    const empty = parsePlan({
+      ...basePlan,
+      apiChanges: [],
+      dbChanges: [],
+      dependencyChanges: [],
+      permissionChanges: [],
+      secretChanges: [],
+      externalSideEffects: [],
+    });
+    expect(empty.apiChanges).toEqual([]);
+    expect(empty.dbChanges).toEqual([]);
+    expect(empty.dependencyChanges).toEqual([]);
+    expect(empty.permissionChanges).toEqual([]);
+    expect(empty.secretChanges).toEqual([]);
+    expect(empty.externalSideEffects).toEqual([]);
+  });
 });

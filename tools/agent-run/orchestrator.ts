@@ -33,10 +33,11 @@ import type {
 } from "../trusted-runner/protocol.js";
 import { TrustedRunnerClient } from "../trusted-runner/client.js";
 import { sanitizeString } from "../trusted-runner/redaction.js";
+import type { PublicationEvidence } from "../trusted-runner/publication-policy.js";
 import {
-  validatePublicationIntent,
-  type PublicationEvidence,
-} from "../trusted-runner/publication-policy.js";
+  buildTrustedPublicationRequest,
+  validateTrustedPublication,
+} from "../trusted-runner/trusted-publication.js";
 
 const actor = z.enum(["planner", "runner", "verifier", "publisher"]);
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -409,24 +410,17 @@ export class TrustedOrchestrator {
       handoff,
       revision: snapshot.revision,
     };
-    const request: PublicationRequest = {
-      protocolVersion: "1",
+    const request = buildTrustedPublicationRequest({
       runId: snapshot.runId,
       planHash: snapshot.planHash,
       revision: snapshot.revision,
-      capability: "publish_approved_sha",
-      args: {
-        targetSha,
-        canonicalContext: {
-          startRecordSha256: contentHash(startRecord),
-          approvalSha256: contentHash(approval),
-          handoffSha256: contentHash(handoff),
-          headSha: targetSha,
-        },
-      },
-      nonce: TrustedRunnerClient.createNonce(),
-    };
-    const intent = validatePublicationIntent(
+      targetSha,
+      plan,
+      approval,
+      startRecord,
+      handoff,
+    });
+    const intent = validateTrustedPublication(
       request,
       evidence,
       (this.io.now ?? (() => new Date()))(),

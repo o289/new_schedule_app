@@ -44,6 +44,10 @@ const markdownEntries = (entries: Entry[]): string[] =>
   entries.flatMap((entry) =>
     Object.entries(entry).map(([key, value]) => `- ${key}: ${value}`),
   );
+const displayChanges = (entries: Entry[]): Entry[] =>
+  entries.length > 0
+    ? entries
+    : [{ status: "NOT_APPLICABLE", description: "NOT_APPLICABLE: 変更なし" }];
 
 export function createPlanViewModel(input: unknown): PlanViewModel {
   const plan = parsePlan(input);
@@ -53,7 +57,7 @@ export function createPlanViewModel(input: unknown): PlanViewModel {
 export function renderPlanHtml(view: PlanViewModel): string {
   const { plan, planHash } = view;
   const changes = (title: string, entries: Entry[]) =>
-    `<section class="doc-section"><h2>${escapeHtml(title)}</h2>${htmlEntries(entries)}</section>`;
+    `<section class="doc-section"><h2>${escapeHtml(title)}</h2>${htmlEntries(displayChanges(entries))}</section>`;
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="plan-id" content="${escapeHtml(plan.planId)}"><meta name="schema-version" content="${plan.schemaVersion}"><meta name="plan-hash" content="${planHash}"><link rel="stylesheet" href="../../styles/documentation.css"><title>${escapeHtml(plan.planId)}</title></head><body><main class="doc-page"><header class="doc-hero"><h1>${escapeHtml(plan.objective)}</h1><p>planId: <code>${escapeHtml(plan.planId)}</code> / runId: <code>${escapeHtml(plan.runId)}</code> / schemaVersion: <code>${plan.schemaVersion}</code> / planHash: <code>${planHash}</code></p></header><section class="doc-section"><h2>目的・前提</h2><p>${escapeHtml(plan.objective)}</p><ul>${htmlList(plan.assumptions)}</ul><h2>Open decisions</h2><ul>${htmlList(plan.openDecisions)}</ul></section><section class="doc-section"><h2>Phases</h2>${plan.phases.map((phase) => `<article class="doc-phase"><h3>${escapeHtml(phase.id)}: ${escapeHtml(phase.name)}</h3><p>${escapeHtml(phase.objective)}</p><h4>Allowed paths</h4><ul>${htmlList(phase.allowedPaths)}</ul><h4>Quality gates</h4><ul>${htmlList(phase.qualityGates)}</ul><h4>Acceptance criteria</h4><ul>${htmlList(phase.acceptanceCriteria)}</ul><h4>Stop conditions</h4><ul>${htmlList(phase.stopConditions)}</ul></article>`).join("")}</section><section class="doc-section"><h2>Paths</h2><h3>Allowed</h3><ul>${htmlList(plan.allowedPaths)}</ul><h3>Forbidden</h3><ul>${htmlList(plan.forbiddenPaths)}</ul></section>${changes("API changes", plan.apiChanges)}${changes("DB changes", plan.dbChanges)}${changes("Dependency changes", plan.dependencyChanges)}${changes("Permission changes", plan.permissionChanges)}${changes("Secret changes", plan.secretChanges)}${changes("External side effects", plan.externalSideEffects)}<section class="doc-section"><h2>Quality and execution</h2><h3>Quality gates</h3><ul>${htmlList(plan.qualityGates)}</ul><h3>Failure policy</h3><p>${escapeHtml(plan.failurePolicy)}</p><h3>Limits</h3>${htmlEntries([Object.fromEntries(Object.entries(plan.limits).map(([key, value]) => [key, String(value)]))])}<h3>Branch / worktree</h3>${htmlEntries([plan.branch])}<h3>Acceptance criteria</h3><ul>${htmlList(plan.acceptanceCriteria)}</ul></section></main></body></html>\n`;
 }
 
@@ -103,12 +107,12 @@ export function renderPlanMarkdown(view: PlanViewModel): string {
     ...plan.forbiddenPaths.map((value) => `- ${value}`),
   );
   for (const [title, entries] of [
-    ["API changes", plan.apiChanges],
-    ["DB changes", plan.dbChanges],
-    ["Dependency changes", plan.dependencyChanges],
-    ["Permission changes", plan.permissionChanges],
-    ["Secret changes", plan.secretChanges],
-    ["External side effects", plan.externalSideEffects],
+    ["API changes", displayChanges(plan.apiChanges)],
+    ["DB changes", displayChanges(plan.dbChanges)],
+    ["Dependency changes", displayChanges(plan.dependencyChanges)],
+    ["Permission changes", displayChanges(plan.permissionChanges)],
+    ["Secret changes", displayChanges(plan.secretChanges)],
+    ["External side effects", displayChanges(plan.externalSideEffects)],
   ] as const)
     lines.push("", `## ${title}`, ...markdownEntries(entries));
   lines.push(

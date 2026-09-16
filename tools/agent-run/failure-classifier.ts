@@ -46,6 +46,17 @@ export type ClassifiedFailure = {
   revokeCapabilities: boolean;
   quarantine: boolean;
 };
+export type CanonicalFailureOutcome = "REPLAN" | "FAILED" | "SAFETY_STOP";
+
+/** Adapts the legacy classifier without changing its public classification. */
+export function toCanonicalFailureOutcome(
+  failure: ClassifiedFailure,
+): CanonicalFailureOutcome {
+  if (failure.classification === "REPLAN_REQUIRED") return "REPLAN";
+  if (failure.classification === "SAFETY_VIOLATION") return "SAFETY_STOP";
+  return "FAILED";
+}
+
 const safeMessage = (code: string): string => `trusted runner failure: ${code}`;
 export function classifyFailure(input: unknown): ClassifiedFailure {
   const failure = failureSchema.parse(input);
