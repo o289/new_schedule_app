@@ -23,7 +23,7 @@ ESLintのみtypescript7.1になるまで、導入を見送る
 project_root/
 ├── apps ← アプリケーションコード(純粋なソースコード)
 ├── packages ← 共通処理
-├── package.json  
+├── package.json
 ├── tsconfig.base.json
 ├── tsconfig.backend.json
 ├── tsconfig.frontend.json
