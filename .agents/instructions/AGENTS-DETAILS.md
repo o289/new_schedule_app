@@ -1,0 +1,59 @@
+# AIエージェント開発フロー
+
+## Canonical plan契約（新規計画）
+
+新規計画の正本はZod検証済み`plan.json`とし、`agent:plan:generate`で`plan-review.html`と`agent-plan.md`を生成する。生成物の手編集は禁止し、修正は入力planへ戻して再生成する。承認は変更単位ごとの`APPROVED`/`NOT_APPLICABLE`、`openDecisions`ゼロ、planHash、approvedBy、approvedAt、expiresAt（最大7日）を確認する。
+
+新規開始はschemaVersion 2のcanonical plan／approval／agent-plan.md参照だけを受理し、v1入力へ暗黙変換しない。既存completed v1開始recordは履歴互換のため保持する。Stage 2導入までは版branch上で実装し、worktree隔離・state machine・trusted runnerは未実装である。
+
+## 役割の選択
+
+Stage 2以降のrun状態はorchestratorのappend-only event logを正本とし、AIが状態ファイルを直接編集してはならない。cleanupは登録済み未公開runだけを`.agents/tools/agent-run/cleanup.ts`経由で実行する。
+
+cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git-common-dir）、run event log、worktree realpath、現在branch、HEADを照合する。statusの伏字、diff概要、event log全量をrun directoryへ保存できた場合だけ、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBは操作しない。証跡保存に失敗した場合は対象を温存して停止する。
+
+依頼内容と現在の工程に応じて、次の役割を選択し、対応する文書に従う。
+
+- 要求整理、直接実装可否の判断、実装計画の作成・修正は[`計画作成エージェント.md`](計画作成エージェント.md)に従う。
+- 承認済み計画または直接実装可能な小規模変更の実装は[`実装エージェント.md`](実装エージェント.md)に従う。
+- 実装結果の検証、品質ゲート判定、DB統合テスト、E2E確認は[`品質管理エージェント.md`](品質管理エージェント.md)に従う。
+- 全フェーズの最終品質PASS後のレビュー資料・branch別公開（push・CI確認、機能branchのみ通常PR作成）は[`PR作成エージェント.md`](PR作成エージェント.md)に従う。
+
+メインが`gpt-6-astra`または`gpt-5.6-sol`の場合の実装委譲と品質ループは、[`MULTI_AGENT_WORKFLOW.md`](.md)を正本とする。書き込みを行うサブエージェントを同時に複数起動しない。
+
+役割は別のプロセスや別のAIであることを必須としない。同じAIが複数工程を担当する場合も、工程を移るたびに現在の役割を明確にし、対応する役割文書を読んで責務を切り替える。
+
+## 引き継ぎフロー
+
+```text
+依頼
+ ↓
+計画作成エージェント
+ ├─ 小規模変更 → 実装エージェント
+ └─ 中規模以上 → 実装計画を提出 → ユーザー承認を待つ
+                                      ↓
+                               実装エージェント
+                         （高モデル時はLuna / Terraへ逐次委譲）
+                                      ↓
+                               品質管理エージェント
+                                ├─ FAIL → 実装エージェントへ差し戻し
+                                └─ PASS → 次フェーズ
+                                           または全フェーズ完了
+                                                  ↓
+                                           PR作成エージェント
+                                                  ↓
+                                ├─ 版branch → push・CI成功で完了
+                                └─ 機能branch → 通常PR完成 → 人間レビュー
+```
+
+- 中規模以上の変更は、ユーザーが実装計画を承認するまで実装へ進まない。
+- 同じ計画書内では、現在フェーズが品質ゲートをPASSしたら追加承認なしで次フェーズへ進む。
+- 品質ゲートがFAILした場合は、品質管理エージェントが原因と再現方法を報告し、実装エージェントが修正する。修正後は品質管理エージェントが必要なゲートを最初から再実行する。
+- 新たな権限、計画外変更、仕様判断が必要になった場合は進行を止め、ユーザーへ報告する。
+- 高モデル時もメインエージェントは計画と品質判定を保持し、実装サブエージェントの完了後に品質管理へ戻る。品質FAIL時の修正は同じ実装役へ差し戻し、メインが再検証する。
+
+## 文書の責務
+
+- 詳細な規則は主担当となる役割文書に一度だけ記載し、他の役割からはリンクで参照する。
+- 判断フロー、計画書形式、品質手順の正本は、それぞれ[`IMPLEMENTATION_DECISION_FLOW.md`](IMPLEMENTATION_DECISION_FLOW.md)、[`IMPLEMENTATION_PLAN_TEMPLATE.md`](IMPLEMENTATION_PLAN_TEMPLATE.md)、[`品質管理.md`](.md)とする。
+- ディレクトリ内に追加の`AGENTS.md`がある場合は、そのディレクトリ固有の指示も併せて適用する。

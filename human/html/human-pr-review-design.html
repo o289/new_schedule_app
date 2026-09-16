@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>人間向けPRレビュー — デザイン案</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <span class="doc-badge">DRAFT PR · feature/v3.2.2 → main</span>
+        <h1>グループ体験と<br />複数端末ログインの改善</h1>
+        <p>
+          2つのタスクを含むPRのレビュー画面例です。最初に判断材料を確認し、タブごとに変更理由・データフロー・検証結果・全文diffを追えます。
+        </p>
+      </header>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Decision Summary</p>
+        <h2>このPRを判断するための要点</h2>
+        <div class="doc-review-summary">
+          <div class="doc-review-metric">
+            <span>Quality gate</span>
+            <strong class="status-success">PASS</strong>
+          </div>
+          <div class="doc-review-metric">
+            <span>Tasks</span>
+            <strong>2件</strong>
+          </div>
+          <div class="doc-review-metric">
+            <span>Risk</span>
+            <strong class="status-danger">重大</strong>
+          </div>
+          <div class="doc-review-metric">
+            <span>DB migration</span>
+            <strong class="status-warning">あり</strong>
+          </div>
+        </div>
+        <div class="doc-alert alert-danger">
+          <strong>最優先レビュー:</strong>
+          認証Sessionと招待Tokenを変更しています。UIより先に、失効条件・権限・migrationを確認してください。
+        </div>
+
+        <div class="doc-tabs" role="tablist" aria-label="PR内のタスク">
+          <button
+            id="tab-overview"
+            class="doc-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="panel-overview"
+            data-tab="overview"
+          >
+            全体
+          </button>
+          <button
+            id="tab-invite"
+            class="doc-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-invite"
+            data-tab="invite"
+          >
+            01 招待リンク
+          </button>
+          <button
+            id="tab-session"
+            class="doc-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-session"
+            data-tab="session"
+          >
+            02 複数端末Session
+          </button>
+        </div>
+      </section>
+
+      <div
+        id="panel-overview"
+        class="doc-tab-panel"
+        role="tabpanel"
+        aria-labelledby="tab-overview"
+        data-panel="overview"
+      >
+        <section class="doc-section">
+          <p class="doc-eyebrow">Pull Request Map</p>
+          <h2>変更全体の地図</h2>
+          <div class="doc-flow doc-flow-columns-nine">
+            <div class="doc-flow-node">招待リンクを開く</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">ログイン状態を確認</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">Tokenを検証</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">グループ参加</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node doc-flow-node-status-success">
+              端末別Sessionを発行
+            </div>
+          </div>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card doc-card-status-warning">
+              <span class="doc-badge doc-badge-status-warning"
+                >TASK 01 · HIGH</span
+              >
+              <h3>招待リンクを主方式へ変更</h3>
+              <p>
+                共有、ログイン後復帰、再発行、旧Token失効を一つの利用フローとして扱います。
+              </p>
+              <p>
+                <strong>主な境界:</strong> URL fragment / Router / Service / DB
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <span class="doc-badge doc-badge-status-danger"
+                >TASK 02 · CRITICAL</span
+              >
+              <h3>複数端末Session</h3>
+              <p>
+                端末ごとのログアウトと全端末ログアウトを分離し、同期済みPasskeyから新しいSessionを作成します。
+              </p>
+              <p>
+                <strong>主な境界:</strong> WebAuthn / refresh token / Session DB
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <p class="doc-eyebrow">Review Route</p>
+          <h2>推奨レビュー順序</h2>
+          <ol class="doc-review-order">
+            <li>
+              <strong>Session失効:</strong>
+              現在端末と全端末の境界が混ざっていないか
+            </li>
+            <li>
+              <strong>招待Token:</strong> 再発行時に旧Tokenが必ず無効になるか
+            </li>
+            <li>
+              <strong>DB migration:</strong> 既存データの扱いとrollback可能性
+            </li>
+            <li>
+              <strong>API契約:</strong> status code、code、Response Schemaの整合
+            </li>
+            <li>
+              <strong>UI:</strong> 未ログイン復帰、Web Share、コピーのfallback
+            </li>
+            <li><strong>テスト:</strong> 重要な失敗経路を直接検証しているか</li>
+          </ol>
+        </section>
+
+        <section class="doc-section">
+          <p class="doc-eyebrow">Completeness Rule</p>
+          <h2>diffの完全性</h2>
+          <div class="doc-alert alert-success">
+            この画面を実際に生成するときは、baseとheadの間に存在する全変更ファイル・全hunk・全追加行・全削除行を各タスクの末尾へ掲載します。
+          </div>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>許可すること</strong>
+              <ul>
+                <li>上部の要約で重要度順に並べ替える</li>
+                <li>ファイルへタスク・リスクのラベルを付ける</li>
+                <li>行番号と構文色で読みやすくする</li>
+              </ul>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <strong>禁止すること</strong>
+              <ul>
+                <li>diffの一部を「重要でない」と省略する</li>
+                <li>長いファイルを途中で打ち切る</li>
+                <li>生成物・lockfile・migrationを除外する</li>
+                <li>タスクへ分類できない差分を隠す</li>
+              </ul>
+            </article>
+          </div>
+          <div class="doc-alert alert-warning">
+            複数タスクへまたがる共通ファイルは、主タスクへ全文を一度掲載し、他タスクから参照します。分類不能な差分は「未分類」として独立タブを自動追加し、PR作成を停止します。
+          </div>
+        </section>
+      </div>
+
+      <div
+        id="panel-invite"
+        class="doc-tab-panel"
+        role="tabpanel"
+        aria-labelledby="tab-invite"
+        data-panel="invite"
+        hidden
+      >
+        <section class="doc-section">
+          <p class="doc-eyebrow">Task 01</p>
+          <h2>招待リンクを主方式へ変更</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>ユーザーへの効果</strong>
+              <p>
+                コード転記を不要にし、共有されたリンクから参加確認まで移動できます。手動コード入力はfallbackとして残します。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>確認すべきリスク</strong>
+              <p>
+                fragmentからTokenを取り出した後の消去、再発行による旧Token失効、オーナー権限の検証。
+              </p>
+            </article>
+          </div>
+          <h3>データフロー</h3>
+          <div class="doc-flow doc-flow-columns-seven">
+            <div class="doc-flow-node">#invite=token</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">Frontendで退避・除去</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">APIで検証</div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node doc-flow-node-status-success">
+              参加を確定
+            </div>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <p class="doc-eyebrow">Evidence</p>
+          <h2>品質ゲート</h2>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>検証</th>
+                  <th>結果</th>
+                  <th>対象</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>typecheck</td>
+                  <td class="status-success">PASS</td>
+                  <td>Frontend / Backend / Tools / Project rules</td>
+                </tr>
+                <tr>
+                  <td>Unit</td>
+                  <td class="status-success">PASS</td>
+                  <td>Token取得、共有fallback、Service失効条件</td>
+                </tr>
+                <tr>
+                  <td>Integration</td>
+                  <td class="status-success">PASS</td>
+                  <td>再発行と旧Token無効化</td>
+                </tr>
+                <tr>
+                  <td>E2E</td>
+                  <td class="status-success">PASS</td>
+                  <td>未ログイン → ログイン → 招待画面復帰</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <p class="doc-eyebrow">Complete Diff · 2 / 2 files</p>
+          <h2>このタスクの全文diff</h2>
+          <div class="doc-alert alert-info">
+            デザイン例のためdiff内容はサンプルです。実運用ではGitから取得した内容を省略せず表示します。
+          </div>
+
+          <article class="doc-diff-file">
+            <header class="doc-diff-header">
+              <span>apps/frontend/features/groups/invite-token.ts</span>
+              <span>+8 −1</span>
+            </header>
+            <div class="doc-diff-scroll">
+              <table class="doc-diff" aria-label="invite-token.ts diff">
+                <tbody>
+                  <tr class="doc-diff-hunk">
+                    <td class="doc-diff-line-number">12</td>
+                    <td class="doc-diff-line-number">12</td>
+                    <td>@@ -12,7 +12,14 @@</td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">12</td>
+                    <td class="doc-diff-line-number">12</td>
+                    <td>
+                      export function readInviteToken(hash: string): string |
+                      null {
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-deletion">
+                    <td class="doc-diff-line-number">13</td>
+                    <td class="doc-diff-line-number"></td>
+                    <td>- return new URLSearchParams(hash).get("invite");</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">13</td>
+                    <td>
+                      + const fragment = hash.startsWith("#") ? hash.slice(1) :
+                      hash;
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">14</td>
+                    <td>
+                      + const token = new
+                      URLSearchParams(fragment).get("invite");
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">15</td>
+                    <td>+</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">16</td>
+                    <td>+ if (token === null || token.length === 0) {</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">17</td>
+                    <td>+ return null;</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">18</td>
+                    <td>+ }</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">19</td>
+                    <td>+</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">20</td>
+                    <td>+ return token;</td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">14</td>
+                    <td class="doc-diff-line-number">21</td>
+                    <td>}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="doc-diff-file">
+            <header class="doc-diff-header">
+              <span>apps/backend/features/groups/service.ts</span>
+              <span>+5 −0</span>
+            </header>
+            <div class="doc-diff-scroll">
+              <table class="doc-diff" aria-label="groups service diff">
+                <tbody>
+                  <tr class="doc-diff-hunk">
+                    <td class="doc-diff-line-number">88</td>
+                    <td class="doc-diff-line-number">88</td>
+                    <td>@@ -88,6 +88,11 @@</td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">88</td>
+                    <td class="doc-diff-line-number">88</td>
+                    <td>
+                      export async function reissueInvite(groupId: string,
+                      ownerId: string) {
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">89</td>
+                    <td class="doc-diff-line-number">89</td>
+                    <td>await assertGroupOwner(groupId, ownerId);</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">90</td>
+                    <td>
+                      + return database.transaction(async (transaction) =&gt; {
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">91</td>
+                    <td>
+                      + await inviteRepository.revokeActive(transaction,
+                      groupId);
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">92</td>
+                    <td>
+                      + return inviteRepository.create(transaction, groupId);
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">93</td>
+                    <td>+ });</td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">90</td>
+                    <td class="doc-diff-line-number">94</td>
+                    <td>}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <div
+        id="panel-session"
+        class="doc-tab-panel"
+        role="tabpanel"
+        aria-labelledby="tab-session"
+        data-panel="session"
+        hidden
+      >
+        <section class="doc-section">
+          <p class="doc-eyebrow">Task 02</p>
+          <h2>複数端末Sessionを維持する</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>ユーザーへの効果</strong>
+              <p>
+                iPhoneとMacなど複数端末で同時ログインでき、現在端末だけ、または全端末を選んでログアウトできます。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <strong>確認すべきリスク</strong>
+              <p>
+                Token
+                rotation、Session所有者、全端末失効範囲、盗難端末からの再利用防止。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <p class="doc-eyebrow">Complete Diff · 1 / 1 files</p>
+          <h2>このタスクの全文diff</h2>
+          <div class="doc-alert alert-info">
+            デザイン例のためdiff内容はサンプルです。省略表示や「残りN行」は使用しません。
+          </div>
+          <article class="doc-diff-file">
+            <header class="doc-diff-header">
+              <span>apps/backend/features/auth/session-service.ts</span>
+              <span>+7 −2</span>
+            </header>
+            <div class="doc-diff-scroll">
+              <table class="doc-diff" aria-label="session service diff">
+                <tbody>
+                  <tr class="doc-diff-hunk">
+                    <td class="doc-diff-line-number">41</td>
+                    <td class="doc-diff-line-number">41</td>
+                    <td>@@ -41,8 +41,13 @@</td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">41</td>
+                    <td class="doc-diff-line-number">41</td>
+                    <td>
+                      export async function logout(userId: string, sessionId:
+                      string) {
+                    </td>
+                  </tr>
+                  <tr class="doc-diff-deletion">
+                    <td class="doc-diff-line-number">42</td>
+                    <td class="doc-diff-line-number"></td>
+                    <td>- await sessionRepository.revokeAll(userId);</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">42</td>
+                    <td>
+                      + await sessionRepository.revokeById(userId, sessionId);
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="doc-diff-line-number">43</td>
+                    <td class="doc-diff-line-number">43</td>
+                    <td>}</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">44</td>
+                    <td>+</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">45</td>
+                    <td>+export async function logoutAll(userId: string) {</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">46</td>
+                    <td>+ await sessionRepository.revokeAll(userId);</td>
+                  </tr>
+                  <tr class="doc-diff-addition">
+                    <td class="doc-diff-line-number"></td>
+                    <td class="doc-diff-line-number">47</td>
+                    <td>+}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <footer class="doc-footer">
+        デザイン用サンプル — 実際のPR生成時は、計画・品質管理結果・Git
+        diffから内容を構成します。
+      </footer>
+    </main>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll("[data-tab]"));
+      const panels = Array.from(document.querySelectorAll("[data-panel]"));
+
+      function selectTab(selectedTab) {
+        const selectedId = selectedTab.dataset.tab;
+
+        for (const tab of tabs) {
+          const isSelected = tab === selectedTab;
+          tab.setAttribute("aria-selected", String(isSelected));
+          tab.tabIndex = isSelected ? 0 : -1;
+        }
+
+        for (const panel of panels) {
+          panel.hidden = panel.dataset.panel !== selectedId;
+        }
+      }
+
+      for (const tab of tabs) {
+        tab.addEventListener("click", () => selectTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const currentIndex = tabs.indexOf(tab);
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const nextIndex =
+            (currentIndex + direction + tabs.length) % tabs.length;
+          tabs[nextIndex].focus();
+          selectTab(tabs[nextIndex]);
+        });
+      }
+    </script>
+  </body>
+</html>

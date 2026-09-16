@@ -31,7 +31,7 @@ export default defineConfig({
       {
         test: {
           name: "tools",
-          include: ["tools/**/*.test.ts"],
+          include: ["tools/**/*.test.ts", ".agents/tools/**/*.test.ts"],
           environment: "node",
         },
       },

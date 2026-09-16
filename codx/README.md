@@ -16,7 +16,7 @@ credential失効、socket切断、checker failure、remote/branch不一致では
 
 ## Canonical planとの境界
 
-新規計画の正本はZod検証済み`plan.json`、生成物は`docs/agent-runs/<runId>/plan-review.html`と`agent-plan.md`である。生成物の手編集は禁止し、planHashと承認record（approvedBy、approvedAt、expiresAt、最大7日）を開始・公開時に再検証する。新規開始はschemaVersion 2のみを受理し、completed済みschemaVersion 1の開始recordだけは履歴互換として読み取る。Stage 2導入前は版branch上の暫定運用で、worktree／state machine／trusted runnerは未実装である。
+新規計画の正本はZod検証済み`plan.json`、生成物は`ai/runs/<runId>/plan-review.html`と`agent-plan.md`である。生成物の手編集は禁止し、planHashと承認record（approvedBy、approvedAt、expiresAt、最大7日）を開始・公開時に再検証する。新規開始はschemaVersion 2のみを受理し、completed済みschemaVersion 1の開始recordだけは履歴互換として読み取る。Stage 2導入前は版branch上の暫定運用で、worktree／state machine／trusted runnerは未実装である。
 
 ## 配置とRules
 
@@ -26,7 +26,7 @@ credential失効、socket切断、checker failure、remote/branch不一致では
 
 ```sh
 codex execpolicy check --pretty --rules codx/rules/pr-agent.rules -- git status
-codex execpolicy check --pretty --rules codx/rules/pr-agent.rules -- ./tools/pr-agent-publish
+codex execpolicy check --pretty --rules codx/rules/pr-agent.rules -- ./.agents/tools/pr-agent-publish
 codex execpolicy check --pretty --rules codx/rules/pr-agent.rules -- git push origin main
 codex execpolicy check --pretty --rules codx/rules/pr-agent.rules -- gh pr create
 ```
@@ -37,7 +37,7 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 ## 実装開始の記録
 
-規模の正本は[判断フロー](../IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`docs/agent-plan-input.json`を入力に`./tools/agent-plan-generate`で生成し、`docs/agent-runs/<runId>/`へ`plan.json`、`plan-review.html`、`agent-plan.md`、最後にmanifestを保存する。`./tools/agent-plan-approve`はapproval inputを検証してapproval recordを作成する。開始処理は`./tools/pr-agent-start`（引数なし）で、入力は`docs/pr-agent-start-input.json`、出力は入力のrunIdから導出した`docs/agent-runs/<runId>/start.json`である。旧`docs/pr-agent-start-record.json`は新runでは使用しない。
+規模の正本は[判断フロー](../.agents/instructions/IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`ai/runs/<runId>/plan.source.json`を入力に`./.agents/tools/agent-plan-generate`で生成し、`ai/runs/<runId>/`へ`plan.json`、`plan-review.html`、`agent-plan.md`、最後にmanifestを保存する。`./.agents/tools/agent-plan-approve`はapproval inputを検証してapproval recordを作成する。開始処理は`./.agents/tools/pr-agent-start`（引数なし）で、入力は`ai/runs/<runId>/start-input.json`、出力は入力のrunIdから導出した`ai/runs/<runId>/start.json`である。旧`docs/pr-agent-start-record.json`は新runでは使用しない。
 
 ```json
 {
@@ -83,7 +83,7 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 ## 公開入力（schemaVersion 2）
 
-正本は[公開処理のhandoffSchema](../tools/pr-agent-publish.ts)。旧version 1は暗黙変換せずSTOPする。開始v2と公開v2は別schemaとして検証する。
+正本は[公開処理のhandoffSchema](../.agents/tools/pr-agent-publish.ts)。旧version 1は暗黙変換せずSTOPする。開始v2と公開v2は別schemaとして検証する。
 
 入力は`docs/pr-agent-handoff.json`。品質管理PASS後、実装引き継ぎ・品質証跡には同じhead SHAを記録する。開始記録のmode/head/reviewBaseSha/plan参照が公開入力と一致することを確認する。承認済み計画snapshotのhashを変えない。artifactは非空のUTF-8ファイルをdocs内へ置き、hashを`shasum -a 256 <file>`で取得する。docs外へのsymlinkは拒否する。これらのhashは改変検出であり、品質判定の真正性や分類の意味を保証する署名ではない。
 
@@ -99,7 +99,7 @@ push_onlyはPR base・baseSha・prReview・title・bodyを持たない。以下�
   "headSha": "品質確認した40桁SHA",
   "reviewBaseSha": "実装開始前の40桁SHA",
   "start": {
-    "path": "docs/agent-runs/<runId>/start.json",
+    "path": "ai/runs/<runId>/start.json",
     "sha256": "64桁のSHA-256"
   },
   "plan": {
@@ -151,7 +151,7 @@ push_onlyはPR base・baseSha・prReview・title・bodyを持たない。以下�
     "noUnapprovedChanges": true,
     "destructiveMigrationApproved": true,
     "html": {
-      "path": "docs/html/review.html",
+      "path": "human/html/review.html",
       "sha256": "64桁のSHA-256"
     }
   }
@@ -170,7 +170,7 @@ pull_requestではbaseをheadの末尾から自動導出する。次のheadな�
   "headSha": "品質確認した40桁SHA",
   "reviewBaseSha": "実装開始前の40桁SHA",
   "start": {
-    "path": "docs/agent-runs/<runId>/start.json",
+    "path": "ai/runs/<runId>/start.json",
     "sha256": "64桁のSHA-256"
   },
   "plan": {
@@ -222,7 +222,7 @@ pull_requestではbaseをheadの末尾から自動導出する。次のheadな�
     "noUnapprovedChanges": true,
     "destructiveMigrationApproved": true,
     "html": {
-      "path": "docs/html/review.html",
+      "path": "human/html/review.html",
       "sha256": "64桁のSHA-256"
     }
   },
@@ -262,7 +262,7 @@ shasum -a 256 docs/pr-full.diff
 
 ## 公開と再実行
 
-公開mutationはorchestratorがtrusted runnerへ渡すcanonical requestだけで行う。`./tools/pr-agent-publish`はhandoff schemaのモジュールであり、直接起動はSTOPする。runnerはpolicy固定のorigin・repository・branchだけを使い、callerからremote、refspec、shell、env、pathを受け取らない。remoteが先行・分岐していたらforceせずSTOPする。remote commitがローカルに未取得で祖先性を確認できない場合もSTOPし、実装側で取得してから再検証する。branchが未作成なら新規push、同一SHAなら再pushを省略する。tag追随・mirror・削除は行わない。
+公開mutationはorchestratorがtrusted runnerへ渡すcanonical requestだけで行う。`./.agents/tools/pr-agent-publish`はhandoff schemaのモジュールであり、直接起動はSTOPする。runnerはpolicy固定のorigin・repository・branchだけを使い、callerからremote、refspec、shell、env、pathを受け取らない。remoteが先行・分岐していたらforceせずSTOPする。remote commitがローカルに未取得で祖先性を確認できない場合もSTOPし、実装側で取得してから再検証する。branchが未作成なら新規push、同一SHAなら再pushを省略する。tag追随・mirror・削除は行わない。
 
 - push_onlyはPR一覧取得もPR作成も呼ばない。remoteの同一SHAとCI成功で完了する。結果はmode/head/headSha/ciUrl。
 - pull_requestはheadから導出した版branchへ通常PRを作る。結果は上記にbase/prUrlを追加。同一base/head/SHAの通常PRを再利用し、Draft・閉じたPR・異なるbase/head・重複はSTOPする。既存PRの本文・状態は変更しない。
@@ -275,4 +275,4 @@ push後のCI失敗・待機・PR応答不明時はpush済み状態を残して�
 
 ## Stage 2の状態管理とcleanup
 
-`tools/agent-run/cleanup.ts`は固定された`.agent-runs/<runId>`のevent logとworktree markerを読み、Gitの実体（repository realpath、git-common-dir、task branch、開始SHA、HEAD）を再確認する。公開済み・終端・安全隔離中、登録外またはsymlink/path escapeの対象は停止する。statusを伏字化した証跡、diff概要、event log全量をrun directoryへ保存できた後に限り、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBには書き込まない。
+`.agents/tools/agent-run/cleanup.ts`は固定された`.agent-runs/<runId>`のevent logとworktree markerを読み、Gitの実体（repository realpath、git-common-dir、task branch、開始SHA、HEAD）を再確認する。公開済み・終端・安全隔離中、登録外またはsymlink/path escapeの対象は停止する。statusを伏字化した証跡、diff概要、event log全量をrun directoryへ保存できた後に限り、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBには書き込まない。

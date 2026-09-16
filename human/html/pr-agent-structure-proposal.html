@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR作成タスクエージェント 構造提案</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <span class="doc-badge">PR Agent / Human Interface Proposal</span>
+        <h1>PR作成タスクエージェント<br />構造提案</h1>
+        <p>
+          AIの実装結果をそのまま渡すのではなく、人間が「承認できるか」を短時間で判断できる情報へ圧縮する。
+          現在の計画・実装・品質管理フローの後段に置く、第4の役割として設計する。
+        </p>
+      </header>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Conclusion</p>
+        <h2>提案の結論</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>追加する文書</strong>
+            <p>
+              <code>PR作成エージェント.md</code>を役割規則の正本として追加する。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>開始条件</strong>
+            <p>
+              全Phase完了かつ品質管理エージェントの最終判定がPASSした後だけ起動する。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>自律実行の終点</strong>
+            <p>
+              レビューHTMLと完成品質のPR本文を生成し、push・CI確認・通常PR作成まで停止せず進める。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-info">
+          PR
+          Agentの本質は「文章を書くこと」ではなく、変更・検証・リスクを、人間が判断する順序へ再構成すること。
+          コードレビューや品質管理の代替にはしない。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Current Workflow</p>
+        <h2>現在の3役へ、PR Agentを接続する</h2>
+        <div class="doc-flow doc-flow-columns-seven">
+          <div class="doc-flow-node">計画作成<br />要求・範囲・完了条件</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">実装<br />承認範囲だけ変更</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            品質管理<br />最終PASS判定
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-special">
+            PR Agent<br />判断材料へ圧縮
+          </div>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>既存フローから受け取れるもの</strong>
+            <ul>
+              <li>承認済み実装計画と全Phase完了条件</li>
+              <li>実装エージェントの変更・テスト・DB変更の引き継ぎ</li>
+              <li>品質管理エージェントのコマンド、結果、未実行理由</li>
+              <li>Gitの差分、コミット、変更ファイル</li>
+            </ul>
+          </article>
+          <article class="doc-card">
+            <strong>PR Agentから人間へ渡すもの</strong>
+            <ul>
+              <li>何を解決した変更か</li>
+              <li>ユーザー体験とデータフローがどう変わったか</li>
+              <li>どこが危険で、どの順番でレビューすべきか</li>
+              <li>何が検証済みで、何が未確認か</li>
+            </ul>
+          </article>
+        </div>
+        <h3>品質管理PASS後の自律フロー</h3>
+        <div class="doc-pipeline doc-pipeline-columns-four">
+          <article class="doc-pipeline-stage">
+            <strong>1. 対象確定</strong>
+            <p>base / headを確定し、PR対象の全Git diffを取得する。</p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>2. 照合・分類</strong>
+            <p>
+              計画・STEPと照合し、全hunkをSTEP / 共通 / 未分類へ100%分類する。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-special">
+            <strong>3. 成果物生成</strong>
+            <p>
+              リスクを整理し、全diffを含むレビューHTMLと完成品質のPR本文を生成する。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-success">
+            <strong>4. PR完成</strong>
+            <p>
+              許可されたheadをpushし、CIを確認してGitHub上へ通常PRを作成する。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Role Boundary</p>
+        <h2>責務分離</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>担当</th>
+                <th>判断・処理</th>
+                <th>PR工程での位置付け</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>計画作成エージェント</td>
+                <td>目的、対象、対象外、完了条件、必要なテストを定義</td>
+                <td>「何を作ると承認したか」の正本</td>
+              </tr>
+              <tr>
+                <td>実装エージェント</td>
+                <td>承認範囲を実装し、変更内容を引き継ぐ</td>
+                <td>実装事実の一次情報</td>
+              </tr>
+              <tr>
+                <td>品質管理エージェント</td>
+                <td>
+                  完了条件、型、Unit、Integration、E2E、DBをPASS / FAIL判定
+                </td>
+                <td>検証事実の一次情報</td>
+              </tr>
+              <tr>
+                <td><strong>PR作成エージェント</strong></td>
+                <td>
+                  計画・実装・検証・全Git差分を照合し、HTML・PR本文・push・CI確認・通常PR作成まで自律実行
+                </td>
+                <td>完成したPRと人間のレビューをつなぐHuman Interface</td>
+              </tr>
+              <tr>
+                <td>プログラム / CI</td>
+                <td>コマンド実行、差分集計、禁止事項、CI statusを機械判定</td>
+                <td>事実の改変を防ぐゲート</td>
+              </tr>
+              <tr>
+                <td>人間</td>
+                <td>完成したPRを読み、仕様、リスク許容、マージ可否を判断</td>
+                <td>PR作成者ではなくReviewer・最終意思決定者</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-alert alert-warning">
+          PR
+          Agentは品質ゲートを自分でPASSに変更しない。失敗や不足を見つけた場合は、実装または品質管理へ差し戻す。
+        </div>
+        <div class="doc-alert alert-success">
+          START条件を満たした後は、通常の人間確認を挟まず通常PR完成まで進む。実装完了をレビュー可能なPRが作成された状態と定義し、人間の最初の作業は完成したPRのレビューとする。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Entry Gate</p>
+        <h2>開始前に満たす条件</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-success">
+            <span class="doc-badge doc-badge-status-success">START</span>
+            <h3>すべて満たす場合</h3>
+            <ul>
+              <li>承認済み計画の全Phaseが完了</li>
+              <li>最終<code>pnpm verify:phase</code>がPASS</li>
+              <li>必要なIntegration / E2EがPASS</li>
+              <li>DB・依存・設定・生成物の有無が明記済み</li>
+              <li>計画外差分がない、または別差分として識別済み</li>
+              <li>headが許可された<code>feature/</code>形式に一致する</li>
+              <li>PRのbase branchを事実から特定できる</li>
+            </ul>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <span class="doc-badge doc-badge-status-danger">STOP</span>
+            <h3>一つでも該当する場合</h3>
+            <ul>
+              <li>品質管理がFAILまたは未判定</li>
+              <li>未実行テストに根拠がない</li>
+              <li>秘密情報、デバッグ、<code>.only</code>等を検出</li>
+              <li>説明できない差分や計画外変更がある</li>
+              <li>破壊的migrationに承認・復旧方針がない</li>
+              <li>base branchやpush対象が曖昧</li>
+              <li>push後の必須CIがFAIL・未完了・対象SHA不一致</li>
+              <li>安全にpushまたは通常PR作成できない</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Agent Procedure</p>
+        <h2><code>PR作成エージェント.md</code>の推奨構造</h2>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <h3>役割と禁止事項</h3>
+            <p>
+              人間の判断支援が目的であること、品質管理の代替ではないことを最初に固定する。
+            </p>
+            <ul>
+              <li>実装、テスト修正、migration生成を行わない</li>
+              <li><code>main</code>を直接変更しない</li>
+              <li>force push、reset、rebase、任意の履歴改変を行わない</li>
+              <li>検証していない内容をPASSと書かない</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <h3>入力と開始条件</h3>
+            <p>
+              計画書、実装引き継ぎ、品質管理PASS報告、Git差分、必要時の画面証跡を必須入力として列挙する。
+            </p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">3</div>
+          <div>
+            <h3>全diffの取得・照合・100%分類</h3>
+            <p>
+              base...headのPR対象diff全体を母集団とし、承認済み計画のSTEP /
+              Phase / 完了条件へhunk単位で割り当てる。事実とAIの解釈を分離する。
+            </p>
+            <ul>
+              <li>計画した変更 ↔ 実際の差分</li>
+              <li>完了条件 ↔ テストまたは実行証跡</li>
+              <li>対象外 ↔ 混入していないこと</li>
+              <li>全hunk ↔ STEP / 共通変更 / 未分類変更</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">4</div>
+          <div>
+            <h3>リスク分類とレビュー順序</h3>
+            <p>変更量よりリスクを優先し、重大領域から読める順序を生成する。</p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">5</div>
+          <div>
+            <h3>レビューHTMLとPR本文の生成</h3>
+            <p>
+              HTMLは全diffを保持した理解の地図、PR本文はそのまま採用できる完成品として、同じ根拠から生成する。HTMLは現在の規則どおり<code>docs/html/</code>へ置き、Git管理しない。
+            </p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">6</div>
+          <div>
+            <h3>push・CI・通常PR</h3>
+            <p>
+              許可されたfeature系headだけをpushし、そのcommit
+              SHAで起動したCIを確認して通常PRを作成する。機能branchのbaseは対応するfeature/v系branchへ固定し、STOP条件がなければ事前の人間承認は要求しない。
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Diff Completeness</p>
+        <h2>PR対象diffの定義と完全性</h2>
+        <div class="doc-alert alert-info">
+          <strong>全diff</strong>とは、1ファイルの全行ではなく、<code
+            >git diff base...head</code
+          >相当で得られるPR対象変更全体を指す。production
+          code、test、migration、生成物、package.json、lockfile、設定、CI/CD、文書、refactor、format変更を除外しない。
+        </div>
+        <pre><code>PR全体のdiff = 100%
+│
+├─ STEP 1のdiff
+├─ STEP 2のdiff
+├─ STEP 3のdiff
+├─ 共通変更
+└─ 未分類変更
+
+全hunk数 = STEP別hunk + 共通hunk + 未分類hunk</code></pre>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-success">
+            <strong>分割してよい</strong>
+            <p>
+              一つのファイルに複数STEPの変更がある場合、hunk単位で各STEPへ分ける。説明量はリスクに応じて圧縮できる。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <strong>省略してはいけない</strong>
+            <p>
+              重要度が低い、生成物である、長いという理由で母集団から除外しない。分類できないdiffを近いSTEPへ押し込まない。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-danger">
+          <strong>UNCLASSIFIED DIFF:</strong>
+          どのSTEPにも対応しないhunkは専用区分へ表示する。共通変更として説明できなければ計画外diffとしてPR作成をSTOPする。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Risk First</p>
+        <h2>変更量ではなくリスクで情報量を変える</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>レベル</th>
+                <th>このプロジェクトでの対象</th>
+                <th>HTMLに必須の情報</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="status-danger">重大</span></td>
+                <td>
+                  Passkey、認証、Session、権限、Token、秘密情報、破壊的DB変更
+                </td>
+                <td>
+                  脅威・失敗時影響、境界、関連テスト、レビュー必須箇所、復旧方法
+                </td>
+              </tr>
+              <tr>
+                <td><span class="status-warning">高</span></td>
+                <td>
+                  DB schema / migration、API契約、日時、Transaction、CI/CD
+                </td>
+                <td>
+                  Before / After、互換性、データ影響、実行順序、rollback可否
+                </td>
+              </tr>
+              <tr>
+                <td><span class="status-info">中</span></td>
+                <td>
+                  TanStack Query cache、画面state、ユーザーフロー、Router /
+                  Service / Repository
+                </td>
+                <td>データフロー、影響画面、維持した既存動作、回帰テスト</td>
+              </tr>
+              <tr>
+                <td><span class="doc-muted">低</span></td>
+                <td>文言、文書、テスト整理、挙動を変えないリファクタ</td>
+                <td>目的、範囲、検証結果を簡潔に記載</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-alert alert-danger">
+          認証やDB変更は、差分が数行でも重大扱いにする。大量のREADME変更より先にレビュー対象へ出す。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Review HTML</p>
+        <h2>生成するレビューHTMLの情報構造</h2>
+        <div class="doc-pipeline doc-pipeline-columns-four">
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-success">
+            <strong>1. 判断サマリー</strong>
+            <p>
+              目的、品質状態、総合リスク、DB変更、依存変更、未確認事項を最初の画面に集約。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage">
+            <strong>2. 変更の地図</strong>
+            <p>
+              ユーザーフローと、Frontend → API → Service → Repository →
+              DBの関係を図解。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>3. 重要変更</strong>
+            <p>
+              リスク順に、変更理由、Before /
+              After、関連ファイル、関連テストを表示。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-special">
+            <strong>4. STEP別全diff</strong>
+            <p>
+              タブとナビゲーションでSTEPを分け、共通・未分類を含む全hunkを省略せず掲載。
+            </p>
+          </article>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>必須セクション</strong>
+            <ol>
+              <li>目的とユーザーへの効果</li>
+              <li>計画との一致・対象外</li>
+              <li>アーキテクチャ / データフロー</li>
+              <li>リスク別の重要変更</li>
+              <li>API / DB / 認証 / 日時への影響</li>
+              <li>テスト証跡</li>
+              <li>レビュー推奨順序</li>
+              <li>STEP / Phase別の全diff</li>
+              <li>共通変更とUNCLASSIFIED DIFF</li>
+              <li>未確認事項とrollback</li>
+              <li>独立タスクが複数ある場合のタスク別タブ</li>
+            </ol>
+          </article>
+          <article class="doc-card">
+            <strong>表示の圧縮ルール</strong>
+            <ul>
+              <li>
+                PASSしたformat / lint / typecheck / testの生ログは要約する
+              </li>
+              <li>FAIL / SKIP / 部分実行 / 証跡不足は詳細表示する</li>
+              <li>低リスク変更は説明を短くしてよいが、diffは省略しない</li>
+              <li>同じ説明をPR本文とHTMLで重複させすぎない</li>
+              <li>証拠のない評価語を避ける</li>
+              <li>人間が決める必要のある項目を埋もれさせない</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">PR Body</p>
+        <h2>PR本文の推奨テンプレート</h2>
+        <pre><code>## 目的
+ユーザーまたは運用上の課題と、この変更で得られる結果
+
+## ユーザーへの影響
+- 新しくできること
+- 維持される既存動作
+- 操作・互換性への影響
+
+## 変更の全体像
+- ユーザーフロー
+- Frontend / Backend / DBの責務ごとの変更
+
+## STEPごとの変更概要
+- STEP / Phase名、完了条件、対応する主なdiff
+
+## 重要な変更とリスク
+- CRITICAL / HIGH / MEDIUM / LOW
+- 関連ファイルと確認観点
+
+## 契約・データへの影響
+- API: あり / なし
+- DB migration: あり / なし
+- 認証・Session: あり / なし
+- 依存・設定: あり / なし
+
+## 検証結果
+- format: PASS / FAIL / 未実行
+- typecheck: PASS / FAIL / 未実行
+- Unit: 実行範囲と件数
+- Integration: 実行範囲または不要理由
+- E2E: 実行範囲または不要理由
+- CI: workflow名、commit SHA、結果
+
+## Integration / E2Eの範囲
+- 実行した主要フロー、対象ブラウザ、未実行項目と理由
+
+## レビュー推奨順序
+1. 最重要ロジック
+2. API・DB・認証境界
+3. UIと状態管理
+4. Test
+
+## 対象外・未確認・rollback
+- 今回変更していないこと
+- 人間の確認が必要なこと
+- 問題発生時の戻し方</code></pre>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Project Specific Findings</p>
+        <h2>現プロジェクトへ適用するときの注意</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-warning">
+            <strong>PRイベントではCIが起動しない</strong>
+            <p>
+              現在の<code>.github/workflows/ci.yml</code>は全ブランチのpushで起動し、Pull
+              Requestイベントでは起動しない。 PR Agentはhead
+              branchをpushした後、そのcommit SHAのCI結果を証跡にする必要がある。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>E2EはmainのCIだけ</strong>
+            <p>
+              Branch CIではformat・typecheck・Unit
+              Testまで。PR前にE2Eが必要な変更は、品質管理エージェントがローカルで
+              <code>./tools/run-e2e</code>を実行した証跡を必須にする。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <strong>branch種別ごとにbaseを確定する</strong>
+            <p>
+              <code>feature/&lt;機能名&gt;-vX.Y.Z</code
+              >のbaseは、同じバージョンの<code>feature/vX.Y.Z</code>へ固定する。
+              <code>feature/vX.Y.Z</code
+              >のbaseは、upstream、merge-base、承認済み計画の明示情報で一意に決まらなければSTOPする。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>既存品質ゲートを再利用できる</strong>
+            <p>
+              <code>pnpm verify:phase</code>、DB
+              Integration、<code>./tools/run-e2e</code>が既に定義済み。 PR
+              Agentは再発明せず、品質管理の結果を読み取る。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-info">
+          将来の改善候補として、CIへ<code>pull_request</code>トリガーを追加し、PR上で必須checkとして見えるようにすると、push結果との対応付けを人が追う負担を減らせる。
+          これはPR Agent文書の作成とは別タスクで検討する。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Git Safety</p>
+        <h2>Git・GitHub操作の安全境界</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>操作</th>
+                <th>推奨</th>
+                <th>ルール</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>status / diff / log / merge-base</td>
+                <td><span class="status-success">自動実行可</span></td>
+                <td>読み取り専用。base / head / 対象差分の確定に使用。</td>
+              </tr>
+              <tr>
+                <td>現在branchのpush</td>
+                <td><span class="status-warning">条件付き</span></td>
+                <td>
+                  許可された2種類のfeature系branchだけ。remote・追跡先を検証し、forceは禁止。
+                </td>
+              </tr>
+              <tr>
+                <td>通常PR作成</td>
+                <td><span class="status-success">自律実行可</span></td>
+                <td>
+                  既存PRの重複確認後、確定したbase /
+                  headで作成。機能branchは対応するfeature/v系branchをbaseに固定する。
+                </td>
+              </tr>
+              <tr>
+                <td>merge</td>
+                <td><span class="status-danger">人間の判断</span></td>
+                <td>
+                  レビューHTMLは判断材料。merge権限はPR Agentへ持たせない。
+                </td>
+              </tr>
+              <tr>
+                <td>reset / rebase / force push / branch削除</td>
+                <td><span class="status-danger">禁止</span></td>
+                <td>PR生成に不要で、履歴やユーザー差分を破壊しうる。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-flow doc-flow-columns-nine">
+          <div class="doc-flow-node">品質管理PASS</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">HTML・本文生成</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">push・CI確認</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-special">通常PR</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            人間レビュー
+          </div>
+        </div>
+        <div class="doc-alert alert-danger">
+          Approve、Merge、branch削除、force push、reset、rebaseはPR
+          Agentの権限外とする。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Codex Exec Policy</p>
+        <h2><code>~/.codex/rules/</code>の最終構成</h2>
+        <p>
+          Codex
+          Rulesは、sandbox外で実行するコマンドを<code>allow</code>、<code>prompt</code>、<code>forbidden</code>へ分類する仕組みである。
+          PR
+          Agentの判断手順は<code>PR作成エージェント.md</code>、実行権限はRulesに分離する。
+          設定先は<code>~/.codex/rules/pr-agent.rules</code>とし、追加後はCodexを再起動する。
+        </p>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>読み取りはallow</strong>
+            <p>
+              Git差分、branch、既存PR、CI結果など、外部状態を変更しない読み取り操作。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>専用PR処理はallow</strong>
+            <p>
+              branchとPR先を機械検証する、引数なしのプロジェクト専用処理だけに書き込み権限を与える。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <strong>直接操作はforbidden</strong>
+            <p>
+              直接のpush・PR作成、Merge、履歴改変、force
+              push、branch削除は実行不能にする。
+            </p>
+          </article>
+        </div>
+        <h3>最終Rules案</h3>
+        <pre><code># ~/.codex/rules/pr-agent.rules
+
+# Gitの読み取り
+prefix_rule(
+    pattern = ["git", ["status", "diff", "log", "show", "merge-base", "rev-parse", "ls-files"]],
+    decision = "allow",
+    justification = "PR対象差分とbranch情報の読み取りに限定する。",
+)
+
+# GitHub認証、PR、CIの読み取り
+prefix_rule(
+    pattern = ["gh", "auth", "status"],
+    decision = "allow",
+    justification = "GitHub認証状態の確認に限定する。",
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", ["list", "view", "diff"]],
+    decision = "allow",
+    justification = "既存PRとPR差分の読み取りに限定する。",
+)
+
+prefix_rule(
+    pattern = ["gh", "run", ["list", "view"]],
+    decision = "allow",
+    justification = "GitHub Actionsの状態と結果の読み取りに限定する。",
+)
+
+# branch・PR先を検証するプロジェクト専用処理だけ、自律実行を許可する
+prefix_rule(
+    pattern = ["/Users/iamboku/Develop/new_schedule_app/tools/pr-agent-publish"],
+    decision = "allow",
+    justification = "検証済みのnew_schedule_app専用PR公開処理だけを自動許可する。",
+)
+
+# 専用処理を迂回する書き込みは禁止する
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "未検証のbranchを直接pushできないようにする。",
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "create"],
+    decision = "forbidden",
+    justification = "検証済みの専用処理以外からPRを作成できないようにする。",
+)
+
+# PR Agentの責務外
+prefix_rule(
+    pattern = ["gh", "pr", ["merge", "close", "reopen", "ready", "review"]],
+    decision = "forbidden",
+    justification = "PR Agentは通常PR作成後の判断や状態変更を行わない。",
+)
+
+prefix_rule(
+    pattern = ["git", ["reset", "rebase", "clean"]],
+    decision = "forbidden",
+    justification = "作業内容や履歴を破壊しうる操作を禁止する。",
+)
+
+prefix_rule(
+    pattern = ["git", "branch", ["-d", "-D", "--delete"]],
+    decision = "forbidden",
+    justification = "PR Agentによるbranch削除を禁止する。",
+)</code></pre>
+        <h3>通常PRまで自律実行する専用処理</h3>
+        <div class="doc-flow doc-flow-columns-seven">
+          <div class="doc-flow-node">品質管理PASS</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">専用PR処理<br />対象・branch検証</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">push・通常PR作成</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            人間レビュー
+          </div>
+        </div>
+        <p>
+          引数を受け取らない<code>/Users/iamboku/Develop/new_schedule_app/tools/pr-agent-publish</code>を追加し、
+          その処理内でrepository、remote、base、head、品質証跡、既存PR、force不使用を検証する。
+          検証後に限って現在branchをpushし、通常PRを作成する。
+        </p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>現在branch</th>
+                <th>push</th>
+                <th>通常PRのbase</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <code
+                    >feature/v&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code
+                  >
+                </td>
+                <td><span class="status-success">許可</span></td>
+                <td>
+                  承認済み計画、upstream、merge-baseから一意に確定したbranch。推測できない場合はSTOP。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code
+                    >feature/&lt;機能名&gt;-v&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code
+                  >
+                </td>
+                <td><span class="status-success">許可</span></td>
+                <td>
+                  <code>feature/v&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code
+                  >へ固定。末尾のバージョンと一致しない場合はSTOP。
+                </td>
+              </tr>
+              <tr>
+                <td>上記2形式以外</td>
+                <td><span class="status-danger">禁止</span></td>
+                <td>PRを作成しない。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-alert alert-danger">
+          <strong>push可能なのはfeature系branchだけ。</strong>
+          許可形式を<code>feature/v&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code>、または
+          <code
+            >feature/&lt;機能名&gt;-v&lt;major&gt;.&lt;minor&gt;.&lt;patch&gt;</code
+          >に限定する。
+          <code>main</code>、<code>release</code>、その他のbranch、detached
+          HEADからはpushもPR作成も行わない。
+          機能branchは、branch名末尾から対応バージョンを取得し、同じバージョンの<code>feature/v系</code>branchだけをPR先にする。
+        </div>
+        <div class="doc-alert alert-warning">
+          <code>prefix_rule</code
+          >だけではbranch名やPR先を検証できないため、これらの制約は専用PR処理で強制する。
+          Rulesは専用処理だけをsandbox外で許可し、直接の<code>git push</code
+          >と<code>gh pr create</code>を禁止する境界として使う。
+        </div>
+        <div class="doc-alert alert-info">
+          Rulesは実験的機能である。導入前に<code
+            >codex execpolicy check --pretty --rules &lt;rules-file&gt; --
+            &lt;command&gt;</code
+          >で allow / prompt /
+          forbiddenの判定を確認し、Codex更新時にも再検証する。 仕様根拠は<a
+            href="https://learn.chatgpt.com/docs/agent-configuration/rules?translationFallback=ja-JP"
+            >OpenAI公式Codex Rules</a
+          >を正本とする。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Files</p>
+        <h2>既存文書への最小変更案</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong><code>AGENTS.md</code></strong>
+            <p>
+              役割一覧へPR作成エージェントを1行追加し、引き継ぎ図を「品質管理PASS
+              → PR Agent →
+              人間レビュー」へ延長する。詳細ルールは重複記載しない。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong><code>PR作成エージェント.md</code></strong>
+            <p>
+              役割、開始条件、入力、照合、リスク分類、成果物、Git安全規則、STOP条件、完了報告を集約する正本。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong><code>品質管理エージェント.md</code></strong>
+            <p>
+              PASS報告の引き継ぎ先としてPR
+              Agentをリンクするだけに留める。既存の検証規則は動かさない。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>将来の機械化</strong>
+            <p>
+              全hunkの識別子と分類後の集合を照合し、100%対応を専用scriptで強制する。CI取得・HTML生成も安定後に機械化できる。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-warning">
+          <code>docs/</code
+          >は現在の規則でGit管理禁止。レビューHTMLをPR参加者へ共有したい場合は、GitHub
+          Actions
+          Artifact、PRコメント内要約、または別の安全な一時公開先が必要になる。
+          初版ではローカルレビュー用と割り切るのが最小構成。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Adoption</p>
+        <h2>段階導入の提案</h2>
+        <div class="doc-pipeline doc-pipeline-columns-four">
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-success">
+            <strong>Stage 1</strong>
+            <p>
+              MD、専用PR処理、Rulesを追加。許可branchの検証からpush・CI確認・通常PR完成まで一貫して担当。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage">
+            <strong>Stage 2</strong>
+            <p>
+              全hunkの100%分類、未分類検出、CI commit
+              SHA照合を専用scriptで強制。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>Stage 3</strong>
+            <p>
+              反復運用で安定した項目だけscript化。差分分類や証跡取得を機械的に固定。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-special">
+            <strong>Stage 4</strong>
+            <p>
+              必要ならPRトリガーCI、Artifact共有、GitHub上のrequired
+              checkへ発展。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-success">
+          Stage 1の時点から人間はReviewerに専念する。Stage
+          2以降は、AIが判断している完全性確認を機械的な保証へ置き換える。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Acceptance Criteria</p>
+        <h2>PR Agent文書を作る次タスクの完了条件</h2>
+        <ul>
+          <li>全Phase完了・最終品質PASSより前に起動できない</li>
+          <li>計画、差分、検証証跡を相互に照合する</li>
+          <li>base...headの全PR diffをSTEP / 共通 / 未分類へ100%対応付ける</li>
+          <li>分割と省略を区別し、低リスク・生成物を含むdiffを隠さない</li>
+          <li>認証、DB、API、日時、CI/CDをリスク優先で扱う</li>
+          <li>PASSした機械判定は圧縮し、FAIL・SKIP・証跡不足は詳細表示する</li>
+          <li>未確認事項をPASSとして隠さない</li>
+          <li>base / headが曖昧な場合にPR作成を停止する</li>
+          <li>push対象を許可された2種類のfeature系branchだけに制限する</li>
+          <li>機能branchのPR先を同じバージョンのfeature/v系branchへ固定する</li>
+          <li>履歴改変、merge、branch削除を実行しない</li>
+          <li>PR本文を人間の追記不要な完成品質で生成する</li>
+          <li>人間確認を挟まずpush・CI確認・通常PR作成まで自律実行する</li>
+          <li>人間は完成したPRのReviewerとしてMergeを判断する</li>
+          <li>既存の計画・実装・品質管理文書と規則が重複していない</li>
+        </ul>
+      </section>
+
+      <footer class="doc-footer">
+        調査対象:
+        AGENTS.md、計画作成エージェント.md、実装エージェント.md、品質管理エージェント.md、品質管理.md、package.json、GitHub
+        Actions、現在のGit branch構成
+      </footer>
+    </main>
+  </body>
+</html>
