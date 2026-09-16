@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AIエージェント向けディレクトリ構成提案</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <section class="doc-hero">
+        <p class="doc-eyebrow">Repository Structure Audit / 2026-09-15</p>
+        <h1>AIエージェント向け<br />ディレクトリ構成提案</h1>
+        <p>
+          AIへの指示、AIが参照する資料、人間が読む資料を分離しながら、Git管理とDocker
+          build
+          contextの安全性を両立できるかを、現在のプロジェクト構成から評価した調査資料です。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>結論</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-warning">
+            <strong>AI指示が多い：true</strong>
+            <p>
+              ルートに複数の役割文書・判断フロー・運用ルールがあり、入口から参照先が広がっています。役割ごとの責務は整理されていますが、探索負担は残ります。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>人間資料とAI資料が混在：true</strong>
+            <p>
+              docs配下にHTML、計画入力、承認・品質・差分証跡が混在し、ルートにもAI向け文書があります。用途ごとの境界が見えにくい状態です。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>AI資料が全部Docker対象：partly</strong>
+            <p>
+              .dockerignoreはdocsとREADME.mdを除外していますが、ルートのAI向けMD群はbuild
+              contextに入ります。一方、最終production
+              imageには通常残りません。dev/testではbind
+              mountにより別の見え方になります。
+            </p>
+          </article>
+        </div>
+        <div class="alert-info">
+          <strong>推奨:</strong>
+          AGENTS.mdは探索の入口としてルートに残し、内容の正本を`.agents/`へ集約します。人間向け資料は`docs/human/`、AIが参照する技術・運用資料は`docs/ai/context/`に分け、Dockerに不要なものはbuild
+          contextから除外します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>1. 現状マップ（確認済み事実）</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>分類</th>
+                <th>現在の配置・状態</th>
+                <th>Git</th>
+                <th>Docker／実行時</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>入口・AI指示</td>
+                <td>
+                  ルートのAGENTS.md、計画作成・実装・品質管理・PR作成エージェント.md、各種フロー文書
+                </td>
+                <td>tracked</td>
+                <td>ルートAI MDはprod build contextに入る</td>
+              </tr>
+              <tr>
+                <td>AI資料・正本候補</td>
+                <td>
+                  IMPLEMENTATION_DECISION_FLOW.md、IMPLEMENTATION_PLAN_TEMPLATE.md、MULTI_AGENT_WORKFLOW.md、品質管理.md、README.md
+                </td>
+                <td>tracked</td>
+                <td>READMEは.dockerignore、その他は除外指定なし</td>
+              </tr>
+              <tr>
+                <td>人間向け・証跡</td>
+                <td>docs/のHTML、計画入力、承認・品質・差分証跡</td>
+                <td>docs/*で現在非追跡。docs/AGENTS.mdもGit管理を禁止</td>
+                <td>docsは.dockerignore対象</td>
+              </tr>
+              <tr>
+                <td>開発・テストruntime</td>
+                <td>
+                  compose.dev.yml／compose.test.ymlがホストのプロジェクトをmount
+                </td>
+                <td>設定はtracked</td>
+                <td>.dockerignoreはbind mountの可視性を変えない</td>
+              </tr>
+              <tr>
+                <td>production build</td>
+                <td>Dockerfile.prodのmigration／build stageはCOPY . ./</td>
+                <td>contextにあるファイルがstageへ入る</td>
+                <td>
+                  最終imageはnode_modules、dist、public中心で通常AI MDは残らない
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>build context</strong>
+            <p>
+              Dockerが送受信する「ビルド材料」です。`.dockerignore`の対象外ファイルは、DockerfileのCOPYで使わなくてもcontextには含まれます。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>runtime visibility</strong>
+            <p>
+              composeの<code>.:/app</code>はホスト全体をコンテナへ見せます。これはbuild
+              contextから除外する話とは別です。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>2. 推奨ディレクトリ構成</h2>
+        <pre
+          class="doc-card"
+        ><code>AGENTS.md                         # 探索の入口・短い委譲ルール
+.agents/
+├── 計画作成.md                    # 役割・制御指示
+├── 実装.md
+├── 品質管理.md
+├── PR作成.md
+└── workflow.md                    # state machine・安全境界
+docs/
+├── human/                          # 人間向けHTML・説明資料（Git tracked）
+│   └── html/
+└── ai/
+    └── context/                    # AI参照用の技術・運用資料（Git tracked）
+docs/agent-runs/
+├── source/                         # sanitizedな計画正本（方針によりtracked）
+├── generated/                      # HTML／MD生成物（tracked方針を選択）
+└── runtime/                        # 一時run・秘密・大容量証跡（Git対象外）
+src/、backend/、frontend/           # アプリ本体・migration・設定</code></pre>
+        <div class="alert-warning">
+          <strong>例外:</strong>
+          「すべてGit管理」は、人間向け資料・AI資料・制御指示・sanitizedな計画を対象にします。秘密情報、実行時token、巨大な動画・ログなどは漏えい・容量・再現性の観点からGit管理しません。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>3. GitとDockerの変更方針</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>対象</th>
+                <th>現状</th>
+                <th>推奨</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>.gitignore</td>
+                <td>docs/*を一括ignoreし、docs/AGENTS.mdもGit管理を禁止</td>
+                <td>
+                  blanket ignoreを廃止し、human／ai/context／sanitized
+                  sourceを追跡。runtime、秘密、大容量evidenceだけ明示ignore
+                </td>
+              </tr>
+              <tr>
+                <td>.dockerignore</td>
+                <td>docsとREADME.mdは除外。ルートAI MDは除外されない</td>
+                <td>
+                  docs/**、.agents/**、AI用ディレクトリ、ルートAI役割MDを除外。ただしmigration
+                  SQL、実行設定、必要なpackage manifestは除外しない
+                </td>
+              </tr>
+              <tr>
+                <td>Dockerfile.prod</td>
+                <td>migration／build stageはCOPY . ./</td>
+                <td>
+                  context除外を基本にし、必要ならCOPY対象をallowlist化。最終imageの確認も継続
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <pre class="doc-card"><code># .dockerignore の変更案（例）
+docs/**
+.agents/**
+docs/ai/**
+AGENTS.md
+*エージェント.md
+MULTI_AGENT_WORKFLOW.md
+IMPLEMENTATION_*.md
+品質管理.md
+
+# ただし、Docker buildに必要な migration SQL・package manifest・runtime設定は
+# 個別に除外しない。最終的にはDockerfileとCIの参照を照合する。</code></pre>
+        <div class="alert-danger">
+          <strong>未確認:</strong> 上記は提案例です。実際のmigration
+          SQL・runtime設定の参照先を確認せずに一括除外すると、buildや起動が壊れるため、移行時にCI／Dockerfileの検査が必要です。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>4. bind mountは別問題</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge">build</span>
+            <h3>.dockerignore</h3>
+            <p>Dockerへ送る材料を減らす</p>
+          </div>
+          <div class="doc-flow-arrow">≠</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">runtime</span>
+            <h3>.:/app</h3>
+            <p>ホスト全体をコンテナから見せる</p>
+          </div>
+        </div>
+        <p>
+          compose.dev／compose.testの<code>.:/app</code>は、`.dockerignore`に関係なくホストファイルをコンテナから見せます。「build
+          contextから除外」が目的なら現状のruntime可視性は許容できます。コンテナからもAI指示を隠すなら、必要なディレクトリだけを個別mountする変更が必要ですが、開発体験と変更範囲が大きいため別計画に分けます。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>5. 移行マッピング</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>現在の群</th>
+                <th>新配置案</th>
+                <th>同時に更新する参照</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>ルートの役割MD</td>
+                <td>.agents/</td>
+                <td>AGENTS.md、役割文書相互リンク、Codex agent設定</td>
+              </tr>
+              <tr>
+                <td>判断・計画・品質の正本</td>
+                <td>docs/ai/context/</td>
+                <td>AGENTS.md、README、generator、toolsの固定path</td>
+              </tr>
+              <tr>
+                <td>人間向けHTML</td>
+                <td>docs/human/</td>
+                <td>リンク、開く場所、公開・閲覧手順</td>
+              </tr>
+              <tr>
+                <td>計画・承認・証跡</td>
+                <td>agent-runs/source／generated／runtime</td>
+                <td>generator、start／publish tool、CI artifact方針</td>
+              </tr>
+              <tr>
+                <td>既存ファイルの移動</td>
+                <td>git mvで履歴を維持</td>
+                <td>.gitignore解除時に秘密・巨大diffを事前点検</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>6. リスクと対策</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-warning">
+            <strong>参照切れ</strong>
+            <p>
+              AGENTS探索や相対リンク、toolsの固定path、CIの参照先が壊れる。移行後に全リンク・script・workflowを検索検査する。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>追跡復帰の混入</strong>
+            <p>
+              docsをGitへ戻す際、秘密・token・巨大証跡が混入する。allowlist方式とsecret
+              scanを使う。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <strong>build破壊</strong>
+            <p>
+              必要なmigration／configを.dockerignoreで除外する。Dockerfile、compose、CIのCOPY／mount参照を先に棚卸しする。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>生成物の不一致</strong>
+            <p>
+              HTMLとAI MDを手編集すると正本からずれる。plan
+              sourceからgeneratorで生成し、hash・golden testで照合する。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>7. 移行フェーズと判断事項</h2>
+        <div class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <h3>境界を決める</h3>
+            <p>
+              human／ai context／instructions／run
+              artifactの分類、Git追跡方針、秘密の除外方針を承認。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <h3>配置と参照を移す</h3>
+            <p>
+              git
+              mvで移動し、AGENTS・相互リンク・tools・generator・README・CIを更新。移行中は旧pathとの互換期間を決める。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">3</div>
+          <div>
+            <h3>Docker境界を検証</h3>
+            <p>
+              .dockerignoreとDockerfileのallowlistを確認し、dev/testのbind
+              mountとproduction final imageを別々に検査。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">4</div>
+          <div>
+            <h3>運用を固定</h3>
+            <p>
+              generator、secret scan、リンク検査、CI
+              artifact保存、復旧手順を品質ゲートへ追加。
+            </p>
+          </div>
+        </div>
+        <div class="alert-warning">
+          <strong>判断が必要:</strong> sanitized計画をGitに保存するか、generated
+          HTML／MDを追跡するか、runtime evidenceの保存先・期間、bind
+          mountを個別mountへ変えるか、旧path互換をいつ廃止するかは人間が決定します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>8. 最小推奨案と厳格分離案</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>最小推奨案</th>
+                <th>厳格分離案</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>配置</td>
+                <td>
+                  AGENTS.mdを入口に残し、.agents／docs/human／docs/ai/contextだけ追加
+                </td>
+                <td>
+                  instructions、context、source、generated、runtimeを完全分離
+                </td>
+              </tr>
+              <tr>
+                <td>Docker</td>
+                <td>AI資料を.dockerignoreへ追加。bind mountは維持</td>
+                <td>DockerfileのCOPY allowlist＋composeの個別mount</td>
+              </tr>
+              <tr>
+                <td>変更規模</td>
+                <td>中規模。リンク・ignore・CIを確認</td>
+                <td>大規模。開発体験とCI・証跡基盤も変更</td>
+              </tr>
+              <tr>
+                <td>評価</td>
+                <td>
+                  <span class="doc-badge-status-success">推奨</span
+                  >懸念を解消しつつ過剰な階層化を避ける
+                </td>
+                <td>
+                  <span class="doc-badge-status-warning">将来候補</span
+                  >秘密隔離を最優先する場合のみ
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert-success">
+          <strong>推奨判断:</strong> まず最小推奨案で用途の境界、Git追跡、build
+          context除外を明確にします。runtimeからも隠す厳格分離は、秘密を扱うtrusted
+          runner導入など別の承認済み計画と同時に検討します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>最終評価</h2>
+        <p>
+          現在の懸念は「AI資料が全部Dockerに残る」というより、build
+          context・build stage・最終image・bind
+          mountを同じ問題として扱うと誤解が生じる状態です。用途別ディレクトリと明示的なignore、generator、参照検査を導入すれば、既存のAI開発フローを維持しながら理解しやすくできます。
+        </p>
+        <p class="doc-muted">
+          本資料は調査・設計のみです。アプリ、設定、既存MD、ignore、Dockerfileは変更していません。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

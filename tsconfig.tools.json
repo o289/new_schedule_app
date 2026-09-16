@@ -16,7 +16,8 @@
     "drizzle.config.ts",
     "playwright.config.ts",
     "e2e/**/*.ts",
-    "tools/**/*.ts"
+    ".agents/tools/**/*.ts",
+    "tools/check-runtime.mjs"
   ],
   "exclude": ["node_modules", "dist"]
 }

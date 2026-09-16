@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>セキュリティテスト調査報告</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <span class="doc-badge">Security Test Audit · 2026-09-08</span>
+        <h1>セキュリティテスト<br />調査報告</h1>
+        <p>
+          現在のテストが防いでいるセキュリティ上の事故と、まだ攻撃者視点で検証されていない領域を、実装コード・Unit・Integration・E2E・CIから照合した結果です。
+        </p>
+      </header>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Executive Summary</p>
+        <h2>結論</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>セキュリティ回帰テストは存在する</strong>
+            <p>
+              Session失効、refresh
+              token再利用、グループ認可、招待失効、非公開データ漏えいを直接検証しています。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>体系的な攻撃テストではない</strong>
+            <p>
+              機能テストの中に安全性の確認が点在しており、脅威一覧とテストの対応表はありません。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-danger">
+            <strong>重要な未検証領域がある</strong>
+            <p>
+              レート制限、WebAuthn改ざん、全機能のIDOR、XSS、Security
+              Header、依存脆弱性検査が不足しています。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-warning">
+          <strong>総合判定:</strong>
+          「安全性を意識したテストはあるが、セキュリティテストスイートとしては未完成」です。現在のPASSだけで、一般的なWeb攻撃への耐性まで保証することはできません。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">How To Read</p>
+        <h2>判定の意味</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>判定</th>
+                <th>意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="status-success">直接検証</span></td>
+                <td>
+                  攻撃または事故に相当する入力・状態を作り、拒否・失効・非開示をassertしている。
+                </td>
+              </tr>
+              <tr>
+                <td><span class="status-info">間接的</span></td>
+                <td>
+                  安全な実装やSchemaは存在するが、攻撃ケースを狙ったテストはない、またはMock境界内だけである。
+                </td>
+              </tr>
+              <tr>
+                <td><span class="status-danger">未検証</span></td>
+                <td>
+                  該当するテストを確認できない。実装自体が確認できない項目も含む。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="doc-muted">
+          確認対象は42個のUnit / Integration /
+          E2Eテストファイルと、認証・認可・Repository・Schema・CI設定です。今回はコード変更やテスト実行は行わず、静的調査で判定しています。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Covered</p>
+        <h2>現在、直接防止を確認できる問題</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>防いでいる問題</th>
+                <th>確認できたテスト</th>
+                <th>保護内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>refresh tokenの再利用・競合</strong></td>
+                <td>
+                  <code>auth/service.test.ts</code><br /><code
+                    >index.integration.test.ts</code
+                  >
+                </td>
+                <td>
+                  refresh時にtokenをローテーションし、使用済みtokenと同時利用を401にします。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>ログアウト後のSession再利用</strong></td>
+                <td>
+                  <code>auth/service.test.ts</code><br /><code
+                    >index.integration.test.ts</code
+                  ><br /><code>e2e/auth.spec.ts</code>
+                </td>
+                <td>
+                  現在端末・全端末を区別してSessionを失効し、古いaccess
+                  tokenでも保護APIへ入れないことを確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>端末・ユーザー切替時のデータ混在</strong></td>
+                <td>
+                  <code>e2e/session-boundary.spec.ts</code><br /><code
+                    >sessionManager.test.ts</code
+                  >
+                </td>
+                <td>
+                  Tokenとユーザー固有Query
+                  cacheを消し、前ユーザーの予定・カテゴリーを次ユーザーへ表示しません。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>期限切れ・不正なPasskey Challenge</strong></td>
+                <td>
+                  <code>auth/service.test.ts</code><br /><code
+                    >auth/router.test.ts</code
+                  >
+                </td>
+                <td>
+                  期限切れ、不存在、形式不正なChallengeを拒否し、検証後にChallengeを削除します。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Passkey credentialの重複登録</strong></td>
+                <td><code>auth/service.test.ts</code></td>
+                <td>登録済みcredential IDの再登録を409にします。</td>
+              </tr>
+              <tr>
+                <td><strong>未認証アクセス</strong></td>
+                <td>
+                  <code>user/router.test.ts</code><br /><code
+                    >index.integration.test.ts</code
+                  ><br /><code>e2e/auth.spec.ts</code>
+                </td>
+                <td>
+                  Authorizationなし・不正Sessionから保護APIとdashboardへ入れないことを確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>グループ権限の昇格・IDOR</strong></td>
+                <td><code>index.integration.test.ts</code></td>
+                <td>
+                  非参加者の閲覧・招待再発行を404、一般memberによる招待再発行・グループ削除を403にします。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>追放済みユーザーの再参加</strong></td>
+                <td><code>index.integration.test.ts</code></td>
+                <td>
+                  追放とbanをtransactionで確定し、同じ招待Tokenによる再参加を403にします。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>古い招待Tokenの再利用</strong></td>
+                <td>
+                  <code>index.integration.test.ts</code><br /><code
+                    >e2e/group-invitation.spec.ts</code
+                  >
+                </td>
+                <td>
+                  招待再発行後に旧Tokenを無効化し、DBへ平文Tokenを保存しないことを確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>招待Tokenのブラウザ内残留</strong></td>
+                <td>
+                  <code>e2e/group-invitation.spec.ts</code><br /><code
+                    >invitationLink.test.ts</code
+                  >
+                </td>
+                <td>
+                  参加後にURL fragmentを除去し、localStorage /
+                  sessionStorageへTokenが残らないことを確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>グループ定員の競合突破</strong></td>
+                <td><code>index.integration.test.ts</code></td>
+                <td>
+                  最後の1枠へ同時参加しても、DB
+                  lockにより5人を超えないことを実DBで確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>非公開予定データの漏えい</strong></td>
+                <td><code>index.integration.test.ts</code></td>
+                <td>
+                  グループカレンダーへemail、予定名、メモ、カテゴリーを含めず、公開列だけ返すことを確認しています。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>不正な会議URLのリンク扱い</strong></td>
+                <td><code>meetingUrl.test.ts</code></td>
+                <td>
+                  HTTPSかつ許可したGoogle
+                  Meet・Zoom・Teamsのhostだけを会議URLとして認識します。
+                </td>
+              </tr>
+              <tr>
+                <td><strong>不正形式の入力</strong></td>
+                <td>各Router / Schema test</td>
+                <td>
+                  ZodとUUID検証により、確認済みの空文字、形式不正、範囲外入力をAPI境界で拒否します。余分なfieldの拒否はstrict指定されたSchemaに限られます。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Defense Layers</p>
+        <h2>現在の防御は複数レイヤーに分かれている</h2>
+        <div class="doc-flow doc-flow-columns-seven">
+          <div class="doc-flow-node">Schema<br />形式・長さ</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">Router<br />認証・HTTP契約</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">Service<br />認可・状態遷移</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            Repository / DB<br />所有者・制約・lock
+          </div>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>良い点</strong>
+            <ul>
+              <li>
+                Access tokenだけでなく、有効なSessionと所有ユーザーの一致も確認
+              </li>
+              <li>refresh tokenと招待TokenはSHA-256 digestでDB保存</li>
+              <li>グループ参加上限と追放を実DB・transactionで検証</li>
+              <li>エラー時に生のDBエラーを返さない</li>
+            </ul>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>限界</strong>
+            <ul>
+              <li>安全な通常経路のテストと、敵対入力のテストが混在</li>
+              <li>WebAuthnの暗号検証は多くがMock</li>
+              <li>認可確認の濃さが機能ごとに異なる</li>
+              <li>ブラウザ・HTTP・依存関係の防御はCIで検証されていない</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Critical Gaps</p>
+        <h2>追加を優先すべきセキュリティテスト</h2>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <span class="doc-badge doc-badge-status-danger">CRITICAL</span>
+            <h3>認証・招待APIのレート制限と濫用防止</h3>
+            <p>
+              <code>/auth/passkey/*/options</code
+              >、<code>/groups/join</code>、招待再発行に回数制限の実装・テストを確認できません。
+            </p>
+            <ul>
+              <li>短時間の大量options発行を429にする</li>
+              <li>大量ChallengeによるDB増加を制限する</li>
+              <li>招待Token総当たりと再発行連打を抑止する</li>
+              <li>IPだけでなくuser / group単位の制限方針を決める</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <span class="doc-badge doc-badge-status-danger">CRITICAL</span>
+            <h3>WebAuthnの敵対入力を実ライブラリ境界で検証</h3>
+            <p>
+              現在は期限切れChallenge等を検証していますが、origin、RP
+              ID、signature、counter改ざんを明示的に失敗させるテストがありません。
+            </p>
+            <ul>
+              <li>別origin / 別RP IDのcredentialを拒否</li>
+              <li>署名・authenticatorData・clientDataJSON改ざんを拒否</li>
+              <li>register用Challengeをloginへ流用できない</li>
+              <li>sign counterの後退・複製Authenticator相当を拒否</li>
+            </ul>
+            <div class="doc-alert alert-warning">
+              実装は<code>requireUserVerification: false</code>かつ<code
+                >userVerification: preferred</code
+              >です。これは即座に脆弱性という意味ではありませんが、求める本人確認強度を仕様として決め、テストで固定する必要があります。
+            </div>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">3</div>
+          <div>
+            <span class="doc-badge doc-badge-status-danger">CRITICAL</span>
+            <h3>全リソースの横取りアクセス（IDOR）表</h3>
+            <p>
+              グループ認可は強く検証されていますが、他人のschedule /
+              categoryをID指定で取得・更新・削除するケースは明示的な回帰テストが不足しています。
+            </p>
+            <ul>
+              <li>
+                user AのTokenでuser BのscheduleをGET / PUT / DELETEできない
+              </li>
+              <li>user AのTokenでuser BのcategoryをPUT / DELETEできない</li>
+              <li>user Bのcategoryをuser Aのscheduleへ設定できない</li>
+              <li>
+                存在しない場合と他人所有の場合の応答差から情報を推測できない
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">4</div>
+          <div>
+            <span class="doc-badge doc-badge-status-warning">HIGH</span>
+            <h3>XSSと危険URLのブラウザE2E</h3>
+            <p>
+              Reactの標準escapeは利用できますが、悪意ある予定名・メモ・ユーザー名・グループ名を保存して表示するE2Eはありません。
+            </p>
+            <ul>
+              <li>
+                <code>&lt;img onerror=...&gt;</code
+                >等を文字列として表示し、scriptが動かない
+              </li>
+              <li>
+                <code>javascript:</code>、data
+                URL、似たドメインをクリック可能にしない
+              </li>
+              <li>
+                TokenをlocalStorageに保存しているため、XSS発生時の影響を重大として扱う
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">5</div>
+          <div>
+            <span class="doc-badge doc-badge-status-warning">HIGH</span>
+            <h3>JWT・Session claimの改ざん</h3>
+            <p>
+              不正文字列と失効Sessionは確認されていますが、JWT境界の個別攻撃ケースが不足しています。
+            </p>
+            <ul>
+              <li>期限切れ、別署名、<code>alg: none</code>、HS256以外を拒否</li>
+              <li>
+                <code>sub</code
+                >欠落、<code>sid</code>欠落、Session所有者不一致を拒否
+              </li>
+              <li>期限切れ・失効済みrefresh tokenを実DBで拒否</li>
+              <li>
+                同時refreshの片方だけが成功することを並行Integrationで固定
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">6</div>
+          <div>
+            <span class="doc-badge doc-badge-status-warning">HIGH</span>
+            <h3>HTTP Security HeaderとCORS</h3>
+            <p>
+              CORS allowlistと<code>Cache-Control: no-store</code
+              >は実装されていますが、レスポンスを検査するテストはありません。CSP、frame制御、MIME
+              sniffing防止等の実装も確認できません。
+            </p>
+            <ul>
+              <li>許可originだけにCORS headerを返す</li>
+              <li>未知originへcredential付きアクセスを許可しない</li>
+              <li>認証・予定APIが必ず<code>no-store</code></li>
+              <li>
+                CSP、frame-ancestors、nosniff、Referrer-Policyの期待値を固定
+              </li>
+            </ul>
+          </div>
+        </article>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Additional Gaps</p>
+        <h2>その次に検討する項目</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-warning">
+            <strong>依存脆弱性・静的解析</strong>
+            <p>
+              CIにdependency
+              review、脆弱性audit、CodeQL等を確認できません。アプリのUnit
+              Testではライブラリ既知脆弱性を検出できません。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>秘密情報スキャン</strong>
+            <p>
+              テスト規則には秘密情報を残さない確認がありますが、commitへ混入したsecretを機械検出する専用checkは確認できません。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>SQL injection</strong>
+            <p>
+              DB操作はDrizzleのparameter
+              bindingを利用しており危険は低減されていますが、敵対文字列をAPIから保存・検索する回帰テストはありません。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>巨大payload・DoS</strong>
+            <p>
+              文字列長はSchemaで制限される箇所がありますが、HTTP
+              body全体の上限や巨大配列・大量日付を拒否する試験は確認できません。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>ログへの機密情報流出</strong>
+            <p>
+              Passkeyログはfingerprintと長さに限定されていますが、token、credential、個人情報がログへ出ないことをassertするテストはありません。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>ユーザー列挙</strong>
+            <p>
+              login
+              optionsは未登録メールへ<code>PASSKEY_NOT_FOUND</code>を返すため、登録有無を推測できます。UXとのトレードオフを仕様判断し、期待動作を固定すべきです。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Applicability</p>
+        <h2>この構成では優先度が低い、または条件付きの問題</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>問題</th>
+                <th>現在の評価</th>
+                <th>理由</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>従来型CSRF</td>
+                <td><span class="status-info">現時点では低め</span></td>
+                <td>
+                  認証情報はcookie自動送信ではなく、JavaScriptがAuthorization
+                  headerまたはbodyへ明示的に付与します。ただし将来HttpOnly
+                  cookieへ変更する場合はCSRF対策テストが必須です。
+                </td>
+              </tr>
+              <tr>
+                <td>パスワード総当たり</td>
+                <td><span class="status-info">直接は対象外</span></td>
+                <td>
+                  パスワード認証はなくPasskeyを使用しています。ただしoptions
+                  APIや招待Tokenへの濫用対策は別途必要です。
+                </td>
+              </tr>
+              <tr>
+                <td>平文refresh tokenのDB漏えい</td>
+                <td><span class="status-success">直接検証済み</span></td>
+                <td>
+                  Integration
+                  TestでDBには64文字のdigestだけが入り、発行した平文tokenを含まないことを確認しています。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Recommended Test Structure</p>
+        <h2>今後のテスト構造案</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card">
+            <span class="doc-badge">Unit</span>
+            <h3>境界値と純粋な判定</h3>
+            <p>
+              Schema、URL allowlist、JWT claim判定、rate limit
+              key生成、ログredaction。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge doc-badge-status-warning">Integration</span>
+            <h3>認可とDB競合</h3>
+            <p>
+              他人IDへの操作、Session失効、refresh競合、ban、定員、transaction、migration。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge doc-badge-status-special">E2E</span>
+            <h3>ブラウザ攻撃面</h3>
+            <p>
+              WebAuthn改ざん、XSS、危険URL、CORS、Header、認証後の秘密情報残留。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-info">
+          新しいセキュリティテストを一つの巨大ファイルへ集約するより、対象責務の近くへ回帰テストを置き、別途「脅威
+          ↔
+          テストファイル」の一覧を正本として管理する方が現在のプロジェクト構造に合います。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Suggested Order</p>
+        <h2>追加するならこの順序</h2>
+        <div class="doc-pipeline doc-pipeline-columns-four">
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>1. 認可マトリクス</strong>
+            <p>
+              schedule・category・groupの他人ID操作をIntegration Testで固定。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>2. WebAuthn / JWT</strong>
+            <p>
+              改ざんcredential、origin、RP
+              ID、署名、claim、期限切れを敵対入力で検証。
+            </p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-warning">
+            <strong>3. Abuse対策</strong>
+            <p>レート制限を設計・実装して、認証・参加・再発行を429で保護。</p>
+          </article>
+          <article class="doc-pipeline-stage doc-pipeline-stage-status-special">
+            <strong>4. Browser / CI</strong>
+            <p>XSS・Header・CORS E2Eと、依存脆弱性・secret scanをCIへ追加。</p>
+          </article>
+        </div>
+        <div class="doc-alert alert-danger">
+          レート制限はテスト追加だけでは成立しません。現在実装を確認できないため、導入する場合はAPI仕様と保存方式を含む中規模以上の別計画が必要です。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Evidence Files</p>
+        <h2>主な調査対象</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>認証・Session</strong>
+            <ul>
+              <li><code>apps/backend/features/auth/service.ts</code></li>
+              <li><code>apps/backend/core/security.ts</code></li>
+              <li><code>apps/backend/core/webauthn.ts</code></li>
+              <li><code>apps/backend/core/current-user.ts</code></li>
+              <li><code>apps/backend/index.integration.test.ts</code></li>
+              <li><code>e2e/auth.spec.ts</code></li>
+            </ul>
+          </article>
+          <article class="doc-card">
+            <strong>認可・公開データ</strong>
+            <ul>
+              <li><code>apps/backend/features/group/service.ts</code></li>
+              <li><code>apps/backend/features/group/repository.ts</code></li>
+              <li><code>apps/backend/features/schedule/service.ts</code></li>
+              <li><code>apps/backend/features/category/service.ts</code></li>
+              <li><code>e2e/group-invitation.spec.ts</code></li>
+              <li><code>e2e/session-boundary.spec.ts</code></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <footer class="doc-footer">
+        調査日: 2026-09-08 ·
+        調査・報告のみ。セキュリティ機能、テスト、CI設定は変更していません。
+      </footer>
+    </main>
+  </body>
+</html>

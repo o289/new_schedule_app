@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CI/CD ワークフロー図解</title>
+    <style>
+      :root {
+        --ink: #172033;
+        --muted: #64748b;
+        --line: #dbe4f0;
+        --panel: #fff;
+        --bg: #f4f7fb;
+        --blue: #2563eb;
+        --cyan: #0e7490;
+        --green: #059669;
+        --amber: #d97706;
+        --purple: #7c3aed;
+        --red: #dc2626;
+        --shadow: 0 16px 40px #17203312;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #eef5ff, #f8fbff 46%, #f5f3ff);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Hiragino Kaku Gothic ProN",
+          "Yu Gothic",
+          sans-serif;
+        line-height: 1.6;
+      }
+      .page {
+        max-width: 1240px;
+        margin: auto;
+        padding: 42px 24px 70px;
+      }
+      .eyebrow {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+      .hero h1 {
+        font-size: clamp(28px, 4vw, 46px);
+        line-height: 1.15;
+        margin: 8px 0 10px;
+        letter-spacing: -0.04em;
+      }
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 780px;
+      }
+      .stamp {
+        background: #ffffffb8;
+        border: 1px solid #fff;
+        border-radius: 18px;
+        padding: 12px 16px;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        box-shadow: var(--shadow);
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .tabs button {
+        border: 1px solid var(--line);
+        background: #ffffffb8;
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 10px 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .tabs button[aria-selected="true"] {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+      }
+      .view[hidden] {
+        display: none;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid #e3eaf3;
+        border-radius: 26px;
+        padding: 26px;
+        box-shadow: var(--shadow);
+        margin-bottom: 20px;
+      }
+      .panel h2 {
+        margin: 0 0 5px;
+        font-size: 22px;
+      }
+      .lead {
+        margin: 0 0 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+        margin: 18px 0 4px;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .dot.blue {
+        background: var(--blue);
+      }
+      .dot.green {
+        background: var(--green);
+      }
+      .dot.amber {
+        background: var(--amber);
+      }
+      .dot.purple {
+        background: var(--purple);
+      }
+      .dot.dashed {
+        border: 2px dashed var(--muted);
+        background: transparent;
+      }
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        align-items: stretch;
+      }
+      .stage {
+        position: relative;
+        border: 1px solid var(--line);
+        border-top: 5px solid var(--blue);
+        border-radius: 18px;
+        padding: 16px;
+        background: #fbfdff;
+        min-height: 190px;
+      }
+      .stage::after {
+        content: "→";
+        position: absolute;
+        right: -20px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 25px;
+        color: #94a3b8;
+        z-index: 2;
+      }
+      .stage:nth-child(4n)::after {
+        display: none;
+      }
+      .stage.green {
+        border-top-color: var(--green);
+      }
+      .stage.amber {
+        border-top-color: var(--amber);
+      }
+      .stage.purple {
+        border-top-color: var(--purple);
+      }
+      .stage h3 {
+        margin: 4px 0 8px;
+        font-size: 17px;
+      }
+      .stage p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .stage ul {
+        padding-left: 18px;
+        margin: 10px 0 0;
+        font-size: 12px;
+      }
+      .tag {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 800;
+        background: #eaf2ff;
+        color: var(--blue);
+      }
+      .tag.green {
+        background: #e7f8f1;
+        color: var(--green);
+      }
+      .tag.amber {
+        background: #fff4df;
+        color: var(--amber);
+      }
+      .tag.purple {
+        background: #f1eaff;
+        color: var(--purple);
+      }
+      .condition {
+        margin-top: 12px;
+        border: 1px dashed #f59e0b;
+        color: #9a5b00;
+        background: #fffbeb;
+        border-radius: 10px;
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+      .subflow {
+        display: grid;
+        grid-template-columns: 1.1fr 0.2fr 1fr 0.2fr 1.1fr;
+        align-items: center;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      .subflow .box {
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        padding: 13px;
+        background: #f8fafc;
+      }
+      .subflow b {
+        display: block;
+        font-size: 14px;
+      }
+      .subflow small {
+        color: var(--muted);
+      }
+      .arrow {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 24px;
+      }
+      .callout {
+        margin-top: 20px;
+        border-radius: 15px;
+        padding: 13px 16px;
+        background: #fff7ed;
+        border-left: 4px solid var(--amber);
+        font-size: 13px;
+      }
+      .callout strong {
+        color: #92400e;
+      }
+      .workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .workflow {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        background: #fff;
+      }
+      .workflow h3 {
+        margin: 0 0 5px;
+        font-size: 18px;
+      }
+      .workflow .file {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--blue);
+        font-size: 11px;
+        background: #eff6ff;
+        padding: 3px 7px;
+        border-radius: 6px;
+      }
+      .workflow p {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 11px 0;
+      }
+      .workflow dl {
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 5px 10px;
+        font-size: 12px;
+        margin: 0;
+      }
+      .workflow dt {
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .workflow dd {
+        margin: 0;
+        color: var(--muted);
+      }
+      .artifact-flow {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        align-items: center;
+      }
+      .artifact {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 15px;
+        background: #fbfdff;
+        min-height: 145px;
+      }
+      .artifact h3 {
+        font-size: 15px;
+        margin: 0 0 7px;
+      }
+      .artifact p {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .artifact .num {
+        font-size: 12px;
+        color: var(--blue);
+        font-weight: 900;
+      }
+      .secret-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 20px;
+      }
+      .secret-table th,
+      .secret-table td {
+        text-align: left;
+        padding: 11px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      .secret-table th {
+        color: var(--muted);
+        font-size: 12px;
+        background: #f8fafc;
+      }
+      .pill {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: #334155;
+        background: #eef2f7;
+        border-radius: 5px;
+        padding: 2px 5px;
+      }
+      .refs {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .refs a {
+        color: var(--blue);
+        font-size: 12px;
+        text-decoration: none;
+        border-bottom: 1px solid #93c5fd;
+      }
+      .footer {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+        margin-top: 28px;
+      }
+      @media (max-width: 900px) {
+        .pipeline {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .stage:nth-child(2n)::after {
+          display: none;
+        }
+        .stage:nth-child(odd)::after {
+          display: block;
+        }
+        .artifact-flow {
+          grid-template-columns: 1fr;
+        }
+        .artifact-flow .arrow {
+          transform: rotate(90deg);
+        }
+        .hero {
+          align-items: start;
+          flex-direction: column;
+        }
+        .stamp {
+          white-space: normal;
+        }
+        .workflow-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 560px) {
+        .page {
+          padding: 25px 14px 50px;
+        }
+        .panel {
+          padding: 17px;
+          border-radius: 20px;
+        }
+        .pipeline {
+          grid-template-columns: 1fr;
+        }
+        .stage::after,
+        .stage:nth-child(odd)::after {
+          display: none;
+        }
+        .subflow {
+          grid-template-columns: 1fr;
+        }
+        .subflow .arrow {
+          transform: rotate(90deg);
+        }
+        .secret-table {
+          font-size: 12px;
+          display: block;
+          overflow: auto;
+          white-space: nowrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <div class="eyebrow">GitHub Actions / Deployment Architecture</div>
+          <h1>CI/CD ワークフロー図解</h1>
+          <p>
+            品質チェックからステージング、本番デプロイまで。どのWorkflowが、どの条件で、何を受け渡すかを一枚で確認できます。
+          </p>
+        </div>
+        <div class="stamp">
+          対象: <strong>main → staging → production</strong><br />公開先:
+          プロジェクト内HTMLのみ
+        </div>
+      </header>
+      <nav class="tabs" role="tablist" aria-label="表示切り替え">
+        <button
+          type="button"
+          role="tab"
+          aria-selected="true"
+          data-view="overview"
+        >
+          全体フロー</button
+        ><button
+          type="button"
+          role="tab"
+          aria-selected="false"
+          data-view="workflows"
+        >
+          Workflow別</button
+        ><button
+          type="button"
+          role="tab"
+          aria-selected="false"
+          data-view="artifacts"
+        >
+          Secret・Artifact・Image
+        </button>
+      </nav>
+
+      <section id="overview" class="view" role="tabpanel">
+        <div class="panel">
+          <h2>1. パイプライン全体</h2>
+          <p class="lead">
+            CIが通った変更だけがステージングへ進み、ステージングで確認された同一SHAを本番へ昇格します。
+          </p>
+          <div class="pipeline">
+            <article class="stage">
+              <span class="tag">CI</span>
+              <h3>品質チェック</h3>
+              <p><strong>ci.yml</strong></p>
+              <ul>
+                <li>format:check</li>
+                <li>typecheck</li>
+                <li>test</li>
+              </ul>
+              <div class="condition">
+                push / pull_request。イメージやSecretは扱わない
+              </div>
+            </article>
+            <article class="stage green">
+              <span class="tag green">STAGING</span>
+              <h3>候補を作る</h3>
+              <p><strong>deploy_for_stg.yml</strong></p>
+              <ul>
+                <li>対象SHAと変更範囲を判定</li>
+                <li>必要時だけbuild・migration</li>
+                <li>healthcheck後に候補を記録</li>
+              </ul>
+              <div class="condition">CI成功後のmain、または手動実行</div>
+            </article>
+            <article class="stage amber">
+              <span class="tag amber">VERIFY</span>
+              <h3>昇格を承認</h3>
+              <p><strong>deploy_for_prod.yml</strong></p>
+              <ul>
+                <li>ステージング候補を取得</li>
+                <li>SHA・Artifact・digestを検証</li>
+                <li>人による確認後に承認</li>
+              </ul>
+              <div class="condition">workflow_dispatchのみ</div>
+            </article>
+            <article class="stage purple">
+              <span class="tag purple">PRODUCTION</span>
+              <h3>本番へ反映</h3>
+              <p><strong>deploy_for_prod.yml</strong></p>
+              <ul>
+                <li>必要時だけmigration</li>
+                <li>固定digestのimageをpull</li>
+                <li>applicationを再作成・healthcheck</li>
+              </ul>
+              <div class="condition">Environment: production</div>
+            </article>
+          </div>
+          <div class="legend">
+            <span><i class="dot blue"></i>通常のWorkflow</span
+            ><span><i class="dot green"></i>ステージング</span
+            ><span><i class="dot amber"></i>確認・承認</span
+            ><span><i class="dot purple"></i>本番</span
+            ><span><i class="dot dashed"></i>条件付き処理</span>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>2. ステージング内の処理順</h2>
+          <p class="lead">
+            Reusable
+            Workflowを組み合わせ、イメージ、Secret、DB、アプリケーションの順に準備します。
+          </p>
+          <div class="subflow">
+            <div class="box">
+              <b>build-and-migrate.yml</b
+              ><small
+                >GHCRへapplication / migration
+                imageをbuild・push。digestを出力</small
+              >
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <b>inject-env.yml</b
+              ><small
+                >Environment Secretから.envを生成し、VPSへ安全に転送</small
+              >
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <b>prepare-database.yml</b
+              ><small>DBを起動し、migrationが必要か判定</small>
+            </div>
+          </div>
+          <div class="subflow">
+            <div class="box">
+              <b>migrate</b
+              ><small>必要な場合だけComposeのmigration profileを実行</small>
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <b>deploy</b
+              ><small>固定digestをpull、applicationを起動、/pingを確認</small>
+            </div>
+            <div class="arrow">→</div>
+            <div class="box">
+              <b>deployment-plan</b
+              ><small
+                >候補SHA・実行ID・状態をArtifact / Repository
+                Variablesへ記録</small
+              >
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>3. 重要な判定ポイント</h2>
+          <div class="workflow-grid">
+            <article class="workflow">
+              <h3>変更がない場合</h3>
+              <p>
+                アプリケーション関連ファイルに変更がなければ、ステージングのデプロイ全体をスキップします。
+              </p>
+              <dl>
+                <dt>対象例</dt>
+                <dd>
+                  apps / packages / drizzle / package.json / lockfile /
+                  Dockerfile / compose
+                </dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <h3>DB変更がある場合</h3>
+              <p>
+                Drizzleやバックエンドのモデル・スキーマ変更を検出すると、migrationを条件付きで実行します。
+              </p>
+              <dl>
+                <dt>順序</dt>
+                <dd>build → DB準備 → migration → application deploy</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <h3>本番へ進める条件</h3>
+              <p>
+                ステージングで成功した同一SHA、候補Artifact、GHCRのdigestを検証してから承認します。
+              </p>
+              <dl>
+                <dt>保護</dt>
+                <dd>production Environmentの承認・Secretを利用</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <h3>失敗時</h3>
+              <p>
+                healthcheckや検証に失敗すると、本番候補の承認・デプロイには進みません。
+              </p>
+              <dl>
+                <dt>確認先</dt>
+                <dd>
+                  GitHub ActionsのJob Summary、deployment-plan、VPSのComposeログ
+                </dd>
+              </dl>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflows" class="view" role="tabpanel" hidden>
+        <div class="panel">
+          <h2>Workflow別の役割</h2>
+          <p class="lead">
+            入口のWorkflowと、呼び出されるReusable
+            Workflowを分けて読むと構成を追いやすくなります。
+          </p>
+          <div class="workflow-grid">
+            <article class="workflow">
+              <span class="file">.github/workflows/ci.yml</span>
+              <h3>CI</h3>
+              <p>すべてのpushとPull Requestで実行する品質ゲート。</p>
+              <dl>
+                <dt>実行</dt>
+                <dd>format:check / typecheck / test</dd>
+                <dt>権限</dt>
+                <dd>contents: read</dd>
+                <dt>Secret</dt>
+                <dd>Environment Secretは使わない</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <span class="file">.github/workflows/deploy_for_stg.yml</span>
+              <h3>ステージングデプロイ</h3>
+              <p>CI成功後のmainを候補化し、必要な処理だけを連鎖させる入口。</p>
+              <dl>
+                <dt>呼び出し</dt>
+                <dd>build-and-migrate / inject-env / prepare-database</dd>
+                <dt>記録</dt>
+                <dd>deployment-plan Artifact、Repository Variables</dd>
+                <dt>環境</dt>
+                <dd>staging</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <span class="file">.github/workflows/deploy_for_prod.yml</span>
+              <h3>本番デプロイ</h3>
+              <p>ステージング候補を検証し、人の確認後に同じSHAを本番へ昇格。</p>
+              <dl>
+                <dt>起動</dt>
+                <dd>workflow_dispatch</dd>
+                <dt>検証</dt>
+                <dd>SHA / Artifact / GHCR digest / healthcheck</dd>
+                <dt>環境</dt>
+                <dd>production</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <span class="file">.github/workflows/build-and-migrate.yml</span>
+              <h3>イメージ作成・migration</h3>
+              <p>
+                アプリケーション用とmigration用のイメージをGHCRへpushし、必要時にVPSでmigration。
+              </p>
+              <dl>
+                <dt>入力</dt>
+                <dd>target / commit_sha / build_images / run_migration</dd>
+                <dt>出力</dt>
+                <dd>application_image / migration_image（digest付き）</dd>
+                <dt>注意</dt>
+                <dd>Dockerfile.prodにmigration targetが必要</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <span class="file">.github/workflows/inject-env.yml</span>
+              <h3>Environment Secret注入</h3>
+              <p>
+                staging / productionのEnvironment
+                SecretをCompose用.envへ変換し、VPSへ転送。
+              </p>
+              <dl>
+                <dt>値</dt>
+                <dd>DB / WebAuthn / JWT / image refs</dd>
+                <dt>保護</dt>
+                <dd>単一行化、行数検査、docker compose config検証</dd>
+              </dl>
+            </article>
+            <article class="workflow">
+              <span class="file">.github/workflows/prepare-database.yml</span>
+              <h3>DB準備・初回判定</h3>
+              <p>
+                DBを起動してhealthを待ち、Drizzle migration
+                tableの有無から初回migrationを判断。
+              </p>
+              <dl>
+                <dt>判定</dt>
+                <dd>テーブルなし、または件数0 → migration必要</dd>
+                <dt>出力</dt>
+                <dd>needs_initial_migration</dd>
+              </dl>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="artifacts" class="view" role="tabpanel" hidden>
+        <div class="panel">
+          <h2>Secret・Artifact・Imageの受け渡し</h2>
+          <p class="lead">
+            値そのものではなく、どこで生成され、どこで検証され、どこへ渡るかを示しています。
+          </p>
+          <div class="artifact-flow">
+            <div class="artifact">
+              <span class="num">01 / 入力</span>
+              <h3>Git変更 + CI結果</h3>
+              <p>
+                commit SHA、変更ファイル、CI成功状態を起点に対象範囲を決定。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="artifact">
+              <span class="num">02 / Build</span>
+              <h3>GHCR image</h3>
+              <p>
+                application / migrationをSHAタグで作成し、sha256 digestを固定。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="artifact">
+              <span class="num">03 / 記録</span>
+              <h3>Artifact + Variables</h3>
+              <p>
+                deployment-plan、candidate run ID、candidate SHA、statusを保存。
+              </p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="artifact">
+              <span class="num">04 / VPS</span>
+              <h3>Compose + healthcheck</h3>
+              <p>
+                Environment Secretで.envを作り、同じimage digestをpullして起動。
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>要確認:</strong> `build-and-migrate.yml` は `Dockerfile.prod
+            --target migration`
+            を参照します。Dockerfile.prodにmigrationステージが存在しない場合、migration
+            imageのBuildでCDが失敗します。
+          </div>
+          <table class="secret-table">
+            <thead>
+              <tr>
+                <th>スコープ</th>
+                <th>主な内容</th>
+                <th>利用場所</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CI</td>
+                <td>基本的なread権限のみ</td>
+                <td>format / typecheck / test</td>
+              </tr>
+              <tr>
+                <td>staging Environment</td>
+                <td>
+                  <span class="pill">STG_DB_*</span>、WebAuthn、JWT、SSH、GHCR
+                </td>
+                <td>inject-env、prepare-database、migration、deploy</td>
+              </tr>
+              <tr>
+                <td>production Environment</td>
+                <td>
+                  <span class="pill">PROD_DB_*</span>、WebAuthn、JWT、SSH、GHCR
+                </td>
+                <td>本番のinject-env、migration、deploy</td>
+              </tr>
+              <tr>
+                <td>Repository Secret</td>
+                <td><span class="pill">REPOSITORY_VARIABLES_TOKEN</span></td>
+                <td>本番Workflowが候補Variablesを読み書き</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>参照ファイル</h2>
+          <div class="refs">
+            <a href="../../.github/workflows/ci.yml">ci.yml</a
+            ><a href="../../.github/workflows/deploy_for_stg.yml"
+              >deploy_for_stg.yml</a
+            ><a href="../../.github/workflows/deploy_for_prod.yml"
+              >deploy_for_prod.yml</a
+            ><a href="../../.github/workflows/build-and-migrate.yml"
+              >build-and-migrate.yml</a
+            ><a href="../../.github/workflows/inject-env.yml">inject-env.yml</a
+            ><a href="../../.github/workflows/prepare-database.yml"
+              >prepare-database.yml</a
+            ><a href="../../Dockerfile.prod">Dockerfile.prod</a
+            ><a href="../本番環境構成.md">本番環境構成.md</a>
+          </div>
+        </div>
+      </section>
+      <p class="footer">
+        このHTMLはローカルのドキュメント用です。Pages公開や外部サービスへのアップロードは行っていません。
+      </p>
+    </main>
+    <script>
+      document.querySelectorAll("[data-view]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var id = button.dataset.view;
+          document.querySelectorAll(".view").forEach(function (view) {
+            view.hidden = view.id !== id;
+          });
+          document.querySelectorAll("[data-view]").forEach(function (item) {
+            item.setAttribute("aria-selected", String(item === button));
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

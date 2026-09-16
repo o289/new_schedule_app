@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+echo "STOP: 旧approval入口は使用できません。pnpm agent:run approve <runId>を使用してください。" >&2
+exit 1

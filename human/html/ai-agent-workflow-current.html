@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AIエージェント開発フロー 現状調査</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <section class="doc-hero">
+        <p class="doc-eyebrow">Current Workflow Audit / 2026-09-14</p>
+        <h1>AIエージェント開発フロー<br />現状調査</h1>
+        <p>
+          この資料は、現在のリポジトリに定義されたAIエージェントの作業手順を、実装済みの仕組み・設定が必要な仕組み・文書上の運用に分けて説明する現状報告です。完全自動の一本道ではなく、人間の承認と機械的な品質ゲートを組み合わせた運用として評価します。
+        </p>
+      </section>
+
+      <div class="doc-tabs" role="tablist" aria-label="資料の表示切替">
+        <button
+          class="doc-tab"
+          id="tab-current"
+          type="button"
+          role="tab"
+          aria-controls="panel-current"
+          aria-selected="true"
+          tabindex="0"
+        >
+          現状調査
+        </button>
+        <button
+          class="doc-tab"
+          id="tab-improved"
+          type="button"
+          role="tab"
+          aria-controls="panel-improved"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          改善設計
+        </button>
+      </div>
+
+      <div
+        class="doc-tab-panel"
+        id="panel-current"
+        role="tabpanel"
+        aria-labelledby="tab-current"
+      >
+        <section class="doc-section">
+          <h2>結論</h2>
+          <div class="doc-grid doc-grid-three">
+            <article class="doc-card doc-card-status-success">
+              <strong>運用開始可能</strong>
+              <p>
+                入口、規模判定、Phase品質ゲート、DB／E2E環境分離、開始・公開のfail-closed検査は、かなり詳細に設計され、一部は機械強制済みです。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>完全自動ではない</strong>
+              <p>
+                計画承認、仕様判断、計画外変更、新しい権限、破壊的操作は停止して人間へ戻ります。資料・証跡の準備にも人またはAIの判断が残ります。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <strong>公開前のP0</strong>
+              <p>
+                品質PASS後のcommit担当・再検証手順と、Rulesが実際に有効な設定層へ読み込まれることを確定しないと、PRまでの完全自律とは呼べません。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>1. エンドツーエンドの流れ</h2>
+          <p class="doc-muted">
+            入口はルートのAGENTS.mdです。工程ごとに役割文書へ移り、Phaseごとに品質ゲートを通過します。
+          </p>
+          <div class="doc-flow">
+            <div class="doc-flow-node">
+              <span class="doc-badge">01 入口</span>
+              <h3>依頼を受ける</h3>
+              <p>AGENTS.mdを読み、現在の工程と役割を確定。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">02 計画</span>
+              <h3>規模を判定</h3>
+              <p>smallは直接実装、medium／largeは計画承認を待つ。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">03 実装</span>
+              <h3>Phaseを実装</h3>
+              <p>高モデル時はLunaまたはTerraへ1 Phaseずつ委譲。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">04 品質</span>
+              <h3>検証する</h3>
+              <p>差分、format、typecheck、test、DB／E2Eを確認。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">05 公開</span>
+              <h3>push／PR</h3>
+              <p>全PASS・clean tree・証跡が揃った場合のみ公開。</p>
+            </div>
+          </div>
+          <div class="alert-info">
+            <strong>Phaseの扱い:</strong>
+            同じ計画書に含まれる全Phaseは、最初の計画承認で承認済みです。現在Phaseが品質PASSしたら追加承認なしで次Phaseへ進みます。独立タスクは別の計画書に分けます。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>2. 役割と正本</h2>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>工程</th>
+                <th>担当文書・担当</th>
+                <th>責務</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>要求整理・計画</td>
+                <td>計画作成エージェント.md</td>
+                <td>直接実装可否、規模、計画、承認待ち</td>
+              </tr>
+              <tr>
+                <td>実装</td>
+                <td>実装エージェント.md</td>
+                <td>承認済み計画またはsmall変更を実装</td>
+              </tr>
+              <tr>
+                <td>品質</td>
+                <td>品質管理エージェント.md</td>
+                <td>品質ゲート、DB統合、E2E、FAIL時の差し戻し</td>
+              </tr>
+              <tr>
+                <td>公開</td>
+                <td>PR作成エージェント.md</td>
+                <td>証跡・diff確認、push、CI確認、機能branchの通常PR</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="doc-grid doc-grid-three">
+            <article class="doc-card">
+              <strong>規模判断の正本</strong>
+              <p>IMPLEMENTATION_DECISION_FLOW.md</p>
+            </article>
+            <article class="doc-card">
+              <strong>計画形式の正本</strong>
+              <p>IMPLEMENTATION_PLAN_TEMPLATE.md</p>
+            </article>
+            <article class="doc-card">
+              <strong>品質手順の正本</strong>
+              <p>品質管理.md</p>
+            </article>
+            <article class="doc-card">
+              <strong>高モデル委譲の正本</strong>
+              <p>MULTI_AGENT_WORKFLOW.md</p>
+            </article>
+            <article class="doc-card">
+              <strong>開始・公開入力</strong>
+              <p>codx/README.md、toolsのschema</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>3. 規模判定とbranch経路</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card doc-card-status-warning">
+              <strong>large</strong>
+              <p>
+                Phaseが5以上、または変更ファイルが100以上、またはPhaseが3以上かつ認証変更／複数DBモデルの依存変更。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-success">
+              <strong>small／medium</strong>
+              <p>
+                直接実装できるものだけsmall。それ以外で計画が必要なものはmedium。medium／largeは明示的な計画承認が必要です。
+              </p>
+            </article>
+          </div>
+          <div class="doc-flow">
+            <div class="doc-flow-node">
+              <span class="doc-badge">small／medium</span>
+              <h3>feature/vX.Y.Z</h3>
+              <p>版branchで作業し、同名originへpush_only。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-special">large</span>
+              <h3>feature/&lt;slug&gt;-vX.Y.Z</h3>
+              <p>承認後、feature/vX.Y.Zから機能branchを作成。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">pull_request</span>
+              <h3>feature/vX.Y.Z</h3>
+              <p>機能branchを版branchへ通常PR。</p>
+            </div>
+          </div>
+          <p class="doc-muted">
+            新規機能かつUI変更の場合は、計画より先にPNGモックが必要です。largeだけbranch作成を実施し、small／mediumは版branchを直接利用します。
+          </p>
+        </section>
+
+        <section class="doc-section">
+          <h2>4. メインとサブエージェントの品質ループ</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>メイン（Astra／Solの場合）</strong>
+              <p>
+                計画、規模判定、承認確認、品質判定、再検証、公開引き継ぎを保持します。
+              </p>
+            </article>
+            <article class="doc-card">
+              <strong>実装サブエージェント</strong>
+              <p>
+                smallはLuna、medium／largeはTerra。現在の1
+                Phaseだけを書き込みます。
+              </p>
+            </article>
+          </div>
+          <div class="doc-flow">
+            <div class="doc-flow-node">
+              <span class="doc-badge">MAIN</span>
+              <h3>計画・承認</h3>
+              <p>実装対象と入力契約を確定。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-special">CHILD</span>
+              <h3>Luna／Terraが実装</h3>
+              <p>書き込み担当は常に1つ。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">MAIN</span>
+              <h3>品質を判定</h3>
+              <p>メインが差分とゲートを確認。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-danger">FAIL</span>
+              <h3>同じ役へ差し戻し</h3>
+              <p>修正後、メインが最初から再検証。</p>
+            </div>
+          </div>
+          <div class="alert-warning">
+            <strong>同時実行制限:</strong>
+            .codex/config.tomlのmax_concurrent_threads_per_session=1により、書き込みサブエージェントだけでなくsession内のsubagent全体が1つに制限されます。メイン自身も並行編集しません。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>5. 開始・品質・公開の機械的な流れ</h2>
+          <div class="doc-phase">
+            <div class="doc-phase-number">START</div>
+            <div>
+              <h3>開始前検査</h3>
+              <p>
+                docs/pr-agent-start-input.jsonと承認snapshot／hashを準備し、引数なしの./tools/pr-agent-startを実行。clean
+                worktree、branch、origin、reviewBaseSha、計画hash、規模を検査し、記録の上書きを拒否します。
+              </p>
+            </div>
+          </div>
+          <div class="doc-phase">
+            <div class="doc-phase-number">GATE</div>
+            <div>
+              <h3>品質ゲート</h3>
+              <p>
+                差分照合 → compose.devのapplicationでpnpm format → pnpm
+                verify:phase（typecheck＋test）。DB変更時はdb:generate、SQLレビュー、local
+                dev migrate、compose.test
+                integrationを追加し、必要ならホストNode
+                22.23.1で./tools/run-e2eを実行します。
+              </p>
+            </div>
+          </div>
+          <div class="doc-phase">
+            <div class="doc-phase-number">PUBLISH</div>
+            <div>
+              <h3>公開前検査</h3>
+              <p>
+                全品質PASS、commit済みclean
+                tree、開始記録、同じSHAの実装／品質証跡、全diff分類、HTML、安全記録を揃え、./tools/pr-agent-publishのみを使います。
+              </p>
+            </div>
+          </div>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>対象</th>
+                  <th>現在の実行</th>
+                  <th>適用範囲</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>typecheck</td>
+                  <td>
+                    runtime:check／rules:check／frontend・backend・toolsのtsc
+                  </td>
+                  <td>pnpm verify:phase</td>
+                </tr>
+                <tr>
+                  <td>test</td>
+                  <td>vitest run</td>
+                  <td>pnpm verify:phase</td>
+                </tr>
+                <tr>
+                  <td>CI</td>
+                  <td>全branch pushでformat:check＋verify:phase</td>
+                  <td>E2Eはmain pushのみ、Chromium＋WebKit</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>6. 自律実行と人間承認の境界</h2>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>判断・操作</th>
+                <th>扱い</th>
+                <th>境界</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>smallの直接実装</td>
+                <td><span class="doc-badge-status-success">自律可能</span></td>
+                <td>直接実装可と判定された後は、通常は追加の計画承認なし。</td>
+              </tr>
+              <tr>
+                <td>medium／largeの実装</td>
+                <td><span class="doc-badge-status-warning">承認必要</span></td>
+                <td>
+                  計画書と明示承認が必要。同一計画内の次Phaseは追加承認不要。
+                </td>
+              </tr>
+              <tr>
+                <td>計画外変更・新しい権限・仕様判断</td>
+                <td><span class="doc-badge-status-danger">停止</span></td>
+                <td>AIの判断で進めず、ユーザーへ報告。</td>
+              </tr>
+              <tr>
+                <td>push／通常PR</td>
+                <td>
+                  <span class="doc-badge-status-success">条件付き自律</span>
+                </td>
+                <td>
+                  全PASS、clean
+                  tree、証跡、branch経路などpublish条件成立時のみ。
+                </td>
+              </tr>
+              <tr>
+                <td>merge／approve</td>
+                <td><span class="doc-badge-status-warning">人間</span></td>
+                <td>機能PRのMergeは人間が行う。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h2>7. 仕組みの実装状態</h2>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>分類</th>
+                <th>確認できる内容</th>
+                <th>評価</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>実際に今動くもの</td>
+                <td>
+                  tools/pr-agent-start／publishの入力・branch・SHA・artifact検査、pnpm
+                  verify:phase、CIのformat／品質ゲート、.codex/config.tomlのsubagent上限。
+                </td>
+                <td><span class="doc-badge-status-success">機械実行</span></td>
+              </tr>
+              <tr>
+                <td>設定しないと効かないもの</td>
+                <td>
+                  .codex/agentsのLuna／Terra設定、Astra／Solをメインとして使うこと、Rulesの配置・再起動・execpolicy検証。
+                </td>
+                <td>
+                  <span class="doc-badge-status-warning">導入条件あり</span>
+                </td>
+              </tr>
+              <tr>
+                <td>文書上のもの</td>
+                <td>
+                  Phaseごとの役割切替、実装内容の判断、diff分類、証跡の意味付け、FAIL原因の分析、公開可否の最終判断。
+                </td>
+                <td><span class="doc-badge-status-warning">運用依存</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h2>8. 未整備・リスク</h2>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card doc-card-status-danger">
+              <strong>Rulesの有効性</strong>
+              <p>
+                codx/rules/pr-agent.rulesは自動読込先ではありません。現時点でRulesによる直接git
+                push等の禁止が有効とは確認できません。READMEにも別途配置と再起動が必要とあります。wrapperは強制しますが、OS隔離で迂回を不可能にする仕組みではありません。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <strong>commit工程</strong>
+              <p>
+                品質PASS後から公開までのcommit担当・タイミング・commit後にどのゲートを再実行するかが一意ではありません。publishはdirty
+                treeを拒否するため、ここが停止要因になります。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>formatの範囲</strong>
+              <p>
+                pnpm
+                formatはrepo全体を書き換える可能性があり、Phase外変更禁止と衝突し得ます。CIはformat:checkです。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>証跡の永続性</strong>
+              <p>
+                docs/*は.gitignore対象で、計画・証跡・レビューHTMLはGitで共有・履歴化されません。hash改変検出はありますが署名や永続保管ではありません。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>E2Eの適用範囲</strong>
+              <p>branch CIにE2Eはなく、必要なE2Eはローカル証跡に依存します。</p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>準備作業の多さ</strong>
+              <p>
+                start入力、snapshot、hash、品質証跡、diff分類、handoff
+                JSON、HTMLは単一コマンドで全自動生成されず、AI／人による準備が残ります。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>9. 優先改善提案（未実装）</h2>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>優先度</th>
+                <th>提案</th>
+                <th>目的</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="doc-badge-status-danger">P0</span></td>
+                <td>commit工程を正本化する</td>
+                <td>担当、タイミング、commit後のSHAでの再品質ゲートを明記。</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-danger">P0</span></td>
+                <td>Rulesを有効な設定層へ導入する</td>
+                <td>
+                  配置・再起動・execpolicy検証を行うか、wrapper以外をOS／権限で封じる。
+                </td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>formatをcheck／focused writeへ見直す</td>
+                <td>Phase外の意図しないdiffを防止。</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>artifact・hash・handoff generatorを用意する</td>
+                <td>証跡準備の手作業と入力ミスを削減。</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>local E2EのSHA紐付けとCI方針を明確化する</td>
+                <td>ローカル結果を公開対象のcommitと結び付ける。</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">P2</span></td>
+                <td>docs証跡の保存・共有方針を定める</td>
+                <td>
+                  ignore対象資料の履歴・閲覧方法を決める。read-only並列とwriter直列の分離も検討。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h2>10. 根拠マップ</h2>
+          <p class="doc-muted">
+            以下は、この資料の主張を確認できるリポジトリ内の根拠ファイルです。実在を確認できない機能は実装済みとして扱っていません。
+          </p>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>主張</th>
+                <th>根拠</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>役割選択・引き継ぎ・Phase承認</td>
+                <td>AGENTS.md</td>
+              </tr>
+              <tr>
+                <td>規模判定とbranch方針</td>
+                <td>IMPLEMENTATION_DECISION_FLOW.md</td>
+              </tr>
+              <tr>
+                <td>計画書の形式・Phase品質ゲート</td>
+                <td>IMPLEMENTATION_PLAN_TEMPLATE.md</td>
+              </tr>
+              <tr>
+                <td>実装時の対象範囲・禁止事項</td>
+                <td>実装エージェント.md</td>
+              </tr>
+              <tr>
+                <td>検証順序・FAIL時の差し戻し</td>
+                <td>品質管理エージェント.md、品質管理.md</td>
+              </tr>
+              <tr>
+                <td>高モデルのLuna／Terra委譲と逐次実行</td>
+                <td>
+                  MULTI_AGENT_WORKFLOW.md、.codex/agents/implementation-luna.toml、.codex/agents/implementation-terra.toml
+                </td>
+              </tr>
+              <tr>
+                <td>subagent全体の同時実行上限</td>
+                <td>.codex/config.toml</td>
+              </tr>
+              <tr>
+                <td>開始・公開入力とwrapperのschema</td>
+                <td>
+                  codx/README.md、tools/pr-agent-start.ts、tools/pr-agent-publish.ts、toolsのschema
+                </td>
+              </tr>
+              <tr>
+                <td>Rulesの配置条件</td>
+                <td>codx/README.md、codx/rules/pr-agent.rules</td>
+              </tr>
+              <tr>
+                <td>docs資料がGit管理対象外</td>
+                <td>docs/AGENTS.md、.gitignore</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h2>最終評価</h2>
+          <div class="alert-success">
+            <strong>評価:</strong>
+            現在の構成は、AIに実装を任せながら、Phase品質ゲート・環境分離・公開前検査・人間Mergeを残す運用として開始できます。一方、PRまで完全自律と位置付けるには、まずP0のcommit工程と有効なRules制御を正本化する必要があります。現状の強みは「勝手に最後まで進むこと」ではなく、条件が揃わないと停止できることです。
+          </div>
+          <p class="doc-muted">
+            この資料は現状調査報告です。コード、設定、開発フローの変更や、push・PR・外部公開は行っていません。
+          </p>
+        </section>
+      </div>
+
+      <div
+        class="doc-tab-panel"
+        id="panel-improved"
+        role="tabpanel"
+        aria-labelledby="tab-improved"
+        hidden
+      >
+        <section class="doc-section">
+          <h2>A. 結論</h2>
+          <div class="doc-grid doc-grid-three">
+            <article class="doc-card doc-card-status-success">
+              <strong>実現可能</strong>
+              <p>
+                既存の思想を保ったまま、安全な自動ループへ拡張できます。ただし、文書だけではなく、計画データ・状態機械・隔離された作業場所・信頼できる実行器が必要です。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>承認は最初に集約</strong>
+              <p>
+                DB、依存、API、権限、破壊的変更などを計画段階で洗い出し、未確定事項が0件のときだけ承認可能にします。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-danger">
+              <strong>安全違反は停止</strong>
+              <p>
+                計画外の変更や秘密情報の漏えいなどを検知した場合、実装を続けず隔離・証跡化・ロールバックへ移ります。
+              </p>
+            </article>
+          </div>
+          <div class="alert-info">
+            <strong>維持する思想:</strong>
+            人間は計画承認・重大判断・mergeを担当し、AIは計画提案・実装・修正を担当します。プログラムは、変更範囲・実行権限・品質ゲートを強制します。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>B. 現状との差分</h2>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>現状</th>
+                  <th>推奨する改善</th>
+                  <th>ねらい</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>文書ごとの自由記述</td>
+                  <td>canonical plan.jsonを単一正本にする</td>
+                  <td>計画の解釈ずれを防ぐ</td>
+                </tr>
+                <tr>
+                  <td>HTMLとMDを別々に作る</td>
+                  <td>同じgeneratorから両方を生成する</td>
+                  <td>人間向け説明とAI向け指示を一致させる</td>
+                </tr>
+                <tr>
+                  <td>approved:trueだけで開始</td>
+                  <td>plan hashと具体的decisionを含むapproval record</td>
+                  <td>何を承認したかを固定する</td>
+                </tr>
+                <tr>
+                  <td>AGENTS.md中心の工程遷移</td>
+                  <td>永続state machineだけが遷移</td>
+                  <td>AIの自己判断による飛び越しを防ぐ</td>
+                </tr>
+                <tr>
+                  <td>版branchで直接書き込み</td>
+                  <td>全自動write taskを隔離worktreeで実行</td>
+                  <td>安全な破棄と復旧を可能にする</td>
+                </tr>
+                <tr>
+                  <td>FAILを一律に修正</td>
+                  <td>REWORK / REPLAN / INFRA / SAFETYへ分類</td>
+                  <td>コード修正で解決できない失敗を誤修正しない</td>
+                </tr>
+                <tr>
+                  <td>agentからenvを参照可能</td>
+                  <td>opaque capabilityとtrusted broker</td>
+                  <td>AIへ秘密値を直接渡さない</td>
+                </tr>
+                <tr>
+                  <td>Rules文書への依存</td>
+                  <td>Rulesとrunner allowlistの二層</td>
+                  <td>迂回経路も制限する</td>
+                </tr>
+                <tr>
+                  <td>自由なcommit</td>
+                  <td>trusted checkpointとpromotion</td>
+                  <td>検証したSHAと公開SHAを一致させる</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>C. Canonical Plan設計</h2>
+          <div class="alert-warning">
+            <strong>項目別承認:</strong>
+            DB変更、migration、依存追加、API契約、権限・秘密情報・外部副作用を具体的な変更単位として計画HTMLに一覧化し、人間が各項目を承認または却下します。却下項目・未決・TBDが残る場合は最終承認不可です。最終承認後は、承認済みplan
+            hashの範囲を追加確認なしで自動実行します。
+          </div>
+          <p>
+            人が読むHTMLと、実装AIが読むMDを個別に編集するのではなく、型のある一つの計画から生成します。推奨保存先は
+            <code>docs/agent-runs/&lt;runId&gt;/plan.json</code>
+            です（docsをGitで保存するかは別途決定します）。
+          </p>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge">01</span>
+              <h3>plan.json</h3>
+              <p>Zod schemaで検証する単一正本。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">02</span>
+              <h3>人間向けHTML</h3>
+              <p>承認前のレビュー資料。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">03</span>
+              <h3>承認record</h3>
+              <p>planHash・承認者・期限を固定。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">04</span>
+              <h3>agent-plan.md</h3>
+              <p>承認済みhashから生成。</p>
+            </div>
+          </div>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>必須情報</strong>
+              <p>
+                schemaVersion、planId/runId、目的・前提、openDecisions、Phase、allowedPaths／forbiddenPaths、API変更、DB変更・migration・rollback、依存の版／理由／license、権限、秘密情報方針、外部副作用、品質ゲート、失敗方針、最大試行回数、予算、branch／worktree、受入条件。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>承認条件</strong>
+              <p>
+                <code>openDecisions.length === 0</code>
+                のときだけ承認可能にします。HTMLとMDにはplanId、schemaVersion、planHashを表示し、手編集は禁止します。修正はplan.jsonへ戻し、再生成・再承認します。
+              </p>
+            </article>
+          </div>
+          <div class="alert-success">
+            <strong>一致の保証:</strong> 同じ型付きview
+            modelからHTMLとMDをrenderし、generatorのgolden
+            testで意味的な内容が一致することを検証します。hashだけに依存せず、同じ入力から生成されたことも確認します。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>D. Orchestratorの状態機械</h2>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge">DRAFT</span>
+              <p>計画作成</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">READY_FOR_REVIEW</span>
+              <p>レビュー可能</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-warning">AWAITING_APPROVAL</span>
+              <p>承認待ち</p>
+            </div>
+          </div>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">APPROVED</span>
+              <p>承認済み</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">WORKSPACE_READY</span>
+              <p>隔離場所を準備</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">PHASE_IMPLEMENTING</span>
+              <p>Phaseを実装</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">PHASE_VERIFYING</span>
+              <p>Phaseを検証</p>
+            </div>
+          </div>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>検証結果</th>
+                  <th>遷移先</th>
+                  <th>意味</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>PASS</td>
+                  <td>次PhaseまたはFINAL_VERIFY</td>
+                  <td>承認済み範囲で前進</td>
+                </tr>
+                <tr>
+                  <td>FIXABLE_FAIL</td>
+                  <td>PHASE_REWORK → VERIFY</td>
+                  <td>計画内の修正。最大試行回数内で再実行</td>
+                </tr>
+                <tr>
+                  <td>PLAN_GAP</td>
+                  <td>REPLAN_REQUIRED</td>
+                  <td>
+                    新しいDB／API／依存／権限／仕様。実装停止・再計画・再承認
+                  </td>
+                </tr>
+                <tr>
+                  <td>INFRA_FAIL</td>
+                  <td>INFRA_BLOCKED</td>
+                  <td>コードを変更せず、限定retryまたは人へ報告</td>
+                </tr>
+                <tr>
+                  <td>SAFETY_VIOLATION</td>
+                  <td>QUARANTINED → ROLLBACK／DISCARD</td>
+                  <td>能力を失効し、隔離worktreeを安全に破棄</td>
+                </tr>
+                <tr>
+                  <td>FINAL_VERIFY</td>
+                  <td>COMMIT_CHECKPOINT → REVIEW_ARTIFACT → PUBLISH_READY</td>
+                  <td>検証済みSHAを固定して公開準備</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="alert-warning">
+            <strong>重要:</strong>
+            遷移を決めるのはorchestratorだけです。AIの出力は提案・事実として扱い、状態を直接変更できないようにします。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>E. Phaseごとの自動ループ</h2>
+          <div class="alert-info">
+            <strong>停止条件の区別:</strong>
+            計画にないDB・API・依存・権限・パス・仕様が必要になった場合だけ<code>REPLAN_REQUIRED</code>へ停止し、plan.jsonを修正して再承認します。計画内の通常FAILは追加承認なしで自動修正・再検証します。<code>INFRA_FAIL</code>は環境復旧待ち、<code>SAFETY_VIOLATION</code>は隔離・能力失効であり、REPLANと混同しません。
+          </div>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge">MAIN</span>
+              <h3>計画</h3>
+              <p>承認前に全判断を洗い出す。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-special">IMPLEMENTER</span>
+              <h3>実装</h3>
+              <p>現在Phase・許可パスだけに書く。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">VERIFIER</span>
+              <h3>品質確認</h3>
+              <p>固定toolで読み取り検証。</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">PASS</span>
+              <h3>次Phase</h3>
+              <p>FAILなら分類して修正または再計画。</p>
+            </div>
+          </div>
+          <div class="doc-grid doc-grid-two">
+            <article class="doc-card">
+              <strong>実装前後の境界検査</strong>
+              <p>
+                書き込みごとにdiffの変更パスを確認し、allowedPathsの部分集合であることを強制します。formatは対象指定またはcheck-onlyに限定し、リポジトリ全体の無制限書き換えを避けます。
+              </p>
+            </article>
+            <article class="doc-card">
+              <strong>検証の固定</strong>
+              <p>
+                推奨する自動修正回数は3回ですが、最終値は人が決定します。最終PASSはcheckpoint
+                SHAに対して行い、テストしたSHAと公開するSHAの間に差分を残しません。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>F. 隔離とロールバック</h2>
+          <div class="alert-success">
+            <strong>必須方針:</strong>
+            規模にかかわらず、正式branch／checkoutを直接変更せず、一時branch＋Git
+            worktreeで全自動書き込みを隔離します。現在の「版branchへ直接書く」方式から変更します。
+          </div>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>規模</th>
+                  <th>推奨配置</th>
+                  <th>PASS後</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>small／medium</td>
+                  <td>feature/vX.Y.Zから一時task branch／worktree</td>
+                  <td>
+                    trusted promotionがff-onlyで版branchを更新し、push_only
+                  </td>
+                </tr>
+                <tr>
+                  <td>large</td>
+                  <td>feature/&lt;slug&gt;-vX.Y.Zの専用worktree／branch</td>
+                  <td>版branchへ通常PR</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            通常FAILまたは安全違反時は、伏字済みのdiff・ログなど必要な証跡を保存した後、runId・marker・開始SHAを検証したrun専用task-owned
+            worktreeと一時branchだけをtrusted cleanup
+            APIで破棄します。正式branch／primary
+            checkoutはreset／cleanせず、汚しません。安全違反時は処理とネットワークを停止し、capabilityを失効させます。
+          </p>
+          <div class="alert-danger">
+            <strong>自動で戻せないもの:</strong> push済みのremote
+            branchや外部DBの副作用は自動削除・rollbackしません。破壊的migrationは事前承認済みのbackup・rollback・リハーサルがない限り禁止します。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>G. 秘密情報とCapability</h2>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge">AI</span>
+              <p>固定型の要求だけ送る</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-special">BROKER</span>
+              <p>秘密値を保持・検証</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">RUNNER</span>
+              <p>許可済み処理を実行</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">REDACTED RESULT</span>
+              <p>伏字結果だけ返す</p>
+            </div>
+          </div>
+          <p>
+            本番・stagingの秘密とネットワークはAIプロセスへ渡しません。開発用DBはDocker内部ネットワークの専用ユーザー、外部Providerはsandbox
+            key、GitHubは期限付きでbranchと操作を限定したtokenを使います。
+          </p>
+          <div class="alert-danger">
+            <strong>注意:</strong>
+            秘密値をAIが編集したコードのプロセスへmountするだけでは秘密情報保護になりません。そのコードが出力・外部送信できるためです。秘密を使う処理は、別OSユーザーのbrokerが固定定義の能力として実行します。
+          </div>
+          <p>
+            候補Toolは
+            <code>prepare_run</code
+            >、<code>apply_migration_local</code>、<code>verify_phase</code>、<code>run_e2e</code>、<code>checkpoint</code>、<code>promote_ff_only</code>、<code>publish_approved_sha</code>、<code
+              >quarantine_run</code
+            >
+            です。<code>run_command</code>は作りません。
+          </p>
+        </section>
+
+        <section class="doc-section">
+          <h2>H. 計画段階の人間レビュー項目</h2>
+          <div class="doc-grid doc-grid-three">
+            <article class="doc-card doc-card-status-warning">
+              <strong>データ・契約</strong>
+              <p>
+                DB変更、データ影響、migration順序、backup／rollback、API
+                request／response、後方互換性。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>権限・範囲</strong>
+              <p>
+                認証・認可、対象オブジェクト、session／token、ファイル範囲、生成物、外部副作用。
+              </p>
+            </article>
+            <article class="doc-card doc-card-status-warning">
+              <strong>運用・復旧</strong>
+              <p>
+                依存の版・license・network、秘密情報、E2E、失敗分類、最大試行・予算、branch、監査保持。
+              </p>
+            </article>
+          </div>
+          <div class="alert-warning">
+            <strong>承認を止める条件:</strong> unknown、TBD、open
+            decisionが一つでも残っている場合は承認しません。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>I–K. ルール・強制点・安全違反</h2>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>プログラムで強制する不変条件</th>
+                  <th>検査場所</th>
+                  <th>失敗時</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>承認済みplan hashだけ実行</td>
+                  <td>orchestrator</td>
+                  <td>開始拒否</td>
+                </tr>
+                <tr>
+                  <td>現在Phaseだけ実行</td>
+                  <td>runner</td>
+                  <td>能力失効</td>
+                </tr>
+                <tr>
+                  <td>変更パス⊆allowedPaths</td>
+                  <td>changed-path guard</td>
+                  <td>PLAN_GAPまたはSAFETY</td>
+                </tr>
+                <tr>
+                  <td>DB host／name／roleはlocal allowlist</td>
+                  <td>migration tool</td>
+                  <td>実行拒否</td>
+                </tr>
+                <tr>
+                  <td>依存変更は承認manifestと完全一致</td>
+                  <td>dependency guard</td>
+                  <td>再計画</td>
+                </tr>
+                <tr>
+                  <td>本番／staging経路なし</td>
+                  <td>network／broker</td>
+                  <td>即時隔離</td>
+                </tr>
+                <tr>
+                  <td>検証済みcheckpoint SHAを公開</td>
+                  <td>publisher</td>
+                  <td>publish拒否</td>
+                </tr>
+                <tr>
+                  <td>retry ≤ approved max</td>
+                  <td>orchestrator</td>
+                  <td>人へ停止</td>
+                </tr>
+                <tr>
+                  <td>登録済みworktreeだけcleanup</td>
+                  <td>trusted cleanup</td>
+                  <td>破棄拒否</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            安全違反の例は、本番／staging
+            credential・networkへのアクセス、承認外の破壊的コマンド、diff／ログへの秘密値、登録外worktreeへの書き込み、証跡改ざん、runner／publisherの迂回、未承認の破壊的migrationです。検知時はquarantine、能力失効、subprocess／network停止、伏字証跡保存、人への通知を行います。通常のtest失敗は安全違反ではありません。
+          </p>
+        </section>
+
+        <section class="doc-section">
+          <h2>L–M. 残る人間判断と段階導入</h2>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>決定事項</th>
+                  <th>推奨初期値</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>全サイズを隔離するか</td>
+                  <td>全自動write taskを隔離</td>
+                </tr>
+                <tr>
+                  <td>承認の身元・UI</td>
+                  <td>planHashを表示する明示承認</td>
+                </tr>
+                <tr>
+                  <td>plan.jsonの保存先</td>
+                  <td>sanitized recordは監査保管、秘密はGit外</td>
+                </tr>
+                <tr>
+                  <td>自動修正上限</td>
+                  <td>3回＋時間・費用上限</td>
+                </tr>
+                <tr>
+                  <td>trusted runner</td>
+                  <td>別OSユーザーのローカルdaemonまたはCI</td>
+                </tr>
+                <tr>
+                  <td>commit方式</td>
+                  <td>checkpoint SHA固定、版branchはff-only promotion</td>
+                </tr>
+                <tr>
+                  <td>E2E証跡</td>
+                  <td>対象SHAと環境を記録し保存期限を定める</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="doc-flow doc-flow-columns-five">
+            <div class="doc-flow-node">
+              <span class="doc-badge">Stage 1</span>
+              <p>canonical plan・hash・generator</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge">Stage 2</span>
+              <p>worktree・state machine・path guard</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-special">Stage 3</span>
+              <p>trusted runner・秘密隔離</p>
+            </div>
+            <div class="doc-flow-arrow">→</div>
+            <div class="doc-flow-node">
+              <span class="doc-badge-status-success">Stage 4</span>
+              <p>公開・監査・復旧訓練</p>
+            </div>
+          </div>
+          <div class="alert-warning">
+            <strong>規模:</strong>
+            これは小さな設定変更ではなく、中〜大規模のworkflow
+            platformです。各Stageを独立した実装計画・承認に分けることを推奨します。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>将来変更の対応表（未実装）</h2>
+          <p>
+            現在の正本文書・設定をどのように改善設計へ対応させるかを整理します。ここでは変更案だけを示し、実際の編集・実装は行っていません。
+          </p>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>対象</th>
+                  <th>現状課題</th>
+                  <th>変更案</th>
+                  <th>強制方法</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>AGENTS.md</td>
+                  <td>工程や停止条件が文章中心で、状態遷移を迂回できる</td>
+                  <td>
+                    orchestratorを工程の正本とし、承認範囲・再計画・安全違反時の停止を定義
+                  </td>
+                  <td>文書ルール＋orchestrator</td>
+                </tr>
+                <tr>
+                  <td>計画作成エージェント.md</td>
+                  <td>DB・依存・API・権限などの判断漏れを事前に検出しにくい</td>
+                  <td>
+                    decision inventoryを埋め、open
+                    decisionが0になるまで計画を承認不可にする
+                  </td>
+                  <td>文書ルール＋schema検証</td>
+                </tr>
+                <tr>
+                  <td>IMPLEMENTATION_PLAN_TEMPLATE.md</td>
+                  <td>自由記述ではHTML／MDの解釈がずれる</td>
+                  <td>
+                    plan.jsonの必須項目、Phaseの許可パス、capability、品質・失敗方針をテンプレート化
+                  </td>
+                  <td>文書ルール＋generator</td>
+                </tr>
+                <tr>
+                  <td>実装エージェント.md</td>
+                  <td>実装担当が計画外の変更や広い範囲の編集を判断し得る</td>
+                  <td>
+                    current
+                    Phase・allowedPaths・開始SHAだけを入力し、構造化結果を返す
+                  </td>
+                  <td>文書ルール＋path guard</td>
+                </tr>
+                <tr>
+                  <td>品質管理.md／品質管理エージェント.md</td>
+                  <td>FAILの原因分類と、検証SHAの固定が不十分</td>
+                  <td>
+                    REWORK／REPLAN／INFRA／SAFETYを分類し、checkpoint
+                    SHAで再検証する
+                  </td>
+                  <td>文書ルール＋verifier</td>
+                </tr>
+                <tr>
+                  <td>MULTI_AGENT_WORKFLOW.md</td>
+                  <td>
+                    サブエージェントの役割はあるが、状態機械との接続が弱い
+                  </td>
+                  <td>
+                    Phase単位の逐次委譲、同じ担当への修正、メインによるPASS判定をstate
+                    machineへ接続
+                  </td>
+                  <td>文書ルール＋orchestrator</td>
+                </tr>
+                <tr>
+                  <td>PR作成エージェント.md</td>
+                  <td>品質確認後から公開SHAまでの境界が曖昧</td>
+                  <td>
+                    approved plan hash・passed checkpoint
+                    SHA・promotion条件を入力必須にする
+                  </td>
+                  <td>文書ルール＋publisher</td>
+                </tr>
+                <tr>
+                  <td>.codex/config.toml／.codex/agents</td>
+                  <td>
+                    同時実行数やサブエージェントの権限だけでは計画境界を保証できない
+                  </td>
+                  <td>
+                    writerは1つに限定し、実装agentのsandboxと利用可能なtoolを最小化する
+                  </td>
+                  <td>設定＋runner側検査</td>
+                </tr>
+                <tr>
+                  <td>Rulesの有効配置</td>
+                  <td>
+                    リポジトリ内のcodx/rulesだけでは自動読込を確認できない
+                  </td>
+                  <td>
+                    有効なCodex設定層へ配置し、起動後にexecpolicyで判定を検証する
+                  </td>
+                  <td>Rules＋起動時検査</td>
+                </tr>
+                <tr>
+                  <td>codx/tools</td>
+                  <td>汎用shellや手作業の証跡準備は迂回経路になり得る</td>
+                  <td>
+                    prepare／verify／migration／checkpoint／promote／quarantineを型付きToolとして追加し、任意shellを提供しない
+                  </td>
+                  <td>プログラム強制</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="alert-warning">
+            <strong>変更順序:</strong> まずplan schema・generator・approval
+            hashを整え、次にworktree／state machine／path guard、最後にtrusted
+            runner・秘密情報broker・公開連携を導入します。文書だけを先に変更しても、安全性は保証されません。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>将来変更の対応表（未実装）</h2>
+          <p>
+            現在の正本文書・設定を改善設計へ対応させる案です。実際の編集・実装は行っていません。
+          </p>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>対象</th>
+                  <th>現状課題</th>
+                  <th>変更案</th>
+                  <th>強制方法</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>AGENTS.md</td>
+                  <td>工程遷移が文章中心</td>
+                  <td>orchestratorを正本にし、承認・再計画・安全停止を定義</td>
+                  <td>文書＋プログラム</td>
+                </tr>
+                <tr>
+                  <td>計画作成エージェント.md</td>
+                  <td>判断漏れを検出しにくい</td>
+                  <td>DB・依存・API・権限などのdecision inventoryを必須化</td>
+                  <td>文書＋schema検証</td>
+                </tr>
+                <tr>
+                  <td>IMPLEMENTATION_PLAN_TEMPLATE.md</td>
+                  <td>自由記述で解釈がずれる</td>
+                  <td>
+                    plan.jsonの必須項目、Phase許可パス、capability、品質方針を定義
+                  </td>
+                  <td>文書＋generator</td>
+                </tr>
+                <tr>
+                  <td>実装エージェント.md</td>
+                  <td>計画外編集を判断し得る</td>
+                  <td>current Phase・allowedPaths・開始SHAだけを入力</td>
+                  <td>文書＋path guard</td>
+                </tr>
+                <tr>
+                  <td>品質管理.md／品質管理エージェント.md</td>
+                  <td>FAIL分類とSHA固定が不十分</td>
+                  <td>
+                    REWORK／REPLAN／INFRA／SAFETYを分類しcheckpoint SHAで再検証
+                  </td>
+                  <td>文書＋verifier</td>
+                </tr>
+                <tr>
+                  <td>MULTI_AGENT_WORKFLOW.md</td>
+                  <td>状態機械との接続が弱い</td>
+                  <td>Phase逐次委譲と同一担当への修正を状態機械へ接続</td>
+                  <td>文書＋orchestrator</td>
+                </tr>
+                <tr>
+                  <td>PR作成エージェント.md</td>
+                  <td>検証SHAと公開SHAの境界が曖昧</td>
+                  <td>
+                    approved plan hash・passed SHA・promotion条件を入力必須化
+                  </td>
+                  <td>文書＋publisher</td>
+                </tr>
+                <tr>
+                  <td>.codex/config.toml／.codex/agents</td>
+                  <td>権限設定だけでは境界を保証できない</td>
+                  <td>writerを1つに限定しsandboxとtoolを最小化</td>
+                  <td>設定＋runner検査</td>
+                </tr>
+                <tr>
+                  <td>Rulesの有効配置</td>
+                  <td>codx/rulesの自動読込を確認できない</td>
+                  <td>有効設定層へ配置し、起動後にexecpolicy検証</td>
+                  <td>Rules＋起動時検査</td>
+                </tr>
+                <tr>
+                  <td>codx/tools</td>
+                  <td>汎用shellが迂回経路になる</td>
+                  <td>
+                    prepare／verify／migration／checkpoint／promote／quarantineを型付きTool化
+                  </td>
+                  <td>プログラム強制</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="alert-warning">
+            <strong>導入順序:</strong> plan
+            schema・generator・項目別承認・hash、全規模worktree・state
+            machine・path guard、trusted
+            runner・秘密情報broker、公開・監査の順に導入します。
+          </div>
+        </section>
+
+        <section class="doc-section">
+          <h2>O. 公式情報と設計上の推奨</h2>
+          <p>
+            以下は公式仕様として確認できる範囲と、このプロジェクトへの設計推奨を分けて扱います。
+          </p>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>情報</th>
+                  <th>位置付け</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a
+                      href="https://learn.chatgpt.com/docs/agent-configuration/rules"
+                      >OpenAI Rules</a
+                    >
+                  </td>
+                  <td>
+                    Rulesはsandbox外コマンドの扱いを制御します。実験的機能であり、設定層・再起動・execpolicy確認が必要です。
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a
+                      href="https://learn.chatgpt.com/docs/agent-configuration/subagents"
+                      >OpenAI Subagents</a
+                    >
+                  </td>
+                  <td>
+                    custom agentのsandbox_mode、継承設定、同時実行数、狭いtool
+                    surfaceを設定できます。
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a
+                      href="https://developers.openai.com/api/docs/guides/latest-model"
+                      >OpenAI Model guidance</a
+                    >
+                  </td>
+                  <td>
+                    モデルや指示で委譲の傾向は変わりますが、安全制御の保証ではありません。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="doc-muted">
+            公式仕様からの事実と、状態機械・plan
+            schema・broker・隔離worktreeを組み合わせる設計推奨は区別しています。実装前に、現在のCodex環境で設定の有効性を再確認します。
+          </p>
+        </section>
+
+        <section class="doc-section">
+          <h2>最終的な運用イメージ</h2>
+          <div class="alert-success">
+            <strong>人間が一度承認:</strong>
+            計画HTMLで全判断を確認し、planHashを承認します。その後は、承認範囲内で「実装
+            → 品質確認 → 計画内FAILなら修正 → 再確認 →
+            次Phase」を自動実行します。計画外・安全違反・インフラ障害ではループを止め、再計画または人間対応へ戻します。
+          </div>
+        </section>
+      </div>
+    </main>
+    <script>
+      (() => {
+        const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+        const panels = tabs.map((tab) =>
+          document.getElementById(tab.getAttribute("aria-controls")),
+        );
+        const activate = (index, moveFocus = true) => {
+          tabs.forEach((tab, i) => {
+            const selected = i === index;
+            tab.setAttribute("aria-selected", String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            panels[i].hidden = !selected;
+          });
+          if (moveFocus) tabs[index].focus();
+        };
+        tabs.forEach((tab, index) => {
+          tab.addEventListener("click", () => activate(index, false));
+          tab.addEventListener("keydown", (event) => {
+            let next = index;
+            if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+            else if (event.key === "ArrowLeft")
+              next = (index - 1 + tabs.length) % tabs.length;
+            else if (event.key === "Home") next = 0;
+            else if (event.key === "End") next = tabs.length - 1;
+            else return;
+            event.preventDefault();
+            activate(next);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

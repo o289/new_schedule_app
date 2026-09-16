@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Git管理対象・gitignore 調査報告</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <span class="doc-badge">Git Tracking Audit / 2026-09-10</span>
+        <h1>Git管理対象と<br />gitignoreの調査</h1>
+        <p>
+          現在の未コミット変更、無視対象、scriptの参照関係を調査し、公開すべきプロジェクト資産とローカル専用資産を分類した。
+          調査時点のbranchは<code>feature/v3.2.3</code>、HEADは<code>67e3fd7</code>。
+        </p>
+      </header>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Decision</p>
+        <h2>結論：現在のscript系はGit管理から外さない</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <span class="doc-badge doc-badge-status-success">TRACK</span>
+            <h3>現在の未コミット17件</h3>
+            <p>
+              追跡済み変更10件と未追跡7件は、branch判定・サブエージェント運用・安全なpush・CI確認を構成する変更。すべてGit管理候補。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <span class="doc-badge doc-badge-status-warning"
+              >DO NOT IGNORE</span
+            >
+            <h3><code>tools/*</code>一括除外</h3>
+            <p>
+              typecheck、E2E、PR公開フローがtools配下へ依存するため危険。clone後の検証と安全境界が再現できなくなる。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">LOCAL ONLY</span>
+            <h3>個人用scriptだけ分離</h3>
+            <p>
+              一時scriptを非公開にするなら、用途が明確な<code>tools/local/</code>や<code>tools/scratch/</code>へ置き、限定的にignoreする。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-danger">
+          <strong>現在の未追跡3件だけを除外してはいけない。</strong>
+          変更済みの<code>tools/pr-agent-publish.ts</code>は<code>./pr-agent-start.js</code>をimportしている。
+          start実装をコミットしなければ、公開処理の型検査・実行・安全検証が欠けた状態になる。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Working Tree</p>
+        <h2>現在コミットされていない変更</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card">
+            <strong>追跡済み変更</strong>
+            <p><span class="doc-badge">10 files</span></p>
+            <p class="doc-muted">794行追加・161行削除</p>
+          </article>
+          <article class="doc-card">
+            <strong>未追跡</strong>
+            <p>
+              <span class="doc-badge doc-badge-status-warning">7 files</span>
+            </p>
+            <p class="doc-muted">開始処理3件・エージェント運用4件</p>
+          </article>
+          <article class="doc-card">
+            <strong>branch状態</strong>
+            <p>
+              <span class="doc-badge doc-badge-status-success"
+                >upstream同期</span
+              >
+            </p>
+            <p class="doc-muted"><code>+0 / -0</code></p>
+          </article>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>状態</th>
+                <th>対象</th>
+                <th>内容</th>
+                <th>提案</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td><code>AGENTS.md</code></td>
+                <td>版branchと機能branchの公開フローを役割選択へ反映</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td><code>IMPLEMENTATION_DECISION_FLOW.md</code></td>
+                <td>規模判定、branch、開始記録の正本</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td><code>IMPLEMENTATION_PLAN_TEMPLATE.md</code></td>
+                <td>規模・branch・reviewBaseSha等の計画入力</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td>
+                  <code>計画作成エージェント.md</code><br /><code
+                    >実装エージェント.md</code
+                  ><br /><code>品質管理エージェント.md</code>
+                </td>
+                <td>開始・品質・公開への役割引き継ぎ</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td>
+                  <code>PR作成エージェント.md</code><br /><code
+                    >codx/README.md</code
+                  >
+                </td>
+                <td>push_only / pull_requestと機械入力の運用仕様</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">変更済み</span></td>
+                <td>
+                  <code>tools/pr-agent-publish.ts</code><br /><code
+                    >tools/pr-agent-publish.test.ts</code
+                  >
+                </td>
+                <td>公開時の安全検証、fast-forward、CI確認とRegression Test</td>
+                <td><strong>Git管理を維持</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="doc-badge doc-badge-status-warning">未追跡</span>
+                </td>
+                <td><code>tools/pr-agent-start</code></td>
+                <td>引数なしで開始処理を呼ぶ実行可能wrapper</td>
+                <td><strong>実行権限付きで追加</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="doc-badge doc-badge-status-warning">未追跡</span>
+                </td>
+                <td><code>tools/pr-agent-start.ts</code></td>
+                <td>規模・branch・clean状態・remote・計画hashを検証</td>
+                <td><strong>追加する</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="doc-badge doc-badge-status-warning">未追跡</span>
+                </td>
+                <td><code>tools/pr-agent-start.test.ts</code></td>
+                <td>開始処理の安全境界を207行で検証</td>
+                <td><strong>追加する</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="doc-badge doc-badge-status-warning">未追跡</span>
+                </td>
+                <td>
+                  <code>.codex/config.toml</code><br /><code
+                    >.codex/agents/implementation-luna.toml</code
+                  ><br /><code>.codex/agents/implementation-terra.toml</code>
+                </td>
+                <td>
+                  サブエージェント有効化、同時実行上限、実装担当の権限・責務
+                </td>
+                <td><strong>共有運用として追加する</strong></td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="doc-badge doc-badge-status-warning">未追跡</span>
+                </td>
+                <td><code>MULTI_AGENT_WORKFLOW.md</code></td>
+                <td>
+                  メインと実装サブエージェントの責務、直列実行、FAIL時の差し戻し
+                </td>
+                <td><strong>追加する</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Script Policy</p>
+        <h2>scriptは「公開したいか」ではなく「再現に必要か」で分ける</h2>
+        <div class="doc-flow doc-flow-columns-five">
+          <div class="doc-flow-node">scriptを確認</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">CI・品質・build・安全境界から参照?</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            YES: Git管理
+          </div>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-success">
+            <span class="doc-badge doc-badge-status-success"
+              >PROJECT SCRIPT</span
+            >
+            <h3>Git管理する</h3>
+            <ul>
+              <li>package scriptから呼ばれるcheck・build・migration補助</li>
+              <li>CI/CDまたは品質管理から呼ばれるscript</li>
+              <li>DB・E2E環境を再現するrunner</li>
+              <li>push、PR、branch操作の安全境界</li>
+              <li>上記scriptのUnit / Regression Test</li>
+              <li>プロジェクト固有の固定remoteやbranch規則</li>
+            </ul>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">PERSONAL SCRIPT</span>
+            <h3>Git管理しなくてよい</h3>
+            <ul>
+              <li>一度限りのデータ調査・変換</li>
+              <li>個人の絶対パスやローカルアプリに依存</li>
+              <li>秘密情報や個人設定を含む補助script</li>
+              <li>正式コマンドから参照されない試行コード</li>
+              <li>生成し直せるデバッグ用snippet</li>
+            </ul>
+            <p class="doc-muted">
+              非公開にする場合も、正式scriptと同じディレクトリへ混在させない。
+            </p>
+          </article>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>現行script</th>
+                <th>参照・役割</th>
+                <th>判定</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>tools/check-runtime.mjs</code></td>
+                <td><code>pnpm typecheck</code>のNode・pnpm確認</td>
+                <td>
+                  <span class="doc-badge doc-badge-status-success">TRACK</span>
+                </td>
+              </tr>
+              <tr>
+                <td><code>tools/check-project-rules.ts</code></td>
+                <td><code>pnpm typecheck</code>のimport境界・any検査</td>
+                <td>
+                  <span class="doc-badge doc-badge-status-success">TRACK</span>
+                </td>
+              </tr>
+              <tr>
+                <td><code>tools/run-e2e</code></td>
+                <td><code>品質管理.md</code>が指定する唯一のE2E入口</td>
+                <td>
+                  <span class="doc-badge doc-badge-status-success">TRACK</span>
+                </td>
+              </tr>
+              <tr>
+                <td><code>tools/pr-agent-start*</code></td>
+                <td>実装開始時のbranch・SHA・計画hash・clean確認</td>
+                <td>
+                  <span class="doc-badge doc-badge-status-success">TRACK</span>
+                </td>
+              </tr>
+              <tr>
+                <td><code>tools/pr-agent-publish*</code></td>
+                <td>安全なpush・CI確認・通常PR作成の専用入口</td>
+                <td>
+                  <span class="doc-badge doc-badge-status-success">TRACK</span>
+                </td>
+              </tr>
+              <tr>
+                <td><code>tools/local/*</code>（将来）</td>
+                <td>正式フローから参照しない個人用script</td>
+                <td><span class="doc-badge">IGNORE</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Ignore Review</p>
+        <h2>現在の<code>.gitignore</code>評価</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-success">
+            <h3>現状のままでよい</h3>
+            <ul>
+              <li>
+                <code>node_modules/</code
+                >、<code>.pnpm-store/</code>：合計約992MBの再生成可能依存
+              </li>
+              <li>
+                <code>dist/</code
+                >、<code>build/</code>、<code>coverage/</code>：生成物
+              </li>
+              <li>
+                <code>.env</code>、<code>.env.*</code>、鍵ファイル：秘密情報
+              </li>
+              <li>
+                <code>backups/</code>、dump、PostgreSQL data：ローカルデータ
+              </li>
+              <li>
+                Playwright report、test-results、E2E認証state：テスト生成物
+              </li>
+              <li>IDE、OS、log、cache：端末固有または再生成可能</li>
+              <li>
+                <code>docs/*</code>：現在の「docsはGit管理しない」方針と一致
+              </li>
+            </ul>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <h3>方針を確認してから変更</h3>
+            <ul>
+              <li>
+                <code>.env.*</code>は将来の<code>.env.example</code>も無視する
+              </li>
+              <li>
+                <code>docs/*</code
+                >はHTMLだけでなく、CSS・テンプレート・設計資料・docs固有AGENTSもすべて無視する
+              </li>
+              <li>個人用scriptの専用置場はまだ定義されていない</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3>最小の追加候補</h3>
+        <pre><code># local ad-hoc scripts only
+tools/local/
+tools/scratch/
+scripts/local/
+
+# .env.* の後に置く（この命名で共有templateを使う場合だけ）
+!.env.example
+!.env.*.example</code></pre>
+        <div class="doc-alert alert-info">
+          現在の17件を処理するための<code>.gitignore</code>変更は不要。上記は、今後追加する個人用scriptの置場を限定する予防策である。
+          現在追跡対象の<code>tools/*</code>を無視対象へ移す提案ではない。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Docs Trade-off</p>
+        <h2><code>docs/*</code>は意図的だが、再現性とのトレードオフがある</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <span class="doc-badge">KEEP LOCAL</span>
+            <h3>現方針を維持する場合</h3>
+            <p>
+              調査資料、実装計画、diff、品質証跡、レビューHTMLを公開しない目的には合っている。今回のHTMLもGit状態へ現れない。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <span class="doc-badge doc-badge-status-warning"
+              >REPRODUCIBILITY</span
+            >
+            <h3>clone先でも同じ運用をしたい場合</h3>
+            <p>
+              <code>docs/AGENTS.md</code
+              >、<code>docs/styles/</code>、共通templateまで取得できない。将来必要になれば、生成物だけを狭くignoreし、運用資産を追跡する方針変更が必要。
+            </p>
+          </article>
+        </div>
+        <div class="doc-alert alert-warning">
+          現在の<code>docs/AGENTS.md</code>は「docsディレクトリのファイルをGit管理しない」と明記している。
+          そのため本調査では<code>docs/*</code>の解除を即時提案せず、運用の再現性を必要とする場合の別判断として扱う。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Recommended Action</p>
+        <h2>推奨する次の対応</h2>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <h3>現在の17件は関連する運用変更としてレビューする</h3>
+            <p>
+              文書、エージェント設定、開始処理、公開処理、テストがbranch・実装・公開運用を構成している。scriptや<code>.codex</code>だけを除外せず、未追跡7件を含めて品質確認する。
+            </p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <h3>個人用scriptの置場だけを限定して追加する</h3>
+            <p>
+              今後必要なら<code>tools/local/</code>または<code>tools/scratch/</code>を採用する。正式scriptと個人用scriptをファイル名の推測で分類しない。
+            </p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">3</div>
+          <div>
+            <h3>docs公開方針は別途決める</h3>
+            <p>
+              個人用成果物を非公開にする現在方針は維持可能。ただし、CSS・テンプレート・docs固有ルールをclone先でも使うなら、生成物と運用資産を分離する計画を作る。
+            </p>
+          </div>
+        </article>
+
+        <article class="doc-phase">
+          <div class="doc-phase-number">4</div>
+          <div>
+            <h3>秘密情報はignoreだけに依存しない</h3>
+            <p>
+              <code>.env.dev</code
+              >と<code>.env.e2e</code>は正しく無視されている。commit前には引き続きstaged
+              diffを確認し、鍵・Token・credentialを検査する。
+            </p>
+          </div>
+        </article>
+      </section>
+
+      <section class="doc-section">
+        <p class="doc-eyebrow">Scope &amp; Evidence</p>
+        <h2>調査範囲</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <tbody>
+              <tr>
+                <th>Git</th>
+                <td>
+                  <code>status --porcelain=v2</code>、tracked / untracked /
+                  ignored、diff stat、実行権限
+                </td>
+              </tr>
+              <tr>
+                <th>参照関係</th>
+                <td>
+                  <code>package.json</code
+                  >、AI役割文書、品質管理、<code>codx/README.md</code>、workflow、tools内import
+                </td>
+              </tr>
+              <tr>
+                <th>ignore容量</th>
+                <td>
+                  <code>.pnpm-store</code> 446MB、<code>node_modules</code>
+                  546MB、<code>docs</code> 3.4MB、その他build・test成果物
+                </td>
+              </tr>
+              <tr>
+                <th>変更操作</th>
+                <td>
+                  Git
+                  index、<code>.gitignore</code>、未コミット17件は変更していない。追加したのはignore済みの本HTMLのみ。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
