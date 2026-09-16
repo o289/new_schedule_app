@@ -15,6 +15,7 @@ import { runPaths } from "./run-paths";
 import { CanonicalOrchestrator } from "./canonical-orchestrator";
 import { CanonicalStateStore } from "./state-store";
 import { isFinalResponseAllowed } from "./canonical-orchestration";
+import { prepareLegacyImport } from "./legacy-import";
 import { publicationEvidenceSchema } from "./canonical-state";
 import { TrustedRunnerClient } from "../trusted-runner/client";
 import {
@@ -202,8 +203,25 @@ export async function runCommand(
       "safety-stop",
       "publish",
       "status",
+      "import-legacy-prepare",
     ].includes(command)
   ) {
+    if (command === "import-legacy-prepare") {
+      await prepareLegacyImport(
+        runId,
+        JSON.parse(
+          await io.read(`${paths.ai}/legacy-import-input.json`),
+        ) as unknown,
+        io,
+        paths,
+        {
+          markerContent: await io.read(".agent-run-marker.json"),
+          git: { run: runGit },
+          expectedWorktreeRoot: root,
+        },
+      );
+      return;
+    }
     const orchestrator = await canonical();
     if (command === "status") {
       const plan = createPlanViewModel(

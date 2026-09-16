@@ -133,7 +133,7 @@ export function renderPlanMarkdown(view: PlanViewModel): string {
     ...plan.acceptanceCriteria.map((value) => `- ${value}`),
     "",
   );
-  return `${lines.join("\n")}\n`;
+  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 export async function writePlanRun(

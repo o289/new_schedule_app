@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "runId": "agent-workflow-slim-v323-20260916-r3",
+  "plan": {
+    "path": "ai/runs/agent-workflow-slim-v323-20260916-r3/plan.json",
+    "sha256": "f1d3bc2e5edeb6163b04cb6ae4f25ed1516f78661e2eaf3c9105bc7adf80728f"
+  },
+  "planHash": "dfd6970e1d7aaa3e6fd371152a67f105ae790db0ddc552963f59b047f428c1c0",
+  "approvedBy": "user",
+  "approvedAt": "2026-09-16T12:48:31Z",
+  "expiresAt": "2026-09-23T12:48:31Z",
+  "completed": true
+}

@@ -150,6 +150,8 @@ describe("plan renderer", () => {
     const view = createPlanViewModel(input);
     const html = renderPlanHtml(view);
     const markdown = renderPlanMarkdown(view);
+    expect(markdown.endsWith("\n")).toBe(true);
+    expect(markdown.endsWith("\n\n")).toBe(false);
     expect(html).toContain(view.planHash);
     expect(markdown).toContain(view.planHash);
     expect(html).toContain("&lt;script&gt;");
