@@ -21,12 +21,12 @@
 - 小・中規模は現在の`feature/vX.Y.Z`で実装し、公開モードは`push_only`。同名originへのpushと同一SHAのCI成功で完了し、PR baseもPR URLも要求しない。
 - 大規模は計画承認後、実装前に現在の版branchから`feature/<slug>-vX.Y.Z`を作り、`pull_request`とする。baseは末尾バージョンから同版の版branchへ自動導出する。
 - 開始元は版branch、作業ツリーはclean、slugは英数字・ハイフン・アンダースコア。同名local/remote branchが存在する場合や確認できない場合はSTOP。開始前SHAを`reviewBaseSha`へ記録する。
-- 開始操作と機械入力は`./.agents/tools/pr-agent-start`と[codx/README.md](codx/README.md)に従う。実装前に現在branchと開始記録が一致していることを確認する。
+- 開始操作と機械入力は`agent:run start <runId>`と[codx/README.md](../../codx/README.md)に従う。実装前に現在branchと開始記録が一致していることを確認する。
 - 実装中に規模を変える追加要件・ファイル増加が判明した場合は計画へ戻す。dirty状態で自動branch移動をせず、開始点と承認範囲を見直す。公開処理は開始記録を照合し、不一致で停止する。
 
 ## 高モデル時の実装委譲
 
-メインが`gpt-6-astra`または`gpt-5.6-sol`の場合、計画と品質管理はメインが担当し、実装だけを[`MULTI_AGENT_WORKFLOW.md`](.md)に従って逐次委譲する。
+メインが`gpt-6-astra`または`gpt-5.6-sol`の場合、計画と品質管理はメインが担当し、実装だけを[`MULTI_AGENT_WORKFLOW.md`](MULTI_AGENT_WORKFLOW.md)に従って逐次委譲する。
 
 ```text
 小規模 → implementation_luna

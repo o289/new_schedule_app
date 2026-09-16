@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const projectRoot = process.cwd();
@@ -206,10 +206,84 @@ function inspectInstructionPaths(): RuleViolation[] {
     });
 }
 
+function inspectMarkdownLinks(): RuleViolation[] {
+  const files = [
+    join(projectRoot, "AGENTS.md"),
+    join(projectRoot, "codx/README.md"),
+    ...readdirSync(resolve(projectRoot, ".agents/instructions"))
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => join(projectRoot, ".agents/instructions", file)),
+  ];
+  const pattern = /\[[^\]]*\]\(([^)#?]+)\)/g;
+  const violations: RuleViolation[] = [];
+  for (const file of files) {
+    const text = readFileSync(file, "utf8");
+    for (const match of text.matchAll(pattern)) {
+      const target = match[1]?.trim();
+      if (!target || /^(?:https?:|mailto:)/.test(target)) continue;
+      const resolved = resolve(dirname(file), target.replace(/^<|>$/g, ""));
+      if (!existsSync(resolved)) {
+        violations.push({
+          file: normalized(relative(projectRoot, file)),
+          line: lineNumberAt(text, match.index),
+          message: `Markdownリンク先が存在しません: ${target}`,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+function inspectWorkflowDocumentPaths(): RuleViolation[] {
+  const files = [
+    join(projectRoot, "AGENTS.md"),
+    join(projectRoot, "codx/README.md"),
+    ...readdirSync(resolve(projectRoot, ".agents/instructions"))
+      .filter((file) => file.endsWith(".md"))
+      .map((file) => join(projectRoot, ".agents/instructions", file)),
+  ];
+  const legacyPattern =
+    /docs\/(?:html|agent-runs|pr-agent-handoff|agent-plan-input|agent-plan-approval-input|pr-agent-start-input|pr-agent-start-record|agent-run-command)/;
+  return files.flatMap((file) => {
+    const text = readFileSync(file, "utf8");
+    return text.split("\n").flatMap((line, index) =>
+      legacyPattern.test(line) && !/legacy|read-only|履歴/.test(line)
+        ? [
+            {
+              file: normalized(relative(projectRoot, file)),
+              line: index + 1,
+              message: "旧docs pathを新規入力・書込先に使用できません",
+            },
+          ]
+        : [],
+    );
+  });
+}
+
+function inspectDockerIgnore(): RuleViolation[] {
+  const path = join(projectRoot, ".dockerignore");
+  const lines = readFileSync(path, "utf8").split("\n");
+  const required = ["human/**", "ai/**", ".agents/**", "AGENTS.md"];
+  return required.flatMap((entry) =>
+    lines.includes(entry)
+      ? []
+      : [
+          {
+            file: ".dockerignore",
+            line: 1,
+            message: `${entry}がbuild contextから除外されていません`,
+          },
+        ],
+  );
+}
+
 const violations = [
   ...sourceRoots.flatMap(collectSourceFiles).flatMap(inspectSourceFile),
   ...inspectTsconfigPaths(),
   ...inspectInstructionPaths(),
+  ...inspectMarkdownLinks(),
+  ...inspectWorkflowDocumentPaths(),
+  ...inspectDockerIgnore(),
 ];
 
 if (violations.length > 0) {

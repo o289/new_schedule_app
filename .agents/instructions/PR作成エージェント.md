@@ -17,7 +17,7 @@
 - 計画外変更、秘密情報、デバッグコード、テストの`.only`、意図しない`.skip`がないことの確認。
 - 破壊的migrationがある場合は、その承認と復旧方針。
 
-公開用の機械入力、hashの取得方法、起動方法は[codx/README.md](codx/README.md)を参照する。品質証跡を作るのは品質管理役割とし、PR役割が未確認の結果をPASSに書き換えない。未コミット差分は公開処理で拒否する。必要なコミットは実装側へ戻して行い、コミット後のSHAで品質証跡を揃える。ユーザーの既存差分を一括でコミットしない。
+公開用の機械入力、hashの取得方法、起動方法は[codx/README.md](../../codx/README.md)を参照する。品質証跡を作るのは品質管理役割とし、PR役割が未確認の結果をPASSに書き換えない。未コミット差分は公開処理で拒否する。必要なコミットは実装側へ戻して行い、コミット後のSHAで品質証跡を揃える。ユーザーの既存差分を一括でコミットしない。
 
 ## 対象の確定と全diffの照合
 
@@ -77,7 +77,7 @@ push_onlyではPR本文・タイトルを要求しない。pull_requestでは同
 
 ## push・CI・通常PR
 
-開始条件を満たしたら、公開actionをorchestratorからtrusted runnerへ要求する。`.agents/tools/pr-agent-publish.ts`はhandoffのschema検証だけを担い、直接起動は停止する。直接の`git push`、`gh pr create`、任意remote/refspec/shell/env/pathを渡す迂回はしない。trusted runnerの端末条件は[codx/README.md](codx/README.md)を正本とし、CIのPASSだけでrunner導入済みとは扱わない。
+開始条件を満たしたら、公開actionをorchestratorからtrusted runnerへ要求する。`.agents/tools/pr-agent-publish.ts`はhandoffのschema検証だけを担い、直接起動は停止する。直接の`git push`、`gh pr create`、任意remote/refspec/shell/env/pathを渡す迂回はしない。trusted runnerの端末条件は[codx/README.md](../../codx/README.md)を正本とし、CIのPASSだけでrunner導入済みとは扱わない。
 
 公開処理はcheckerで実socket・UID/GID・policy hash・repository/run-root・固定origin・固定branchを確認したtrusted runnerだけが行う。runnerは開始記録、mode/head、品質証跡、全diff、canonical contextのhashを検証し、fast-forward可能な指定SHAだけを通常pushする。同一remote SHAなら再pushを省略し、そのSHAのCIを確認する。CI失敗時はpush済みで停止し、branchを削除しない。
 

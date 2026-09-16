@@ -19,7 +19,7 @@ cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git
 - 実装結果の検証、品質ゲート判定、DB統合テスト、E2E確認は[`品質管理エージェント.md`](品質管理エージェント.md)に従う。
 - 全フェーズの最終品質PASS後のレビュー資料・branch別公開（push・CI確認、機能branchのみ通常PR作成）は[`PR作成エージェント.md`](PR作成エージェント.md)に従う。
 
-メインが`gpt-6-astra`または`gpt-5.6-sol`の場合の実装委譲と品質ループは、[`MULTI_AGENT_WORKFLOW.md`](.md)を正本とする。書き込みを行うサブエージェントを同時に複数起動しない。
+メインが`gpt-6-astra`または`gpt-5.6-sol`の場合の実装委譲と品質ループは、[`MULTI_AGENT_WORKFLOW.md`](MULTI_AGENT_WORKFLOW.md)を正本とする。書き込みを行うサブエージェントを同時に複数起動しない。
 
 役割は別のプロセスや別のAIであることを必須としない。同じAIが複数工程を担当する場合も、工程を移るたびに現在の役割を明確にし、対応する役割文書を読んで責務を切り替える。
 
@@ -55,5 +55,5 @@ cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git
 ## 文書の責務
 
 - 詳細な規則は主担当となる役割文書に一度だけ記載し、他の役割からはリンクで参照する。
-- 判断フロー、計画書形式、品質手順の正本は、それぞれ[`IMPLEMENTATION_DECISION_FLOW.md`](IMPLEMENTATION_DECISION_FLOW.md)、[`IMPLEMENTATION_PLAN_TEMPLATE.md`](IMPLEMENTATION_PLAN_TEMPLATE.md)、[`品質管理.md`](.md)とする。
+- 判断フロー、計画書形式、品質手順の正本は、それぞれ[`IMPLEMENTATION_DECISION_FLOW.md`](IMPLEMENTATION_DECISION_FLOW.md)、[`IMPLEMENTATION_PLAN_TEMPLATE.md`](../../ai/templates/IMPLEMENTATION_PLAN_TEMPLATE.md)、[`品質管理.md`](品質管理.md)とする。
 - ディレクトリ内に追加の`AGENTS.md`がある場合は、そのディレクトリ固有の指示も併せて適用する。
