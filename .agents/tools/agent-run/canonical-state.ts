@@ -26,6 +26,50 @@ export const publicationStates = [
 ] as const;
 export const publicationStateSchema = z.enum(publicationStates);
 export type PublicationState = z.infer<typeof publicationStateSchema>;
+const publicationEvidenceBase = z
+  .object({ pushedSha: z.string().regex(/^[a-f0-9]{40}$/) })
+  .strict();
+export const publicationEvidenceSchema = z.discriminatedUnion("kind", [
+  publicationEvidenceBase.extend({ kind: z.literal("BRANCH_PUSHED") }),
+  publicationEvidenceBase.extend({
+    kind: z.literal("CI_PASSED"),
+    ciUrl: z
+      .string()
+      .regex(
+        /^https:\/\/github\.com\/o289\/new_schedule_app\/actions\/runs\/[1-9][0-9]*$/,
+      ),
+  }),
+  publicationEvidenceBase.extend({
+    kind: z.literal("PR_CREATED"),
+    url: z
+      .string()
+      .regex(
+        /^https:\/\/github\.com\/o289\/new_schedule_app\/pull\/[1-9][0-9]*$/,
+      ),
+    head: z.string().min(1),
+    base: z.string().min(1),
+    headSha: z.string().regex(/^[a-f0-9]{40}$/),
+    state: z.literal("OPEN"),
+    isDraft: z.literal(false),
+  }),
+  z
+    .object({
+      kind: z.literal("BLOCKED"),
+      failureCode: z.enum([
+        "AUTH",
+        "CI",
+        "PR",
+        "TIMEOUT",
+        "REMOTE",
+        "INTERNAL",
+      ]),
+      messageHash: z.string().regex(/^[a-f0-9]{64}$/),
+      retryCount: z.number().int().min(0).max(3),
+      remoteStateUnknown: z.boolean().optional(),
+    })
+    .strict(),
+]);
+export type PublicationEvidence = z.infer<typeof publicationEvidenceSchema>;
 
 export const canonicalTransitions: Readonly<
   Record<CanonicalState, readonly CanonicalState[]>
@@ -117,6 +161,7 @@ export const canonicalEventSchema = z
         "safety_stop",
         "complete",
         "publish",
+        "publication_status",
       ])
       .optional(),
     evidence: z
@@ -129,6 +174,7 @@ export const canonicalEventSchema = z
       .strict()
       .optional(),
     publicationState: publicationStateSchema.optional(),
+    publicationEvidence: publicationEvidenceSchema.optional(),
   })
   .strict();
 export type CanonicalEvent = z.infer<typeof canonicalEventSchema>;

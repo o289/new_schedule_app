@@ -40,6 +40,7 @@ describe("CanonicalOrchestrator", () => {
     await orchestrator.beginVerify();
     await orchestrator.verificationPassed(evidence("phase-2"));
     expect((await orchestrator.snapshot()).state).toBe("COMPLETED");
+    expect((await orchestrator.snapshot()).publicationState).toBe("PENDING");
     expect(
       (await store.load()).every((event) => event.planHash === planHash),
     ).toBe(true);

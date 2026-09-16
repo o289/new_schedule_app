@@ -11,6 +11,8 @@ import {
   type CanonicalEvent,
   hashCanonicalEvent,
   isCanonicalTransition,
+  publicationStateSchema,
+  type PublicationState,
   projectLegacyEvents,
 } from "./canonical-state";
 import { open, unlink } from "node:fs/promises";
@@ -67,6 +69,15 @@ export class CanonicalStateStore {
   async load(): Promise<CanonicalEvent[]> {
     const events = await this.readEvents();
     let previous: CanonicalEvent | undefined;
+    let publicationState: PublicationState = "NOT_STARTED";
+    const publicationTransitions: Record<string, readonly string[]> = {
+      NOT_STARTED: ["PENDING"],
+      PENDING: ["BRANCH_PUSHED", "BLOCKED"],
+      BRANCH_PUSHED: ["CI_PASSED", "BLOCKED"],
+      CI_PASSED: ["PR_CREATED", "BLOCKED"],
+      PR_CREATED: [],
+      BLOCKED: [],
+    };
     const passedPhaseIds = new Set<string>();
     for (const [index, event] of events.entries()) {
       if (event.sequence !== index + 1)
@@ -81,7 +92,43 @@ export class CanonicalStateStore {
       )
         throw new Error("canonical event contextが不一致です");
       if (event.from && !isCanonicalTransition(event.from, event.to))
-        throw new Error("不正なcanonical state transitionです");
+        if (!(event.action === "publication_status" && event.from === event.to))
+          throw new Error("不正なcanonical state transitionです");
+      const nextPublication: PublicationState =
+        event.publicationState ?? publicationState;
+      if (
+        nextPublication !== "NOT_STARTED" &&
+        nextPublication !== "PENDING" &&
+        !event.publicationEvidence
+      )
+        throw new Error("公開状態には対応する証跡が必要です");
+      if (event.publicationEvidence) {
+        const kind = event.publicationEvidence.kind;
+        if (
+          event.publicationState !== kind ||
+          (kind === "CI_PASSED" && event.to !== "COMPLETED")
+        )
+          throw new Error("公開証跡と状態が不一致です");
+      }
+      publicationStateSchema.parse(nextPublication);
+      if (nextPublication !== publicationState) {
+        if (
+          !publicationTransitions[publicationState]?.includes(nextPublication)
+        )
+          throw new Error("不正なpublication state transitionです");
+        if (
+          event.action !== "publication_status" &&
+          !(
+            event.action === "verify_pass" &&
+            nextPublication === "PENDING" &&
+            event.to === "COMPLETED"
+          )
+        )
+          throw new Error("publication stateは専用eventでのみ変更できます");
+        if (nextPublication === "PENDING" && event.to !== "COMPLETED")
+          throw new Error("PENDINGは実装完了後のみ許可されます");
+        publicationState = nextPublication;
+      }
       if (event.evidence) {
         if (
           event.action !== "verify_pass" ||
@@ -112,6 +159,14 @@ export class CanonicalStateStore {
         .filter((event) => event.evidence)
         .map((event) => [event.evidence!.phaseId, event.evidence!]),
     );
+    const publicationEvidenceByState = Object.fromEntries(
+      events
+        .filter((event) => event.publicationEvidence)
+        .map((event) => [
+          event.publicationEvidence!.kind,
+          event.publicationEvidence!,
+        ]),
+    );
     return {
       runId: last?.runId ?? null,
       planHash: last?.planHash ?? null,
@@ -119,6 +174,8 @@ export class CanonicalStateStore {
       phaseId: last?.phaseId ?? null,
       retryCount: last?.retryCount ?? 0,
       publicationState: last?.publicationState ?? "NOT_STARTED",
+      publicationEvidence: last?.publicationEvidence,
+      publicationEvidenceByState,
       revision: last?.sequence ?? 0,
       eventHash: last?.eventHash ?? null,
       passedPhaseIds: Object.keys(evidenceByPhase),
@@ -171,7 +228,38 @@ export class CanonicalStateStore {
       if (input.from !== (current?.to ?? null))
         throw new Error("canonical state transitionが不一致です");
       if (input.from && !isCanonicalTransition(input.from, input.to))
-        throw new Error("不正なcanonical state transitionです");
+        if (!(input.action === "publication_status" && input.from === input.to))
+          throw new Error("不正なcanonical state transitionです");
+      const currentPublication = current?.publicationState ?? "NOT_STARTED";
+      const nextPublication = input.publicationState ?? currentPublication;
+      if (
+        nextPublication !== "NOT_STARTED" &&
+        nextPublication !== "PENDING" &&
+        !input.publicationEvidence
+      )
+        throw new Error("公開状態には対応する証跡が必要です");
+      if (nextPublication !== currentPublication) {
+        const allowed: Record<string, readonly string[]> = {
+          NOT_STARTED: ["PENDING"],
+          PENDING: ["BRANCH_PUSHED", "BLOCKED"],
+          BRANCH_PUSHED: ["CI_PASSED", "BLOCKED"],
+          CI_PASSED: ["PR_CREATED", "BLOCKED"],
+          PR_CREATED: [],
+          BLOCKED: [],
+        };
+        if (
+          !allowed[currentPublication]?.includes(nextPublication) ||
+          (input.action !== "publication_status" &&
+            !(
+              input.action === "verify_pass" &&
+              nextPublication === "PENDING" &&
+              input.to === "COMPLETED"
+            ))
+        )
+          throw new Error("不正なpublication state transitionです");
+        if (nextPublication === "PENDING" && input.to !== "COMPLETED")
+          throw new Error("PENDINGは実装完了後のみ許可されます");
+      }
       const event = canonicalEventSchema.parse({
         ...input,
         schemaVersion: 2,

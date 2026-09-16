@@ -94,7 +94,7 @@ exit 0
     ]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(
-      "commandはcreate、approve、startのいずれかです",
+      "commandはcreate、approve、start、またはcanonical操作です",
     );
   });
 

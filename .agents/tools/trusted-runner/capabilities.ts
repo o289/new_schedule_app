@@ -32,6 +32,18 @@ export type CapabilityResult = {
   stdoutHash: string;
   stderrHash: string;
   failureCode?: "TIMEOUT" | "CONNECTION_ERROR";
+  publication?: {
+    pushedSha: string;
+    ci: { status: "success"; url: string };
+    pr?: {
+      url: string;
+      head: string;
+      base: string;
+      headSha: string;
+      state: "OPEN";
+      isDraft: false;
+    };
+  };
 };
 export type ExecutorIO = {
   run: (
@@ -261,6 +273,15 @@ export async function executeCapability(
       truncated: false,
       stdoutHash: hash(output),
       stderrHash: hash(""),
+      ...(execution.ci
+        ? {
+            publication: {
+              pushedSha: execution.pushedSha,
+              ci: execution.ci,
+              ...(execution.pr ? { pr: execution.pr } : {}),
+            },
+          }
+        : {}),
     };
   }
   const steps = capabilitySteps(request.capability);

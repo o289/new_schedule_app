@@ -27,6 +27,7 @@ const successfulRun = {
   status: "completed",
   conclusion: "success",
   workflowName: "CI",
+  url: "https://github.com/o289/new_schedule_app/actions/runs/1",
   jobs: [
     {
       name: "型・テスト・書式の確認",
@@ -318,9 +319,8 @@ describe("publication executor", () => {
       fixture.io,
     );
     expect(JSON.stringify(output)).not.toContain("token=must-not-leak");
-    expect(JSON.stringify(output)).not.toContain("feature/v3.2.3");
-    expect(
-      Object.values(output).every((value) => /^[a-f0-9]{64}$/.test(value)),
-    ).toBe(true);
+    expect(output.outcomeHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(output.ciHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(output.pullRequestHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });

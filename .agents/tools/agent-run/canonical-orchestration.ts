@@ -7,6 +7,7 @@ import {
 import {
   publicationStateSchema,
   type PublicationState,
+  publicationEvidenceSchema,
 } from "./canonical-state";
 
 export const canonicalActionSchema = z.enum([
@@ -22,6 +23,7 @@ export const canonicalActionSchema = z.enum([
   "safety_stop",
   "complete",
   "publish",
+  "publication_status",
 ]);
 export type CanonicalAction = z.infer<typeof canonicalActionSchema>;
 const outcomeSchema = z.enum(["REPLAN", "FAILED", "SAFETY_STOP"]);
@@ -35,6 +37,7 @@ export const canonicalSnapshotSchema = z
       .nullable(),
     retryCount: z.number().int().min(0).max(3),
     publicationState: publicationStateSchema.default("NOT_STARTED"),
+    publicationEvidence: publicationEvidenceSchema.optional(),
   })
   .strict();
 export type CanonicalSnapshot = z.infer<typeof canonicalSnapshotSchema>;
@@ -104,10 +107,7 @@ export const publicationCompletionInputSchema = z
     prUrl: z
       .string()
       .url()
-      .refine((value) => {
-        const url = new URL(value);
-        return url.protocol === "https:" && url.hostname === "github.com";
-      }, "GitHubのHTTPS URLが必要です")
+      .regex(/^https:\/\/github\.com\/o289\/new_schedule_app\/pull\/[0-9]+$/)
       .optional(),
     prState: z.enum(["OPEN", "CLOSED", "MERGED"]).optional(),
     isDraft: z.boolean().optional(),

@@ -152,6 +152,37 @@ const resultSchema = z
     truncated: z.boolean(),
     stdoutHash: z.string().regex(/^[a-f0-9]{64}$/),
     stderrHash: z.string().regex(/^[a-f0-9]{64}$/),
+    publication: z
+      .object({
+        pushedSha: shaSchema,
+        ci: z
+          .object({
+            status: z.literal("success"),
+            url: z
+              .string()
+              .regex(
+                /^https:\/\/github\.com\/o289\/new_schedule_app\/actions\/runs\/[0-9]+$/,
+              ),
+          })
+          .strict(),
+        pr: z
+          .object({
+            url: z
+              .string()
+              .regex(
+                /^https:\/\/github\.com\/o289\/new_schedule_app\/pull\/[0-9]+$/,
+              ),
+            head: z.string().min(1),
+            base: z.string().min(1),
+            headSha: shaSchema,
+            state: z.literal("OPEN"),
+            isDraft: z.literal(false),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const errorSchema = z

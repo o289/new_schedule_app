@@ -17,6 +17,11 @@ const workflowRunSchema = z
     status: z.string().min(1),
     conclusion: z.string().nullable(),
     workflowName: z.string().min(1),
+    url: z
+      .string()
+      .regex(
+        /^https:\/\/github\.com\/o289\/new_schedule_app\/actions\/runs\/[0-9]+$/,
+      ),
     jobs: z
       .array(
         z
@@ -75,6 +80,16 @@ export type PublicationExecution = {
   outcomeHash: string;
   ciHash?: string;
   pullRequestHash?: string;
+  pushedSha: string;
+  ci?: { status: "success"; url: string };
+  pr?: {
+    url: string;
+    head: string;
+    base: string;
+    headSha: string;
+    state: "OPEN";
+    isDraft: false;
+  };
 };
 
 function digest(value: string): string {
@@ -201,7 +216,7 @@ async function promote(
 async function verifyCi(
   intent: FixedPublicationIntent,
   io: PublicationExecutorIO,
-): Promise<string> {
+): Promise<{ hash: string; url: string }> {
   const runs = z.array(workflowRunSchema).parse(
     await io.github.listWorkflowRuns({
       repository,
@@ -229,18 +244,21 @@ async function verifyCi(
       "CI evidence does not match the approved publication",
     );
   }
-  return fixedHash({
-    kind: "ci",
-    count: runs.length,
-    target: intent.targetSha,
-  });
+  return {
+    hash: fixedHash({
+      kind: "ci",
+      count: runs.length,
+      target: intent.targetSha,
+    }),
+    url: runs[0]!.url,
+  };
 }
 
 async function publishPullRequest(
   intent: FixedPublicationIntent,
   io: PublicationExecutorIO,
-): Promise<string | undefined> {
-  if (intent.mode === "push_only") return undefined;
+): Promise<{ hash: string; pr?: PublicationExecution["pr"] }> {
+  if (intent.mode === "push_only") return { hash: "" };
   const base = intent.base;
   requireCondition(base !== undefined, "pull request base is unavailable");
   const pullRequests = z.array(pullRequestSchema).parse(
@@ -259,7 +277,17 @@ async function publishPullRequest(
         existing.headSha === intent.targetSha,
       "existing pull request does not match the approved SHA",
     );
-    return fixedHash({ kind: "pr", number: existing.number, reused: true });
+    return {
+      hash: fixedHash({ kind: "pr", number: existing.number, reused: true }),
+      pr: {
+        url: `https://${repository}/pull/${existing.number}`,
+        head: existing.head,
+        base: existing.base,
+        headSha: existing.headSha,
+        state: "OPEN",
+        isDraft: false,
+      },
+    };
   }
   const created = pullRequestSchema.parse(
     await io.github.createPullRequest({
@@ -276,7 +304,17 @@ async function publishPullRequest(
       created.headSha === intent.targetSha,
     "created pull request does not match the approved SHA",
   );
-  return fixedHash({ kind: "pr", number: created.number, reused: false });
+  return {
+    hash: fixedHash({ kind: "pr", number: created.number, reused: false }),
+    pr: {
+      url: `https://${repository}/pull/${created.number}`,
+      head: created.head,
+      base: created.base,
+      headSha: created.headSha,
+      state: "OPEN",
+      isDraft: false,
+    },
+  };
 }
 
 export async function executePublication(
@@ -289,12 +327,16 @@ export async function executePublication(
     result: promotion,
     target: intent.targetSha,
   });
-  if (intent.capability === "promote_ff_only") return { outcomeHash };
-  const ciHash = await verifyCi(intent, io);
-  const pullRequestHash = await publishPullRequest(intent, io);
+  if (intent.capability === "promote_ff_only")
+    return { outcomeHash, pushedSha: intent.targetSha };
+  const ci = await verifyCi(intent, io);
+  const pullRequest = await publishPullRequest(intent, io);
   return {
     outcomeHash,
-    ciHash,
-    ...(pullRequestHash === undefined ? {} : { pullRequestHash }),
+    ciHash: ci.hash,
+    pushedSha: intent.targetSha,
+    ci: { status: "success", url: ci.url },
+    ...(pullRequest.hash ? { pullRequestHash: pullRequest.hash } : {}),
+    ...(pullRequest.pr ? { pr: pullRequest.pr } : {}),
   };
 }

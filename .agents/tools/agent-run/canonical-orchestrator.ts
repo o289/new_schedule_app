@@ -10,7 +10,7 @@ import {
   type CanonicalSnapshot,
 } from "./canonical-orchestration";
 import { CanonicalStateStore } from "./state-store";
-import type { CanonicalEvent } from "./canonical-state";
+import type { CanonicalEvent, PublicationEvidence } from "./canonical-state";
 import { canonicalStateSchema } from "./canonical-state";
 
 export type CanonicalPhase = { id: string };
@@ -18,6 +18,7 @@ export type CanonicalPhase = { id: string };
 export type CanonicalOrchestratorOptions = {
   planHash: string;
   phases: readonly CanonicalPhase[];
+  mode?: "push_only" | "pull_request";
 };
 
 type PhaseEvidence = {
@@ -59,6 +60,7 @@ export class CanonicalOrchestrator {
       phaseId: event.phaseId,
       retryCount: event.retryCount,
       publicationState: event.publicationState ?? "NOT_STARTED",
+      publicationEvidence: event.publicationEvidence,
     };
   }
 
@@ -67,6 +69,9 @@ export class CanonicalOrchestrator {
     phaseId: string | null = null,
     outcome?: "REPLAN" | "FAILED" | "SAFETY_STOP",
     evidence?: PhaseEvidence,
+    publicationState?:
+      "PENDING" | "BRANCH_PUSHED" | "CI_PASSED" | "PR_CREATED" | "BLOCKED",
+    publicationEvidence?: PublicationEvidence,
   ): Promise<CanonicalEvent> {
     const events = await this.store.load();
     const last = events.at(-1);
@@ -89,6 +94,8 @@ export class CanonicalOrchestrator {
       retryCount: next.retryCount,
       action,
       evidence,
+      publicationState,
+      publicationEvidence,
     });
   }
 
@@ -145,7 +152,42 @@ export class CanonicalOrchestrator {
       throw new Error("検証中のPhaseがありません");
     }
     const nextPhase = this.options.phases[index + 1]?.id ?? current.phaseId;
-    return this.transition("verify_pass", nextPhase, undefined, evidence);
+    const nextState =
+      index === this.options.phases.length - 1 ? "COMPLETED" : "RUNNING";
+    return this.transition(
+      "verify_pass",
+      nextPhase,
+      undefined,
+      evidence,
+      nextState === "COMPLETED" ? "PENDING" : undefined,
+    );
+  }
+
+  async updatePublicationState(
+    to: "PENDING" | "BRANCH_PUSHED" | "CI_PASSED" | "PR_CREATED" | "BLOCKED",
+    publicationEvidence?: PublicationEvidence,
+  ): Promise<CanonicalEvent> {
+    const current = await this.snapshot();
+    const allowed = {
+      NOT_STARTED: "PENDING",
+      PENDING: "BRANCH_PUSHED",
+      BRANCH_PUSHED: "CI_PASSED",
+      CI_PASSED: "PR_CREATED",
+      BLOCKED: "BLOCKED",
+      PR_CREATED: "PR_CREATED",
+    } as const;
+    if (to !== "BLOCKED" && allowed[current.publicationState] !== to)
+      throw new Error("公開状態を飛ばせません");
+    if (to === "PENDING" && current.state !== "COMPLETED")
+      throw new Error("実装完了前に公開待ちへ遷移できません");
+    return this.transition(
+      "publication_status",
+      current.phaseId,
+      undefined,
+      undefined,
+      to,
+      publicationEvidence,
+    );
   }
 
   async verificationFailed(input: FailureInput): Promise<CanonicalEvent> {
