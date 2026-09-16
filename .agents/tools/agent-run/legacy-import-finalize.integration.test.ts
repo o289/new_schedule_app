@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { handoffSchema } from "../pr-agent-publish.js";
@@ -10,7 +11,7 @@ import { runPaths } from "./run-paths";
 describe("legacy finalize integration", () => {
   it("creates start, handoff, evidence and completed canonical events", async () => {
     const runId = "agent-workflow-slim-v323-20260916-r3";
-    const root = await mkdtemp(join("/private/tmp", "legacy-finalize-"));
+    const root = await mkdtemp(join(tmpdir(), "legacy-finalize-"));
     const sourceRoot = resolve(".");
     const paths = runPaths(runId);
     const files = new Map<string, string>();
