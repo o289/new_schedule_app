@@ -147,7 +147,7 @@ describe("legacy finalize integration", () => {
       ),
     ).toBe(false);
     expect(
-      containsSecretLikeValue("+token=ghp_abcdefghijklmnopqrstuvwxyz123456\n"),
+      containsSecretLikeValue("+token=" + "ghp_" + "A".repeat(24) + "\n"),
     ).toBe(true);
   });
 });

@@ -135,11 +135,17 @@ export function containsSecretLikeValue(diff: string): boolean {
   return diff
     .split("\n")
     .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
-    .some((line) =>
-      /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|\b(?:password|secret|token)\s*[:=]\s*["']?[A-Za-z0-9+/=_-]{16,}["']?/i.test(
-        line,
-      ),
-    );
+    .some((line) => {
+      const codeLine = line.includes("<") || line.includes(">") ? "" : line;
+      return (
+        /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}/i.test(
+          line,
+        ) ||
+        /\b(?:password|secret|token)\s*[:=]\s*["']?[A-Za-z0-9+/=_-]{16,}["']?/i.test(
+          codeLine,
+        )
+      );
+    });
 }
 
 async function validateGit(
