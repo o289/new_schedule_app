@@ -147,6 +147,9 @@ export function containsSecretLikeValue(diff: string): boolean {
       );
     });
 }
+type DiffClassification =
+  | { path: string; scope: "phase"; phaseId: string; matchedRule: string }
+  | { path: string; scope: "common"; matchedRule: string };
 
 async function validateGit(
   input: z.infer<typeof legacyImportInputSchema>,
@@ -590,27 +593,42 @@ export async function finalizeLegacyImport(
     completed: true,
   });
   validateStart(start);
-  const classification = uniqueDiffPaths.map((changed) => {
-    const phase = plan.phases.find((item) =>
-      item.allowedPaths.some((rule) => matches(changed, rule)),
-    );
-    if (phase) {
-      const matchedRule = phase.allowedPaths.find((rule) =>
+  const classification: DiffClassification[] = uniqueDiffPaths.map(
+    (changed) => {
+      const phase = plan.phases.find((item) =>
+        item.allowedPaths.some((rule) => matches(changed, rule)),
+      );
+      if (phase) {
+        const matchedRule = phase.allowedPaths.find((rule) =>
+          matches(changed, rule),
+        );
+        stop(matchedRule !== undefined, "phaseの変更path ruleが不明です");
+        return {
+          path: changed,
+          scope: "phase",
+          phaseId: phase.id,
+          matchedRule,
+        };
+      }
+      const matchedRule = plan.allowedPaths.find((rule) =>
         matches(changed, rule),
       );
-      return { path: changed, scope: "phase", phaseId: phase.id, matchedRule };
-    }
-    const matchedRule = plan.allowedPaths.find((rule) =>
-      matches(changed, rule),
-    );
-    stop(matchedRule !== undefined, "変更pathを分類できません");
-    return { path: changed, scope: "common", matchedRule };
-  });
+      stop(matchedRule !== undefined, "変更pathを分類できません");
+      return { path: changed, scope: "common", matchedRule };
+    },
+  );
   stop(
-    classification.every(
-      (item) =>
-        item.phaseId === "common" ||
-        plan.phases.some((phase) => phase.id === item.phaseId),
+    classification.every((item) =>
+      item.scope === "common"
+        ? plan.allowedPaths.some(
+            (rule) => rule === item.matchedRule && matches(item.path, rule),
+          )
+        : plan.phases.some(
+            (phase) =>
+              phase.id === item.phaseId &&
+              phase.allowedPaths.includes(item.matchedRule) &&
+              matches(item.path, item.matchedRule),
+          ),
     ),
     "diff classificationが不正です",
   );

@@ -69,7 +69,7 @@ describe("legacy finalize integration", () => {
           return "https://github.com/o289/new_schedule_app.git\n";
         if (args[0] === "status") return "";
         if (args[0] === "diff" && args[1] === "--name-only")
-          return ".agents/tools/agent-run/legacy-import.ts\0";
+          return ".agents/tools/agent-run/legacy-import.ts\0ai/common.txt\0";
         if (args[0] === "diff")
           return "diff --git a/file b/file\n+<safe-tag>\n";
         if (key === `rev-parse feature/v3.2.3`) return "c".repeat(40) + "\n";
