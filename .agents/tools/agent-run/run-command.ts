@@ -15,7 +15,7 @@ import { runPaths } from "./run-paths";
 import { CanonicalOrchestrator } from "./canonical-orchestrator";
 import { CanonicalStateStore } from "./state-store";
 import { isFinalResponseAllowed } from "./canonical-orchestration";
-import { prepareLegacyImport } from "./legacy-import";
+import { finalizeLegacyImport, prepareLegacyImport } from "./legacy-import";
 import { publicationEvidenceSchema } from "./canonical-state";
 import { TrustedRunnerClient } from "../trusted-runner/client";
 import {
@@ -204,6 +204,7 @@ export async function runCommand(
       "publish",
       "status",
       "import-legacy-prepare",
+      "import-legacy-finalize",
     ].includes(command)
   ) {
     if (command === "import-legacy-prepare") {
@@ -219,6 +220,19 @@ export async function runCommand(
           git: { run: runGit },
           expectedWorktreeRoot: root,
         },
+      );
+      return;
+    }
+    if (command === "import-legacy-finalize") {
+      await finalizeLegacyImport(
+        runId,
+        JSON.parse(
+          await io.read(`${paths.runtime}/requests/legacy-finalize.json`),
+        ) as unknown,
+        io,
+        paths,
+        root,
+        { run: runGit },
       );
       return;
     }
