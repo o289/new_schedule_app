@@ -241,9 +241,7 @@ export async function verifyCanonicalContext(
     "approval context mismatch",
   );
   const start = startRecordV2Schema.parse(
-    JSON.parse(
-      await io.read(resolve(canonicalRoot, "docs/pr-agent-start-record.json")),
-    ) as unknown,
+    JSON.parse(await io.read(resolve(base, "start.json"))) as unknown,
   );
   const expectedPlanPath = `docs/agent-runs/${runId}/plan.json`,
     expectedApprovalPath = `docs/agent-runs/${runId}/approval.json`,
@@ -399,7 +397,12 @@ export class TrustedOrchestrator {
       trustedIO.read(resolve(base, "plan.json")),
       trustedIO.read(resolve(base, "approval.json")),
       trustedIO.read(
-        resolve(context.repositoryRoot, "docs/pr-agent-start-record.json"),
+        resolve(
+          context.repositoryRoot,
+          "docs/agent-runs",
+          snapshot.runId,
+          "start.json",
+        ),
       ),
       trustedIO.read(
         resolve(context.repositoryRoot, "docs/pr-agent-handoff.json"),

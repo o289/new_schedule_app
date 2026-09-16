@@ -78,6 +78,10 @@ export const startInputV2Schema = z
 export const startRecordV2Schema = startInputV2Schema
   .extend({ completed: z.literal(true) })
   .strict();
+export function startRecordPath(runId: string): string {
+  check(/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(runId), "runIdが不正です");
+  return `docs/agent-runs/${runId}/start.json`;
+}
 export type StartInputV2 = z.infer<typeof startInputV2Schema>;
 export const startInputSchema = z
   .object({
@@ -317,10 +321,8 @@ async function main() {
     await read("docs/pr-agent-start-input.json"),
   );
   // 記録の上書きを拒否する。異常終了時も開始SHAを推測して再作成しない。
-  const record = await open(
-    resolve(root, "docs/pr-agent-start-record.json"),
-    "wx",
-  );
+  const runId = startInputV2Schema.parse(input).plan.runId;
+  const record = await open(resolve(root, startRecordPath(runId)), "wx");
   try {
     const result = await startTaskV2(input, {
       read,

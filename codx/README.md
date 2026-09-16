@@ -37,7 +37,7 @@ prefixの規則はコマンド形に依存し、別順序のオプション・�
 
 ## 実装開始の記録
 
-規模の正本は[判断フロー](../IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`docs/agent-plan-input.json`を入力に`./tools/agent-plan-generate`で生成し、`docs/agent-runs/<runId>/`へ`plan.json`、`plan-review.html`、`agent-plan.md`、最後にmanifestを保存する。`./tools/agent-plan-approve`はapproval inputを検証してapproval recordを作成する。開始処理は`./tools/pr-agent-start`（引数なし）で、入力は`docs/pr-agent-start-input.json`、出力は`docs/pr-agent-start-record.json`である。
+規模の正本は[判断フロー](../IMPLEMENTATION_DECISION_FLOW.md)。新規計画は`docs/agent-plan-input.json`を入力に`./tools/agent-plan-generate`で生成し、`docs/agent-runs/<runId>/`へ`plan.json`、`plan-review.html`、`agent-plan.md`、最後にmanifestを保存する。`./tools/agent-plan-approve`はapproval inputを検証してapproval recordを作成する。開始処理は`./tools/pr-agent-start`（引数なし）で、入力は`docs/pr-agent-start-input.json`、出力は入力のrunIdから導出した`docs/agent-runs/<runId>/start.json`である。旧`docs/pr-agent-start-record.json`は新runでは使用しない。
 
 ```json
 {
@@ -99,7 +99,7 @@ push_onlyはPR base・baseSha・prReview・title・bodyを持たない。以下�
   "headSha": "品質確認した40桁SHA",
   "reviewBaseSha": "実装開始前の40桁SHA",
   "start": {
-    "path": "docs/pr-agent-start-record.json",
+    "path": "docs/agent-runs/<runId>/start.json",
     "sha256": "64桁のSHA-256"
   },
   "plan": {
@@ -170,7 +170,7 @@ pull_requestではbaseをheadの末尾から自動導出する。次のheadな�
   "headSha": "品質確認した40桁SHA",
   "reviewBaseSha": "実装開始前の40桁SHA",
   "start": {
-    "path": "docs/pr-agent-start-record.json",
+    "path": "docs/agent-runs/<runId>/start.json",
     "sha256": "64桁のSHA-256"
   },
   "plan": {

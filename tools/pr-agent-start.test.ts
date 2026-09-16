@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   classifyWork,
+  startRecordPath,
   startTask,
   startTaskV2,
   validateStart,
@@ -290,6 +291,28 @@ describe("work size", () => {
   });
 });
 describe("task start", () => {
+  it.each([
+    "Run-001",
+    "run_001",
+    "run/001",
+    "../other-run",
+    "-run-001",
+    "run-001-",
+    "run--001",
+    "run..001",
+  ])("rejects invalid canonical runId: %s", (runId) => {
+    expect(() => startRecordPath(runId)).toThrow();
+  });
+
+  it("derives separate run-scoped paths and never the global record path", () => {
+    const runA = startRecordPath("run-001");
+    const runB = startRecordPath("run-002");
+    expect(runA).toBe("docs/agent-runs/run-001/start.json");
+    expect(runB).toBe("docs/agent-runs/run-002/start.json");
+    expect(runA).not.toBe(runB);
+    expect(runA).not.toBe("docs/pr-agent-start-record.json");
+    expect(runB).not.toBe("docs/pr-agent-start-record.json");
+  });
   it("starts a valid v2 medium record without switching", async () => {
     const f = fixtureV2();
     const result = await startTaskV2(

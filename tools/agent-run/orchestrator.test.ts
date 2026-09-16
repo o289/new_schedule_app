@@ -208,7 +208,7 @@ function fixture() {
     ],
     [root + "/docs/agent-runs/run-001/approval.json", approvalText],
     [root + "/docs/agent-runs/run-001/agent-plan.md", agentPlan],
-    [root + "/docs/pr-agent-start-record.json", JSON.stringify(start)],
+    [root + "/docs/agent-runs/run-001/start.json", JSON.stringify(start)],
     [
       root + "/.agent-runs/worktrees/run-001/.agent-run-marker.json",
       JSON.stringify(marker),
@@ -1134,7 +1134,9 @@ describe("trusted orchestrator", () => {
     await add("PHASE_PASSED", "CHECKPOINTED", "publisher");
     await add("CHECKPOINTED", "PUBLISH_READY", "publisher");
     const planText = f.files.get(f.root + "/docs/agent-runs/run-001/plan.json");
-    const startText = f.files.get(f.root + "/docs/pr-agent-start-record.json");
+    const startText = f.files.get(
+      f.root + "/docs/agent-runs/run-001/start.json",
+    );
     if (!planText || !startText) throw new Error("missing canonical fixture");
     f.files.set(
       f.root + "/docs/pr-agent-handoff.json",
@@ -1145,7 +1147,7 @@ describe("trusted orchestrator", () => {
         headSha: sha,
         reviewBaseSha: sha,
         start: {
-          path: "docs/pr-agent-start-record.json",
+          path: "docs/agent-runs/run-001/start.json",
           sha256: digest(startText),
         },
         plan: {
