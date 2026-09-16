@@ -19,6 +19,7 @@ import { worktreeMarkerSchema } from "./worktree";
 import { inspectDependencies } from "./dependency-guard";
 import { inspectPaths } from "./path-guard";
 import { startRecordV2Schema } from "../pr-agent-start.js";
+import { runPaths } from "./run-paths";
 import {
   classifyFailure,
   type ClassifiedFailure,
@@ -204,7 +205,7 @@ export async function verifyCanonicalContext(
   io: ContextIO,
 ): Promise<VerifiedContext> {
   const canonicalRoot = await (io.realpath ?? realpath)(root);
-  const base = resolve(canonicalRoot, "docs/agent-runs", runId);
+  const base = resolve(canonicalRoot, runPaths(runId).ai);
   const planText = await io.read(resolve(base, "plan.json"));
   const plan = parsePlan(JSON.parse(planText) as unknown);
   const manifest = z
@@ -241,11 +242,13 @@ export async function verifyCanonicalContext(
     "approval context mismatch",
   );
   const start = startRecordV2Schema.parse(
-    JSON.parse(await io.read(resolve(base, "start.json"))) as unknown,
+    JSON.parse(
+      await io.read(resolve(canonicalRoot, runPaths(runId).start)),
+    ) as unknown,
   );
-  const expectedPlanPath = `docs/agent-runs/${runId}/plan.json`,
-    expectedApprovalPath = `docs/agent-runs/${runId}/approval.json`,
-    expectedImplementationPath = `docs/agent-runs/${runId}/agent-plan.md`;
+  const expectedPlanPath = runPaths(runId).plan,
+    expectedApprovalPath = runPaths(runId).approval,
+    expectedImplementationPath = `${runPaths(runId).ai}/agent-plan.md`;
   stop(
     start.plan.path === expectedPlanPath &&
       start.approval.path === expectedApprovalPath &&
@@ -387,22 +390,12 @@ export class TrustedOrchestrator {
   }> {
     const trustedIO = this.io.context;
     stop(trustedIO !== undefined, "canonical contextが未検証です");
-    const base = resolve(
-      context.repositoryRoot,
-      "docs",
-      "agent-runs",
-      snapshot.runId,
-    );
+    const base = resolve(context.repositoryRoot, runPaths(snapshot.runId).ai);
     const [plan, approval, startRecord, handoff] = await Promise.all([
       trustedIO.read(resolve(base, "plan.json")),
       trustedIO.read(resolve(base, "approval.json")),
       trustedIO.read(
-        resolve(
-          context.repositoryRoot,
-          "docs/agent-runs",
-          snapshot.runId,
-          "start.json",
-        ),
+        resolve(context.repositoryRoot, runPaths(snapshot.runId).start),
       ),
       trustedIO.read(
         resolve(context.repositoryRoot, "docs/pr-agent-handoff.json"),

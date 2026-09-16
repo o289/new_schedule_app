@@ -307,8 +307,8 @@ describe("task start", () => {
   it("derives separate run-scoped paths and never the global record path", () => {
     const runA = startRecordPath("run-001");
     const runB = startRecordPath("run-002");
-    expect(runA).toBe("docs/agent-runs/run-001/start.json");
-    expect(runB).toBe("docs/agent-runs/run-002/start.json");
+    expect(runA).toBe("ai/runs/run-001/start.json");
+    expect(runB).toBe("ai/runs/run-002/start.json");
     expect(runA).not.toBe(runB);
     expect(runA).not.toBe("docs/pr-agent-start-record.json");
     expect(runB).not.toBe("docs/pr-agent-start-record.json");

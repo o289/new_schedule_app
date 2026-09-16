@@ -142,7 +142,7 @@ function fixture() {
       schemaVersion: 2,
       runId: "run-001",
       plan: {
-        path: "docs/agent-runs/run-001/plan.json",
+        path: "ai/runs/run-001/plan.json",
         sha256: digest(planText),
       },
       planHash,
@@ -170,19 +170,19 @@ function fixture() {
       head: "feature/v3.2.3",
       reviewBaseSha: sha,
       plan: {
-        path: "docs/agent-runs/run-001/plan.json",
+        path: "ai/runs/run-001/plan.json",
         sha256: digest(planText),
         runId: "run-001",
         planHash,
       },
       approval: {
-        path: "docs/agent-runs/run-001/approval.json",
+        path: "ai/runs/run-001/approval.json",
         sha256: digest(approvalText),
         runId: "run-001",
         planHash,
       },
       implementation: {
-        path: "docs/agent-runs/run-001/agent-plan.md",
+        path: "ai/runs/run-001/agent-plan.md",
         sha256: digest(agentPlan),
       },
       completed: true,
@@ -196,9 +196,9 @@ function fixture() {
       gitCommonDir: root + "/.git",
     });
   const files = new Map([
-    [root + "/docs/agent-runs/run-001/plan.json", planText],
+    [root + "/ai/runs/run-001/plan.json", planText],
     [
-      root + "/docs/agent-runs/run-001/manifest.json",
+      root + "/ai/runs/run-001/manifest.json",
       JSON.stringify({
         planId: plan.planId,
         runId: plan.runId,
@@ -206,9 +206,9 @@ function fixture() {
         artifacts: ["plan.json", "plan-review.html", "agent-plan.md"],
       }),
     ],
-    [root + "/docs/agent-runs/run-001/approval.json", approvalText],
-    [root + "/docs/agent-runs/run-001/agent-plan.md", agentPlan],
-    [root + "/docs/agent-runs/run-001/start.json", JSON.stringify(start)],
+    [root + "/ai/runs/run-001/approval.json", approvalText],
+    [root + "/ai/runs/run-001/agent-plan.md", agentPlan],
+    [root + "/ai/runs/run-001/start.json", JSON.stringify(start)],
     [
       root + "/.agent-runs/worktrees/run-001/.agent-run-marker.json",
       JSON.stringify(marker),
@@ -445,7 +445,7 @@ describe("trusted orchestrator", () => {
   });
   it("rejects plan hash mismatch", async () => {
     const { f, io } = contextFixture();
-    f.files.set(f.root + "/docs/agent-runs/run-001/manifest.json", "{}");
+    f.files.set(f.root + "/ai/runs/run-001/manifest.json", "{}");
     await expect(
       verifyCanonicalContext(f.root, "run-001", io),
     ).rejects.toThrow();
@@ -453,11 +453,9 @@ describe("trusted orchestrator", () => {
   it("rejects expired approval", async () => {
     const { f, io } = contextFixture();
     f.files.set(
-      f.root + "/docs/agent-runs/run-001/approval.json",
+      f.root + "/ai/runs/run-001/approval.json",
       JSON.stringify({
-        ...JSON.parse(
-          f.files.get(f.root + "/docs/agent-runs/run-001/approval.json")!,
-        ),
+        ...JSON.parse(f.files.get(f.root + "/ai/runs/run-001/approval.json")!),
         expiresAt: "2025-12-31T00:00:00.000Z",
       }),
     );
@@ -1133,10 +1131,8 @@ describe("trusted orchestrator", () => {
     await add("VERIFYING", "PHASE_PASSED", "verifier");
     await add("PHASE_PASSED", "CHECKPOINTED", "publisher");
     await add("CHECKPOINTED", "PUBLISH_READY", "publisher");
-    const planText = f.files.get(f.root + "/docs/agent-runs/run-001/plan.json");
-    const startText = f.files.get(
-      f.root + "/docs/agent-runs/run-001/start.json",
-    );
+    const planText = f.files.get(f.root + "/ai/runs/run-001/plan.json");
+    const startText = f.files.get(f.root + "/ai/runs/run-001/start.json");
     if (!planText || !startText) throw new Error("missing canonical fixture");
     f.files.set(
       f.root + "/docs/pr-agent-handoff.json",
@@ -1147,11 +1143,11 @@ describe("trusted orchestrator", () => {
         headSha: sha,
         reviewBaseSha: sha,
         start: {
-          path: "docs/agent-runs/run-001/start.json",
+          path: "ai/runs/run-001/start.json",
           sha256: digest(startText),
         },
         plan: {
-          path: "docs/agent-runs/run-001/plan.json",
+          path: "ai/runs/run-001/plan.json",
           sha256: digest(planText),
         },
         implementation: {
@@ -1421,7 +1417,7 @@ describe("trusted orchestrator", () => {
     const dir = await mkdtemp(join(tmpdir(), "orchestrator-invalid-"));
     let reads = 0;
     const store = new StateStore(join(dir, "events.jsonl"));
-    const runner = new TrustedOrchestrator(dir, store, {
+    const runner = new TrustedOrchestrator(join(dir, "run-001"), store, {
       context: {
         read: async () => {
           reads += 1;

@@ -14,7 +14,7 @@ const common = {
   schemaVersion: 2,
   headSha,
   reviewBaseSha: baseSha,
-  start: artifact("docs/agent-runs/run-001/start.json"),
+  start: artifact("ai/runs/run-001/start.json"),
   plan: artifact("docs/plan.json"),
   implementation: artifact("docs/implementation.md"),
   allPhasesComplete: true,
