@@ -23,10 +23,10 @@ docker compose -f compose.dev.yml run --rm application sh -c 'pnpm install --fro
 品質確認がすべてPASSした後、次だけを実行する。
 
 ```sh
-pnpm agent:publish
+./.agents/tools/pr-agent-publish
 ```
 
-この入口はhostのNode.js 20環境から起動できるよう、リポジトリ内の固定された`node_modules/.bin/tsx`を使う。品質確認そのものはhostで行わず、publish内部のDocker Compose環境で実行する。
+AIが使う公開正本はこのwrapperである。hostのNode.js 20環境ではpnpm自体を起動せず、リポジトリ内の固定された`node_modules/.bin/tsx`を使う。`pnpm agent:publish`はNode.js 22が有効な人間terminalでのaliasである。品質確認そのものはhostで行わず、publish内部のDocker Compose環境で実行する。
 
 - `feature/vX.Y.Z`：同名originへ通常pushし、同じSHAのCI成功を確認する。
 - `feature/<slug>-vX.Y.Z`：同名originへpushし、対応する`feature/vX.Y.Z`をbaseに通常PRを作成する。

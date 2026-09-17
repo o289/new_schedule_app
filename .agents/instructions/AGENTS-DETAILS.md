@@ -34,7 +34,7 @@
 - 通常作業は`feature/vX.Y.Z`。大規模だけ承認後にそこから`feature/<slug>-vX.Y.Z`を作る。
 - `feature/vX.Y.Z`は同名originへ通常pushし、同一SHAのCI成功でAI作業を完了する。
 - `feature/<slug>-vX.Y.Z`は同名originへpushし、対応する`feature/vX.Y.Z`をbaseに通常PRを作成する。
-- 公開は`.agents/tools/pr-agent-publish`または`pnpm agent:publish`だけを使う。publishはDocker正式verifyがPASSした後だけpushし、機能branchでは通常PRのhead/base/SHAを確認する。
+- AIは公開正本の`./.agents/tools/pr-agent-publish`だけを使う。host Node.js 20ではpnpm自体を起動しない。`pnpm agent:publish`はNode.js 22が有効な人間terminalで使うaliasである。publishはDocker正式verifyがPASSした後だけpushし、機能branchでは通常PRのhead/base/SHAを確認する。
 - `main`へのpush、force push、branch削除、任意remote/refspec、DB削除、本番DB操作、`docker compose down -v`、任意shell実行を行わない。
 - AIの完了は必要なpushまたは通常PR作成まで。レビュー、承認、merge、merge後監視は人間の業務である。
 
