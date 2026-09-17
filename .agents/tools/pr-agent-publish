@@ -4,6 +4,11 @@ if [ "$#" -ne 0 ]; then
   echo 'STOP: pr-agent-publish accepts no arguments.' >&2
   exit 1
 fi
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
 cd "$repo_root"
-exec pnpm exec tsx .agents/tools/pr-agent-publish.ts
+tsx="$repo_root/node_modules/.bin/tsx"
+if [ ! -x "$tsx" ]; then
+  echo 'STOP: node_modules/.bin/tsx がありません。プロジェクトのDocker環境で依存を準備してから再実行してください。' >&2
+  exit 1
+fi
+exec "$tsx" .agents/tools/pr-agent-publish.ts

@@ -1,4 +1,4 @@
-# 正本: new_schedule_app/codx/rules/pr-agent.rules
+# 正本: new_schedule_app/.agents/rules/pr-agent.rules
 # 自動読込ではない。codx/README.mdの導入手順を参照する。
 prefix_rule(
     pattern = ["git", ["status", "diff", "log", "show", "merge-base", "rev-parse", "ls-files", "ls-remote", "symbolic-ref", "for-each-ref", "check-ref-format"]],

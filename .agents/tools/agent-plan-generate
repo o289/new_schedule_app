@@ -1,4 +1,0 @@
-#!/bin/sh
-set -eu
-echo "STOP: 旧generatorは使用できません。pnpm agent:run create <runId>を使用してください。" >&2
-exit 1

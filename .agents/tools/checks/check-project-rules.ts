@@ -242,8 +242,7 @@ function inspectWorkflowDocumentPaths(): RuleViolation[] {
       .filter((file) => file.endsWith(".md"))
       .map((file) => join(projectRoot, ".agents/instructions", file)),
   ];
-  const legacyPattern =
-    /docs\/(?:html|agent-runs|pr-agent-handoff|agent-plan-input|agent-plan-approval-input|pr-agent-start-input|pr-agent-start-record|agent-run-command)/;
+  const legacyPattern = /docs\/(?:html|agent-runs)/;
   return files.flatMap((file) => {
     const text = readFileSync(file, "utf8");
     return text.split("\n").flatMap((line, index) =>

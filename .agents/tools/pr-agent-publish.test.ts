@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   handoffSchema,
   parsePublicationHandoff,
+  publish,
   sha256,
   validateBranches,
 } from "./pr-agent-publish.js";
@@ -86,14 +86,265 @@ describe("publication handoff contract", () => {
     ).toThrow();
   });
 
-  it("contains no direct git push or gh PR create bypass", async () => {
-    const source = await readFile(
-      new URL("./pr-agent-publish.ts", import.meta.url),
-      "utf8",
+  it("runs verification before fixed push and reuses a matching PR", async () => {
+    const calls: string[] = [];
+    const command = async (program: string, args: readonly string[]) => {
+      calls.push(`${program} ${args.join(" ")}`);
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/task-v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app.git\n",
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "run")
+        return {
+          stdout: JSON.stringify([
+            {
+              conclusion: "success",
+              url: "https://ci.example/run/1",
+              headSha: "a".repeat(40),
+            },
+          ]),
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "list")
+        return {
+          stdout: JSON.stringify([
+            {
+              url: "https://github.com/o289/new_schedule_app/pull/1",
+              headRefName: "feature/task-v3.2.3",
+              baseRefName: "feature/v3.2.3",
+              headRefOid: "a".repeat(40),
+              isDraft: false,
+              state: "OPEN",
+            },
+          ]),
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "view")
+        return {
+          stdout: JSON.stringify({
+            url: "https://github.com/o289/new_schedule_app/pull/1",
+            headRefName: "feature/task-v3.2.3",
+            baseRefName: "feature/v3.2.3",
+            headRefOid: "a".repeat(40),
+            isDraft: false,
+            state: "OPEN",
+          }),
+          stderr: "",
+        };
+      return { stdout: "", stderr: "" };
+    };
+    const result = await publish(command);
+    expect(result).toMatchObject({
+      mode: "pull_request",
+      prUrl: "https://github.com/o289/new_schedule_app/pull/1",
+    });
+    expect(calls[0]).toBe("git branch --show-current");
+    expect(calls).toContain(
+      "docker compose -f compose.dev.yml run --rm application sh -c pnpm install --frozen-lockfile && pnpm verify:phase",
     );
-    expect(source).not.toContain('"push"');
-    expect(source).not.toContain('"pr"');
-    expect(source).not.toContain('"create"');
+    expect(calls).toContain("git push origin feature/task-v3.2.3");
+    expect(
+      calls.indexOf(
+        "docker compose -f compose.dev.yml run --rm application sh -c pnpm install --frozen-lockfile && pnpm verify:phase",
+      ),
+    ).toBeLessThan(calls.indexOf("git push origin feature/task-v3.2.3"));
+  });
+
+  it("stops before push when Docker verification fails", async () => {
+    const calls: string[] = [];
+    const command = async (program: string, args: readonly string[]) => {
+      calls.push(`${program} ${args.join(" ")}`);
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app.git\n",
+          stderr: "",
+        };
+      if (program === "docker") throw new Error("Docker verification failed");
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(command)).rejects.toThrow(
+      "Docker verification failed",
+    );
+    expect(calls.some((call) => call.startsWith("git push "))).toBe(false);
+  });
+
+  it("pushes a version branch without creating a PR", async () => {
+    const calls: string[] = [];
+    const command = async (program: string, args: readonly string[]) => {
+      calls.push(`${program} ${args.join(" ")}`);
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app.git\n",
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "run")
+        return {
+          stdout: JSON.stringify([
+            {
+              conclusion: "success",
+              url: "https://ci.example/run/2",
+              headSha: "a".repeat(40),
+            },
+          ]),
+          stderr: "",
+        };
+      return { stdout: "", stderr: "" };
+    };
+    const result = await publish(command);
+    expect(result).toMatchObject({
+      mode: "push_only",
+      branch: "feature/v3.2.3",
+    });
+    expect(calls).toContain("git push origin feature/v3.2.3");
+    expect(calls.some((call) => call.startsWith("gh pr "))).toBe(false);
+  });
+
+  it("creates and then verifies an open non-draft PR", async () => {
+    const command = async (program: string, args: readonly string[]) => {
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/task-v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app.git\n",
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "run")
+        return {
+          stdout: JSON.stringify([
+            {
+              conclusion: "success",
+              url: "https://ci.example/run/3",
+              headSha: "a".repeat(40),
+            },
+          ]),
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "list")
+        return { stdout: "[]", stderr: "" };
+      if (program === "gh" && args[0] === "pr" && args[1] === "create")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app/pull/3\n",
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "view")
+        return {
+          stdout: JSON.stringify({
+            url: "https://github.com/o289/new_schedule_app/pull/3",
+            headRefName: "feature/task-v3.2.3",
+            baseRefName: "feature/v3.2.3",
+            headRefOid: "a".repeat(40),
+            isDraft: false,
+            state: "OPEN",
+          }),
+          stderr: "",
+        };
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(command)).resolves.toMatchObject({
+      prUrl: "https://github.com/o289/new_schedule_app/pull/3",
+    });
+  });
+
+  it("rejects an existing draft PR", async () => {
+    const command = async (program: string, args: readonly string[]) => {
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/task-v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return {
+          stdout: "https://github.com/o289/new_schedule_app.git\n",
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "run")
+        return {
+          stdout: JSON.stringify([
+            {
+              conclusion: "success",
+              url: "https://ci.example/run/4",
+              headSha: "a".repeat(40),
+            },
+          ]),
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "list")
+        return {
+          stdout: JSON.stringify([
+            {
+              url: "https://github.com/o289/new_schedule_app/pull/4",
+              headRefName: "feature/task-v3.2.3",
+              baseRefName: "feature/v3.2.3",
+              headRefOid: "a".repeat(40),
+              isDraft: true,
+              state: "OPEN",
+            },
+          ]),
+          stderr: "",
+        };
+      if (program === "gh" && args[0] === "pr" && args[1] === "view")
+        return {
+          stdout: JSON.stringify({
+            url: "https://github.com/o289/new_schedule_app/pull/4",
+            headRefName: "feature/task-v3.2.3",
+            baseRefName: "feature/v3.2.3",
+            headRefOid: "a".repeat(40),
+            isDraft: true,
+            state: "OPEN",
+          }),
+          stderr: "",
+        };
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(command)).rejects.toThrow("通常PR");
+  });
+
+  it("stops before push on a forbidden branch", async () => {
+    const calls: string[] = [];
+    const command = async (program: string, args: readonly string[]) => {
+      calls.push(`${program} ${args.join(" ")}`);
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "main\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(command)).rejects.toThrow("STOP:");
+    expect(calls.some((call) => call.startsWith("git push "))).toBe(false);
+  });
+
+  it("stops on a dirty worktree and a non-GitHub origin", async () => {
+    const dirty = async (program: string, args: readonly string[]) => {
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "status")
+        return { stdout: " M app.ts\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(dirty)).rejects.toThrow("未コミット");
+
+    const badOrigin = async (program: string, args: readonly string[]) => {
+      if (program === "git" && args[0] === "branch")
+        return { stdout: "feature/v3.2.3\n", stderr: "" };
+      if (program === "git" && args[0] === "rev-parse")
+        return { stdout: "a".repeat(40), stderr: "" };
+      if (program === "git" && args[0] === "remote")
+        return { stdout: "https://example.com/repo.git\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    };
+    await expect(publish(badOrigin)).rejects.toThrow("originはGitHub");
   });
 
   it("hashes evidence content deterministically", () => {

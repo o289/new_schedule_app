@@ -1,60 +1,43 @@
-# AIエージェント開発フロー
+# AIエージェント開発規則
 
-## Canonical plan契約（新規計画）
+この文書だけをAI作業手順の正本とする。引き継ぎ時は`ai/runs/<runId>/work.json`、同じrunの`plan.md`、Gitの実体（現在branch、HEAD、差分）の順で読む。
 
-新規計画の正本はZod検証済み`plan.json`とし、`agent:plan:generate`で`plan-review.html`と`agent-plan.md`を生成する。生成物の手編集は禁止し、修正は入力planへ戻して再生成する。承認は変更単位ごとの`APPROVED`/`NOT_APPLICABLE`、`openDecisions`ゼロ、planHash、approvedBy、approvedAt、expiresAt（最大7日）を確認する。
+`work.json`はgoal、currentPhase、nextAction、lastVerification、blocker、updatedAtだけを持つ共有メモとする。branch、SHA、hash、期限、event log、state machine、evidence pathは保存せず、branchとSHAはGitから取得する。run履歴とlegacyの`docs/**`は変更・削除しない。計画MDの完了項目は`[ ]`から`[x]`へ更新する。
 
-新規開始はschemaVersion 2のcanonical plan／approval／agent-plan.md参照だけを受理し、v1入力へ暗黙変換しない。既存completed v1開始recordは履歴互換のため保持する。Stage 2導入までは版branch上で実装し、worktree隔離・state machine・trusted runnerは未実装である。
+## 計画とPhase
 
-## 役割の選択
+- 小規模変更は計画書を作らず、実装・品質確認へ進む。
+- 中規模以上は、実装前に人間向けHTMLとAI向け`plan.md`を作り、ユーザーの承認を得る。
+- 計画承認は、その計画に書かれた全Phaseへの承認である。Phase完了ごとの追加承認は求めない。
+- 計画にないDB、依存、API、権限、仕様、設定の変更が必要になった場合だけREPLANで停止し、計画を直して再承認を得る。
 
-Stage 2以降のrun状態はorchestratorのappend-only event logを正本とし、AIが状態ファイルを直接編集してはならない。cleanupは登録済み未公開runだけを`.agents/tools/agent-run/cleanup.ts`経由で実行する。
+## 実装と品質ループ
 
-cleanupは`runId`、marker（repository realpath・開始SHA・task branch・git-common-dir）、run event log、worktree realpath、現在branch、HEADを照合する。statusの伏字、diff概要、event log全量をrun directoryへ保存できた場合だけ、ローカルtask worktreeとtask branchを削除する。primary checkout、remote、登録外worktree、外部DBは操作しない。証跡保存に失敗した場合は対象を温存して停止する。
+- 書き込みを行うサブエージェントは同時に1つだけ。高モデル時は小規模をLuna、中・大規模をTerraへ委譲し、メインが計画と品質判定を保持する。
+- 各Phaseは、実装 → 必要なDB migration → Docker正式環境で`pnpm verify:phase` → PASSなら次Phase、FAILなら原因修正後にverify再実行、の順で進める。
+- 正式verifyは`docker compose -f compose.dev.yml run --rm application sh -c 'pnpm install --frozen-lockfile && pnpm verify:phase'`で実行する。
+- `verify:phase`は`pnpm typecheck && pnpm test`である。typecheck失敗中にtestへ進まない。
+- DB Schema変更が承認済み計画にある場合だけ`pnpm db:generate`、SQL確認、ローカルDBへの`pnpm db:migrate`、必要なintegration testを行う。Schema変更がなければmigrationを作らない。
+- E2Eが必要な変更だけ既存のE2E手順を使い、不要なら理由を報告する。
 
-依頼内容と現在の工程に応じて、次の役割を選択し、対応する文書に従う。
+## 主要なコード規則
 
-- 要求整理、直接実装可否の判断、実装計画の作成・修正は[`計画作成エージェント.md`](計画作成エージェント.md)に従う。
-- 承認済み計画または直接実装可能な小規模変更の実装は[`実装エージェント.md`](実装エージェント.md)に従う。
-- 実装結果の検証、品質ゲート判定、DB統合テスト、E2E確認は[`品質管理エージェント.md`](品質管理エージェント.md)に従う。
-- 全フェーズの最終品質PASS後のレビュー資料・branch別公開（push・CI確認、機能branchのみ通常PR作成）は[`PR作成エージェント.md`](PR作成エージェント.md)に従う。
+- Frontend、Backend、packagesのimport境界を守る。`packages`から`apps`をimportしない。
+- BackendはRouter（HTTP入出力）→ Service（認可・業務ルール）→ Repository（DB操作）→ Model / databaseの責務分離を守る。
+- HTTP入力、環境変数、外部レスポンスを信用せず、既存のZod Schemaと共通API契約を使う。
+- `any`、`@ts-ignore`、検査回避の二重cast、未処理Promise、デバッグログを追加しない。
+- 日時は既存の日本時間wall-clock契約を守り、意図しないUTC変換や末尾`Z`を追加しない。
+- Token、credential、秘密鍵、Join Code、個人情報をログやGitへ出さない。秘密情報は実行時の環境から読み、ファイルへ保存しない。
 
-メインが`gpt-6-astra`または`gpt-5.6-sol`の場合の実装委譲と品質ループは、[`MULTI_AGENT_WORKFLOW.md`](MULTI_AGENT_WORKFLOW.md)を正本とする。書き込みを行うサブエージェントを同時に複数起動しない。
+## Branchと公開
 
-役割は別のプロセスや別のAIであることを必須としない。同じAIが複数工程を担当する場合も、工程を移るたびに現在の役割を明確にし、対応する役割文書を読んで責務を切り替える。
+- 通常作業は`feature/vX.Y.Z`。大規模だけ承認後にそこから`feature/<slug>-vX.Y.Z`を作る。
+- `feature/vX.Y.Z`は同名originへ通常pushし、同一SHAのCI成功でAI作業を完了する。
+- `feature/<slug>-vX.Y.Z`は同名originへpushし、対応する`feature/vX.Y.Z`をbaseに通常PRを作成する。
+- 公開は`.agents/tools/pr-agent-publish`または`pnpm agent:publish`だけを使う。publishはDocker正式verifyがPASSした後だけpushし、機能branchでは通常PRのhead/base/SHAを確認する。
+- `main`へのpush、force push、branch削除、任意remote/refspec、DB削除、本番DB操作、`docker compose down -v`、任意shell実行を行わない。
+- AIの完了は必要なpushまたは通常PR作成まで。レビュー、承認、merge、merge後監視は人間の業務である。
 
-## 引き継ぎフロー
+## 引き継ぎ
 
-```text
-依頼
- ↓
-計画作成エージェント
- ├─ 小規模変更 → 実装エージェント
- └─ 中規模以上 → 実装計画を提出 → ユーザー承認を待つ
-                                      ↓
-                               実装エージェント
-                         （高モデル時はLuna / Terraへ逐次委譲）
-                                      ↓
-                               品質管理エージェント
-                                ├─ FAIL → 実装エージェントへ差し戻し
-                                └─ PASS → 次フェーズ
-                                           または全フェーズ完了
-                                                  ↓
-                                           PR作成エージェント
-                                                  ↓
-                                ├─ 版branch → push・CI成功で完了
-                                └─ 機能branch → push・CI・通常PR完成 → 人間レビュー・Merge
-```
-
-- 中規模以上の変更は、ユーザーが実装計画を承認するまで実装へ進まない。
-- 同じ計画書内では、現在フェーズが品質ゲートをPASSしたら追加承認なしで次フェーズへ進む。
-- 品質ゲートがFAILした場合は、品質管理エージェントが原因と再現方法を報告し、実装エージェントが修正する。修正後は品質管理エージェントが必要なゲートを最初から再実行する。
-- 新たな権限、計画外変更、仕様判断が必要になった場合は進行を止め、ユーザーへ報告する。
-- 高モデル時もメインエージェントは計画と品質判定を保持し、実装サブエージェントの完了後に品質管理へ戻る。品質FAIL時の修正は同じ実装役へ差し戻し、メインが再検証する。
-- 最終応答の前に必ず `pnpm agent:run status <runId>` を実行する。`status` が成功しない（PENDING/ BLOCKED、CI未確認、PR未作成を含む）場合は完了報告を出さず停止する。レビュー・Merge・Merge後監視は人間の責務であり、AIの状態や自動処理には含めない。
-
-## 文書の責務
-
-- 詳細な規則は主担当となる役割文書に一度だけ記載し、他の役割からはリンクで参照する。
-- 判断フロー、計画書形式、品質手順の正本は、それぞれ[`IMPLEMENTATION_DECISION_FLOW.md`](IMPLEMENTATION_DECISION_FLOW.md)、[`IMPLEMENTATION_PLAN_TEMPLATE.md`](../../ai/templates/IMPLEMENTATION_PLAN_TEMPLATE.md)、[`品質管理.md`](品質管理.md)とする。
-- ディレクトリ内に追加の`AGENTS.md`がある場合は、そのディレクトリ固有の指示も併せて適用する。
+実装完了時は、変更ファイル、実装内容、テスト、DB・migration・依存・設定・生成物の有無、実行コマンドと結果、未実行検証、未解決事項、計画外変更の有無をメインへ返す。品質PASSはメインが実際の差分とDocker正式verifyを確認して判定する。
