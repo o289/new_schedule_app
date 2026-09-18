@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>実装計画テンプレート</title>
+    <style>
+      :root {
+        --ink: #182331;
+        --muted: #526273;
+        --line: #d6dee8;
+        --paper: #fff;
+        --wash: #f4f7fa;
+        --accent: #185a8d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--wash);
+        font:
+          16px/1.75 system-ui,
+          -apple-system,
+          "Hiragino Kaku Gothic ProN",
+          "Yu Gothic",
+          sans-serif;
+      }
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 22px 72px;
+      }
+      header,
+      section {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        padding: 24px 28px;
+        margin: 20px 0;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.55rem, 3vw, 2.3rem);
+        line-height: 1.3;
+      }
+      h2 {
+        margin: 0 0 16px;
+        font-size: 1.45rem;
+        border-left: 5px solid var(--accent);
+        padding-left: 12px;
+      }
+      h3 {
+        margin: 22px 0 7px;
+        font-size: 1.08rem;
+        color: var(--accent);
+      }
+      p {
+        margin: 8px 0 12px;
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.92rem;
+        margin-top: 14px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        padding: 14px;
+      }
+      ul,
+      ol {
+        margin: 6px 0 14px;
+        padding-left: 1.45em;
+      }
+      li {
+        margin: 3px 0;
+      }
+      code {
+        background: #eef1f4;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      .note {
+        border-left: 4px solid #8b4b16;
+        background: #fff8ed;
+        padding: 10px 14px;
+      }
+      @media (max-width: 760px) {
+        main {
+          padding: 18px 12px 48px;
+        }
+        header,
+        section {
+          padding: 18px 16px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+          font-size: 10.5pt;
+        }
+        main {
+          max-width: none;
+          padding: 0;
+        }
+        header,
+        section {
+          border: 0;
+          padding: 10px 0;
+          margin: 0 0 14px;
+        }
+        h2 {
+          break-after: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>実装計画：{{PROJECT_NAME}}</h1>
+        <p class="lead">
+          人間向け計画テンプレート。特定runの内容を含めず、複製して計画固有の値を記入する。
+        </p>
+        <div class="meta">
+          担当：{{OWNER}}　／　承認者：{{APPROVER}}　／　作成日：{{DATE}}
+        </div>
+      </header>
+      <section>
+        <h2>概要と範囲</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>目的／課題</h3>
+            <p>{{PURPOSE}}</p>
+            <p>{{PROBLEM}}</p>
+          </div>
+          <div class="card">
+            <h3>対象／対象外</h3>
+            <p>対象：{{IN_SCOPE}}</p>
+            <p>対象外：{{OUT_OF_SCOPE}}</p>
+          </div>
+          <div class="card">
+            <h3>変更有無</h3>
+            <p>DB：{{DB_CHANGE}}　依存：{{DEPENDENCY_CHANGE}}</p>
+            <p>API：{{API_CHANGE}}　権限：{{AUTH_CHANGE}}</p>
+            <p>仕様：{{SPEC_CHANGE}}　設定：{{CONFIG_CHANGE}}</p>
+          </div>
+          <div class="card">
+            <h3>進行</h3>
+            <p>実装 → 技術QA／仕様QA → 公開</p>
+            <p>両QA PASS後のみ公開する。</p>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2>Phase {{PHASE_NUMBER}}：{{PHASE_NAME}}</h2>
+        <h3>変更対象／実装内容</h3>
+        <ul>
+          <li>{{TARGET_FILE}}</li>
+          <li>{{IMPLEMENTATION}}</li>
+          <li>維持する既存動作：{{PRESERVED_BEHAVIOR}}</li>
+        </ul>
+        <h3>受入条件</h3>
+        <ul>
+          <li>[ ] {{ACCEPTANCE_CONDITION}}</li>
+          <li>[ ] 必要なmigrationとSQL確認（Schema変更時のみ）</li>
+          <li>[ ] E2E：{{E2E_REQUIRED}}（不要なら理由：{{E2E_REASON}}）</li>
+        </ul>
+        <h3>QA担当区分</h3>
+        <div class="grid">
+          <div class="card">
+            <p><strong>技術QA</strong></p>
+            <p>テスト担保可否：{{TECHNICAL_QA_TESTABLE}}</p>
+            <p>
+              担当：{{TECHNICAL_QA_OWNER}}（可能なら実装者と別のread-only
+              sub、困難ならmain）
+            </p>
+            <p>判定理由：{{TECHNICAL_QA_REASON}}</p>
+          </div>
+          <div class="card">
+            <p><strong>仕様QA</strong></p>
+            <p>テスト担保可否：{{SPECIFICATION_QA_TESTABLE}}</p>
+            <p>
+              担当：{{SPECIFICATION_QA_OWNER}}（可能なら実装者と別のread-only
+              sub、困難ならmain）
+            </p>
+            <p>判定理由：{{SPECIFICATION_QA_REASON}}</p>
+            <p>仕様QAが必要なE2Eを実行し、結果を記録する。</p>
+          </div>
+        </div>
+        <p>両QA PASS後にmainが最終PASSを判定する。</p>
+        <h3>引継ぎ／差戻し</h3>
+        <p>
+          引継ぎ：{{HANDOFF}}。FAIL時は{{RETURN_TARGET}}へ戻す。計画外変更はREPLANとして停止する。
+        </p>
+      </section>
+      <section>
+        <h2>品質ゲートと公開</h2>
+        <ul>
+          <li>[ ] 実装完了</li>
+          <li>[ ] 技術QA PASS</li>
+          <li>[ ] 仕様QA PASS</li>
+          <li>[ ] Docker正式verify PASS</li>
+          <li>[ ] 計画外差分なし</li>
+          <li>[ ] version branch：push後の同一SHA CI成功を確認した</li>
+          <li>
+            [ ] 機能branch：push後の通常PR作成とhead/base/SHA確認を完了した
+          </li>
+        </ul>
+        <p class="note">
+          branch、公開正本、version
+          branch／機能branchの完了条件は共通契約に従う。レビュー、承認、mergeは人間へ引き継ぐ。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -2,6 +2,8 @@
 
 共通契約は[AGENTS-DETAILS.md](../AGENTS-DETAILS.md)を参照する。
 
+計画テンプレートは[人間向けHTML](../../../templates/IMPLEMENTATION_PLAN_TEMPLATE.html)と[AI向けMarkdown](../../../templates/IMPLEMENTATION_PLAN_TEMPLATE.md)を正本として参照する。
+
 ## 目的
 
 要求を実行可能な範囲、Phase、受入条件、QA判定へ変換する。
@@ -19,6 +21,7 @@
 ## 手順
 
 1. 規模を分類する。小規模はこの計画書作成タスクをスキップし、対象・非対象とQA／E2E判断をメインが確認して[02 実装](02-implementation.md)へ進む。中規模以上ならHTML、plan.md、work.jsonを作る。
+   中規模以上では両テンプレートを複製し、run配下の`plan.html`と`plan.md`を作成する。
 2. 対象・非対象、DB・依存・API・権限・設定の有無を列挙する。
 3. 実装→技術QA／仕様QA→公開の順序、各タスクへの入力・引継ぎ、両QA PASSゲートを計画に明記する。
 4. 各Phaseの実装、QA担当（テスト担保可能なら別の読み取り専用サブ、困難ならメイン）、E2E要否、受入条件を定義する。

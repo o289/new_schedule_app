@@ -19,6 +19,7 @@
 1. Git実体を再確認する。
 2. 開始条件を再確認し、共通契約の[Branch、公開、禁止事項](../AGENTS-DETAILS.md#branch公開禁止事項)に定義された公開正本を使う。
 3. 同契約のbranch種別ごとの順序で公開・確認する。
+   大規模作業の`feature/<slug>-vX.Y.Z`は、対応する`feature/vX.Y.Z`をbaseとして通常PRを作成する。具体的な公開条件は共通契約に従う。
 4. branch、SHA、CI結果、URL等の実行結果を記録し、引き継ぐ。
 
 ## 禁止事項

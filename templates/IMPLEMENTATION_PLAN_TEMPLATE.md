@@ -48,7 +48,7 @@
 
 ---
 
-複数Phaseの場合はこの章を複製し、Phaseごとに変更対象・非対象・完了条件・品質ゲート・QA担当区分・E2E要否・引継ぎ・差戻しを具体的に書く。計画承認は全Phaseを対象とし、計画外のDB、依存、API、権限、仕様、設定はREPLANで停止する。共通のbranch／公開条件は[AGENTS-DETAILS.md](../../.agents/instructions/AGENTS-DETAILS.md#branch公開禁止事項)を参照する。
+複数Phaseの場合はこの章を複製し、Phaseごとに変更対象・非対象・完了条件・品質ゲート・QA担当区分・E2E要否・引継ぎ・差戻しを具体的に書く。計画承認は全Phaseを対象とし、計画外のDB、依存、API、権限、仕様、設定はREPLANで停止する。共通のbranch／公開条件は[AGENTS-DETAILS.md](../.agents/instructions/AGENTS-DETAILS.md#branch公開禁止事項)を参照する。
 
 - [ ] migration生成物のSQLを確認した
 - [ ] ローカル開発DBへmigrationを適用した
