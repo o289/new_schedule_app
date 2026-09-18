@@ -15,6 +15,7 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
   const updatedCategoryName = `${categoryName}-更新`;
   const title = createE2EName("schedule");
   const updatedTitle = `${title}-更新`;
+  const note = "作成時のメモ\n2行目";
 
   await createCategory(page, {
     name: categoryName,
@@ -25,7 +26,7 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
   await openScheduleForm(page);
   await fillScheduleForm(page, {
     title,
-    note: "作成時のメモ",
+    note,
     categoryName,
     start: "10:00",
     end: "11:00",
@@ -42,7 +43,12 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
   await returnToCalendarAside(page);
 
   await page.getByText(title, { exact: true }).click();
-  await expect(page.getByText("作成時のメモ", { exact: true })).toBeVisible();
+  const noteDetail = page.locator(".whitespace-pre-wrap", { hasText: note });
+  await expect(noteDetail).toBeVisible();
+  await expect(noteDetail).toHaveCSS("white-space", "pre-wrap");
+  await expect
+    .poll(() => noteDetail.evaluate((element) => element.textContent))
+    .toBe(note);
   await expect(
     page.getByText(updatedCategoryName, { exact: true }),
   ).toBeVisible();

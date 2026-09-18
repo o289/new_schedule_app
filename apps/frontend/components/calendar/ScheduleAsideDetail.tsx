@@ -154,7 +154,9 @@ export default function ScheduleAsideDetail({
               <Divider className="!mb-6" />
               <div>
                 <div className="font-semibold mb-2">メモ</div>
-                <div>{schedule.note}</div>
+                <div className="whitespace-pre-wrap break-words">
+                  {schedule.note}
+                </div>
               </div>
             </>
           )}
