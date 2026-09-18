@@ -1,126 +1,673 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AIエージェント開発フロー：5タスク分割計画</title>
-  <style>
-    :root { --ink:#182331; --muted:#526273; --line:#d6dee8; --paper:#fff; --wash:#f4f7fa; --accent:#185a8d; --warn:#8b4b16; }
-    * { box-sizing:border-box; }
-    body { margin:0; color:var(--ink); background:var(--wash); font:16px/1.75 system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; }
-    main { max-width:1080px; margin:0 auto; padding:32px 22px 72px; }
-    header { background:var(--paper); border:1px solid var(--line); padding:28px 30px; margin-bottom:24px; }
-    h1 { margin:0 0 8px; font-size:clamp(1.55rem,3vw,2.3rem); line-height:1.3; }
-    h2 { margin:0 0 16px; font-size:1.45rem; border-left:5px solid var(--accent); padding-left:12px; }
-    h3 { margin:22px 0 7px; font-size:1.08rem; color:var(--accent); }
-    p { margin:8px 0 12px; } .lead { color:var(--muted); margin:0; }
-    section, .card { background:var(--paper); border:1px solid var(--line); padding:24px 28px; margin:20px 0; }
-    .meta { display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--muted); font-size:.92rem; margin-top:14px; }
-    .flow { display:grid; grid-template-columns:1.2fr 1.2fr 1fr 1fr 1.2fr; gap:8px; margin:18px 0 8px; align-items:center; }
-    .flow div { padding:12px 8px; border:1px solid #a9bfd3; background:#edf5fb; text-align:center; font-weight:700; }
-    .flow .qa { grid-column:3; display:grid; grid-template-columns:1fr 1fr; gap:8px; background:#fff8ed; border-color:#d4b27e; position:relative; }
-    .flow .qa span { padding:8px 4px; background:#fff; border:1px solid #d4b27e; }
-    .flow .qa::after { content:"↗  ↘"; position:absolute; right:-34px; bottom:-22px; color:var(--accent); letter-spacing:8px; }
-    .flow .join { grid-column:4; }
-    .flow .join::before { content:"→ "; color:var(--accent); }
-    .flow .publish { grid-column:5; }
-    table { width:100%; border-collapse:collapse; margin:10px 0 16px; font-size:.94rem; }
-    th,td { border:1px solid var(--line); padding:9px 11px; vertical-align:top; text-align:left; }
-    th { background:#edf2f7; white-space:nowrap; }
-    ul,ol { margin:6px 0 14px; padding-left:1.45em; } li { margin:3px 0; }
-    code { background:#eef1f4; padding:1px 4px; border-radius:3px; font-size:.92em; }
-    .note { border-left:4px solid var(--warn); background:#fff8ed; padding:10px 14px; margin:12px 0; }
-    .task { break-inside:avoid; } .task h2 span { color:var(--muted); font-size:.82em; font-weight:400; }
-    .small { color:var(--muted); font-size:.9rem; }
-    @media (max-width:760px) { main{padding:18px 12px 48px} section,.card,header{padding:18px 16px}.flow{display:grid;grid-template-columns:1fr}.flow div,.flow .qa,.flow .join,.flow .publish{grid-column:auto;grid-row:auto}.flow .qa{grid-template-columns:1fr}.flow .qa::after{content:"↓";right:auto;bottom:-24px;left:50%;}.flow .join::before{content:"↓ ";} table{display:block;overflow-x:auto;white-space:normal} }
-    @media print { body{background:#fff;font-size:10.5pt} main{max-width:none;padding:0} header,section,.card{border:0;padding:10px 0;margin:0 0 14px} h2{break-after:avoid}.flow{display:flex}.flow div{flex:1} a{color:inherit;text-decoration:none} }
-  </style>
-</head>
-<body>
-<main>
-  <header>
-    <h1>AIエージェント開発フロー：5タスク分割計画</h1>
-    <p class="lead">対象：<code>.agents/instructions/AGENTS-DETAILS.md</code> の圧縮された開発フローを、判定境界と引き継ぎが明確な5タスクへ展開する。</p>
-    <div class="meta"><span>成果物：本HTML（計画書）</span><span>この計画HTMLの作成担当：Luna</span><span>承認者・品質判定：メインエージェント／人間</span></div>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AIエージェント開発フロー：5タスク分割計画</title>
+    <style>
+      :root {
+        --ink: #182331;
+        --muted: #526273;
+        --line: #d6dee8;
+        --paper: #fff;
+        --wash: #f4f7fa;
+        --accent: #185a8d;
+        --warn: #8b4b16;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--wash);
+        font:
+          16px/1.75 system-ui,
+          -apple-system,
+          "Hiragino Kaku Gothic ProN",
+          "Yu Gothic",
+          sans-serif;
+      }
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 22px 72px;
+      }
+      header {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        padding: 28px 30px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.55rem, 3vw, 2.3rem);
+        line-height: 1.3;
+      }
+      h2 {
+        margin: 0 0 16px;
+        font-size: 1.45rem;
+        border-left: 5px solid var(--accent);
+        padding-left: 12px;
+      }
+      h3 {
+        margin: 22px 0 7px;
+        font-size: 1.08rem;
+        color: var(--accent);
+      }
+      p {
+        margin: 8px 0 12px;
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0;
+      }
+      section,
+      .card {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        padding: 24px 28px;
+        margin: 20px 0;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        margin-top: 14px;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1.2fr;
+        gap: 8px;
+        margin: 18px 0 8px;
+        align-items: center;
+      }
+      .flow div {
+        padding: 12px 8px;
+        border: 1px solid #a9bfd3;
+        background: #edf5fb;
+        text-align: center;
+        font-weight: 700;
+      }
+      .flow .qa {
+        grid-column: 3;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        background: #fff8ed;
+        border-color: #d4b27e;
+        position: relative;
+      }
+      .flow .qa span {
+        padding: 8px 4px;
+        background: #fff;
+        border: 1px solid #d4b27e;
+      }
+      .flow .qa::after {
+        content: "↗  ↘";
+        position: absolute;
+        right: -34px;
+        bottom: -22px;
+        color: var(--accent);
+        letter-spacing: 8px;
+      }
+      .flow .join {
+        grid-column: 4;
+      }
+      .flow .join::before {
+        content: "→ ";
+        color: var(--accent);
+      }
+      .flow .publish {
+        grid-column: 5;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 16px;
+        font-size: 0.94rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 11px;
+        vertical-align: top;
+        text-align: left;
+      }
+      th {
+        background: #edf2f7;
+        white-space: nowrap;
+      }
+      ul,
+      ol {
+        margin: 6px 0 14px;
+        padding-left: 1.45em;
+      }
+      li {
+        margin: 3px 0;
+      }
+      code {
+        background: #eef1f4;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 0.92em;
+      }
+      .note {
+        border-left: 4px solid var(--warn);
+        background: #fff8ed;
+        padding: 10px 14px;
+        margin: 12px 0;
+      }
+      .task {
+        break-inside: avoid;
+      }
+      .task h2 span {
+        color: var(--muted);
+        font-size: 0.82em;
+        font-weight: 400;
+      }
+      .small {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      @media (max-width: 760px) {
+        main {
+          padding: 18px 12px 48px;
+        }
+        section,
+        .card,
+        header {
+          padding: 18px 16px;
+        }
+        .flow {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+        .flow div,
+        .flow .qa,
+        .flow .join,
+        .flow .publish {
+          grid-column: auto;
+          grid-row: auto;
+        }
+        .flow .qa {
+          grid-template-columns: 1fr;
+        }
+        .flow .qa::after {
+          content: "↓";
+          right: auto;
+          bottom: -24px;
+          left: 50%;
+        }
+        .flow .join::before {
+          content: "↓ ";
+        }
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: normal;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+          font-size: 10.5pt;
+        }
+        main {
+          max-width: none;
+          padding: 0;
+        }
+        header,
+        section,
+        .card {
+          border: 0;
+          padding: 10px 0;
+          margin: 0 0 14px;
+        }
+        h2 {
+          break-after: avoid;
+        }
+        .flow {
+          display: flex;
+        }
+        .flow div {
+          flex: 1;
+        }
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>AIエージェント開発フロー：5タスク分割計画</h1>
+        <p class="lead">
+          対象：<code>.agents/instructions/AGENTS-DETAILS.md</code>
+          の圧縮された開発フローを、判定境界と引き継ぎが明確な5タスクへ展開する。
+        </p>
+        <div class="meta">
+          <span>成果物：本HTML（計画書）</span
+          ><span>この計画HTMLの作成担当：Luna</span
+          ><span>承認者・品質判定：メインエージェント／人間</span>
+        </div>
+      </header>
 
-  <section>
-    <h2>1. 全体フローと設計原則</h2>
-    <div class="flow" aria-label="5タスクの順序とQA分岐"><div>計画書作成</div><div>実装</div><div class="qa"><span>技術QA</span><span>仕様QA</span></div><div class="join">両方PASS</div><div class="publish">PUSH・PR作成</div></div>
-    <p>計画書の承認後、実装担当は規模に応じて決める。高モデル時は小規模をLuna、中・大規模をTerraへ委譲し、メインが計画と品質判定を保持する。技術QAと仕様QAは実装後に独立して並行判定し、両方がPASSになった後だけ公開タスクへ合流する。FAILは実装へ戻し、原因修正後に該当QAを再実行する。</p>
-    <table><thead><tr><th>役割</th><th>責務</th><th>権限境界</th></tr></thead><tbody>
-      <tr><td>メイン</td><td>計画の保持、承認取得、実体とDocker正式verifyの最終確認、PASS判定</td><td>計画外の仕様・権限変更を独断で承認しない</td></tr>
-      <tr><td>Luna／Terra</td><td>高モデル時は小規模をLuna、中・大規模をTerraへ委譲して実装。Phaseごとの検証と引き継ぎ報告</td><td>書込みサブエージェントは同時に1つ。指定された対象ファイル・計画範囲だけを書き込む</td></tr>
-      <tr><td>技術QA／仕様QA</td><td>Phaseごとにテストで担保できるQAかを判定し、可能なら実装者と別の読み取り専用サブエージェント、困難ならメインが担当する</td><td>QAサブエージェントは原則読み取り専用。修正は実装へ差し戻し、最終PASSは常にメインが保持する</td></tr>
-      <tr><td>技術QA</td><td>差分、設計、セキュリティ、テスト、Docker verifyの技術判定</td><td>実装を兼任せず、PASS/FAILと根拠を残す。仕様QAのE2E実行責務を代替しない</td></tr>
-      <tr><td>仕様QA</td><td>要件、計画、受入条件、UX/API契約、計画外変更の判定と必要なE2E実行</td><td>技術的な都合で要件を緩和しない。E2E不要時は理由を記録する</td></tr>
-      <tr><td>公開担当</td><td>正式verify後のpushまたは通常PR作成</td><td>main push、force push、merge、branch削除をしない</td></tr>
-    </tbody></table>
-    <h3>共通の参照データ</h3>
-    <p><code>ai/runs/&lt;runId&gt;/work.json</code>（<code>goal</code>、<code>currentPhase</code>、<code>nextAction</code>、<code>lastVerification</code>、<code>blocker</code>、<code>updatedAt</code> の6項目だけ）、同じrunの<code>plan.md</code>、Gitの実体（現在branch・HEAD・差分）をこの順に読む。branchやSHA等をwork.jsonへ重複保存しない。plan.mdの完了項目は<code>[ ]</code>から<code>[x]</code>へ更新する。</p>
-  </section>
+      <section>
+        <h2>1. 全体フローと設計原則</h2>
+        <div class="flow" aria-label="5タスクの順序とQA分岐">
+          <div>計画書作成</div>
+          <div>実装</div>
+          <div class="qa"><span>技術QA</span><span>仕様QA</span></div>
+          <div class="join">両方PASS</div>
+          <div class="publish">PUSH・PR作成</div>
+        </div>
+        <p>
+          計画書の承認後、実装担当は規模に応じて決める。高モデル時は小規模をLuna、中・大規模をTerraへ委譲し、メインが計画と品質判定を保持する。技術QAと仕様QAは実装後に独立して並行判定し、両方がPASSになった後だけ公開タスクへ合流する。FAILは実装へ戻し、原因修正後に該当QAを再実行する。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>役割</th>
+              <th>責務</th>
+              <th>権限境界</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>メイン</td>
+              <td>
+                計画の保持、承認取得、実体とDocker正式verifyの最終確認、PASS判定
+              </td>
+              <td>計画外の仕様・権限変更を独断で承認しない</td>
+            </tr>
+            <tr>
+              <td>Luna／Terra</td>
+              <td>
+                高モデル時は小規模をLuna、中・大規模をTerraへ委譲して実装。Phaseごとの検証と引き継ぎ報告
+              </td>
+              <td>
+                書込みサブエージェントは同時に1つ。指定された対象ファイル・計画範囲だけを書き込む
+              </td>
+            </tr>
+            <tr>
+              <td>技術QA／仕様QA</td>
+              <td>
+                Phaseごとにテストで担保できるQAかを判定し、可能なら実装者と別の読み取り専用サブエージェント、困難ならメインが担当する
+              </td>
+              <td>
+                QAサブエージェントは原則読み取り専用。修正は実装へ差し戻し、最終PASSは常にメインが保持する
+              </td>
+            </tr>
+            <tr>
+              <td>技術QA</td>
+              <td>差分、設計、セキュリティ、テスト、Docker verifyの技術判定</td>
+              <td>
+                実装を兼任せず、PASS/FAILと根拠を残す。仕様QAのE2E実行責務を代替しない
+              </td>
+            </tr>
+            <tr>
+              <td>仕様QA</td>
+              <td>
+                要件、計画、受入条件、UX/API契約、計画外変更の判定と必要なE2E実行
+              </td>
+              <td>技術的な都合で要件を緩和しない。E2E不要時は理由を記録する</td>
+            </tr>
+            <tr>
+              <td>公開担当</td>
+              <td>正式verify後のpushまたは通常PR作成</td>
+              <td>main push、force push、merge、branch削除をしない</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>共通の参照データ</h3>
+        <p>
+          <code>ai/runs/&lt;runId&gt;/work.json</code
+          >（<code>goal</code>、<code>currentPhase</code>、<code>nextAction</code>、<code>lastVerification</code>、<code>blocker</code>、<code
+            >updatedAt</code
+          >
+          の6項目だけ）、同じrunの<code>plan.md</code>、Gitの実体（現在branch・HEAD・差分）をこの順に読む。branchやSHA等をwork.jsonへ重複保存しない。plan.mdの完了項目は<code
+            >[ ]</code
+          >から<code>[x]</code>へ更新する。
+        </p>
+      </section>
 
-  <section class="task">
-    <h2>2. 計画書作成タスク <span>要求を実行可能な境界へ変換</span></h2>
-    <h3>目的／担当・権限</h3><p>目的は、実装範囲・Phase・受入条件・品質判定を先に固定すること。担当はメイン（必要な記述作業はLuna）。ユーザーの承認なしに実装へ進めない。</p>
-    <h3>開始条件／入力</h3><p>依頼内容が確定し、AGENTS.md、AGENTS-DETAILS.md、必要なら実装エージェント.mdとMULTI_AGENT_WORKFLOW.mdを読了していること。入力は要件、既存コード、Git状態、既存runのwork.json/plan.md。</p>
-    <h3>詳細手順</h3><ol><li>変更を小規模・中規模以上に分類する（中規模以上はHTMLとAI向けplan.mdを作成）。</li><li>対象ファイル、非対象ファイル、DB・依存・API・権限・設定の有無を列挙する。</li><li>5タスクを同じディレクトリの次の5ファイルへ分割し、<code>.agents/instructions/AGENTS-DETAILS.md</code>は共通契約と索引を持つ正本にする：<code>01-planning.md</code>、<code>02-implementation.md</code>、<code>03-technical-qa.md</code>、<code>04-specification-qa.md</code>、<code>05-publish-pr.md</code>（配置先：<code>.agents/instructions/tasks/</code>）。</li><li>Phaseを「実装→必要なmigration→Docker正式verify→PASS」の反復として分解し、各PhaseのQAがテストで担保可能か、担当（読み取り専用サブエージェントまたはメイン）、受入条件を記す。</li><li>関連文書・テンプレート・参照文書・ルール検査テストは、入口・契約・参照・検査対象としてつながりが必要な箇所だけ同期する。</li><li>work.jsonを6項目だけで初期化し、引継ぎ順を明記する。</li><li>ユーザー承認を得る。承認は計画に書かれた全Phaseへの承認とする。</li></ol>
-    <h3>禁止事項</h3><ul><li>計画にないDB、依存、API、権限、仕様、設定を含める／実装する。</li><li>work.jsonに7項目以上を追加する、またはGit実体の代わりにSHAを記録する。</li><li>承認前の実装差分の書き込み、品質PASSの先取り、公開操作。</li></ul>
-    <h3>成果物／完了条件</h3><p>人間向けHTML、AI向けplan.md、6項目のみのwork.json。範囲・Phase・QA・受入条件・確定事項がレビュー可能で、ユーザー承認済みなら完了。HTMLはこの計画成果物に限り単一ファイルとする。</p>
-    <h3>失敗時／差戻し／引き継ぎ</h3><p>要件不明、計画外変更、権限不足はREPLANとして停止し、判断事項をメインへ返す。承認後は実装タスクへ、入力として計画・対象範囲・受入条件・work.jsonを渡す。</p>
-  </section>
+      <section class="task">
+        <h2>2. 計画書作成タスク <span>要求を実行可能な境界へ変換</span></h2>
+        <h3>目的／担当・権限</h3>
+        <p>
+          目的は、実装範囲・Phase・受入条件・品質判定を先に固定すること。担当はメイン（必要な記述作業はLuna）。ユーザーの承認なしに実装へ進めない。
+        </p>
+        <h3>開始条件／入力</h3>
+        <p>
+          依頼内容が確定し、AGENTS.md、AGENTS-DETAILS.md、必要なら実装エージェント.mdとMULTI_AGENT_WORKFLOW.mdを読了していること。入力は要件、既存コード、Git状態、既存runのwork.json/plan.md。
+        </p>
+        <h3>詳細手順</h3>
+        <ol>
+          <li>
+            変更を小規模・中規模以上に分類する（中規模以上はHTMLとAI向けplan.mdを作成）。
+          </li>
+          <li>
+            対象ファイル、非対象ファイル、DB・依存・API・権限・設定の有無を列挙する。
+          </li>
+          <li>
+            5タスクを同じディレクトリの次の5ファイルへ分割し、<code>.agents/instructions/AGENTS-DETAILS.md</code>は共通契約と索引を持つ正本にする：<code>01-planning.md</code>、<code>02-implementation.md</code>、<code>03-technical-qa.md</code>、<code>04-specification-qa.md</code>、<code>05-publish-pr.md</code>（配置先：<code>.agents/instructions/tasks/</code>）。
+          </li>
+          <li>
+            Phaseを「実装→必要なmigration→Docker正式verify→PASS」の反復として分解し、各PhaseのQAがテストで担保可能か、担当（読み取り専用サブエージェントまたはメイン）、受入条件を記す。
+          </li>
+          <li>
+            関連文書・テンプレート・参照文書・ルール検査テストは、入口・契約・参照・検査対象としてつながりが必要な箇所だけ同期する。
+          </li>
+          <li>work.jsonを6項目だけで初期化し、引継ぎ順を明記する。</li>
+          <li>
+            ユーザー承認を得る。承認は計画に書かれた全Phaseへの承認とする。
+          </li>
+        </ol>
+        <h3>禁止事項</h3>
+        <ul>
+          <li>計画にないDB、依存、API、権限、仕様、設定を含める／実装する。</li>
+          <li>
+            work.jsonに7項目以上を追加する、またはGit実体の代わりにSHAを記録する。
+          </li>
+          <li>承認前の実装差分の書き込み、品質PASSの先取り、公開操作。</li>
+        </ul>
+        <h3>成果物／完了条件</h3>
+        <p>
+          人間向けHTML、AI向けplan.md、6項目のみのwork.json。範囲・Phase・QA・受入条件・確定事項がレビュー可能で、ユーザー承認済みなら完了。HTMLはこの計画成果物に限り単一ファイルとする。
+        </p>
+        <h3>失敗時／差戻し／引き継ぎ</h3>
+        <p>
+          要件不明、計画外変更、権限不足はREPLANとして停止し、判断事項をメインへ返す。承認後は実装タスクへ、入力として計画・対象範囲・受入条件・work.jsonを渡す。
+        </p>
+      </section>
 
-  <section class="task">
-    <h2>3. 実装タスク <span>承認済み範囲をPhase単位で変更</span></h2>
-    <h3>目的／担当・権限</h3><p>目的は承認済み計画を最小差分で実装すること。高モデル時は小規模をLuna、中・大規模をTerraへ委譲し、メインが計画と品質判定を保持する。実装対象は<code>.agents/instructions/tasks/</code>の5ファイルと、共通契約・索引を持つ<code>AGENTS-DETAILS.md</code>、およびPhaseで同期対象と確定した関連箇所に限る。書込みサブエージェントは同時に1つだけとし、他者の変更を巻き戻さない。</p>
-    <h3>開始条件／入力</h3><p>計画承認済みで、work.json→plan.md→branch/HEAD/差分の順に確認済み。入力は計画、既存コード、共通API契約、既存テスト、必要なDocker手順。</p>
-    <h3>詳細手順</h3><ol><li>対象ファイルと非対象ファイルを再確認し、Phaseごとに小さく実装する。</li><li>Frontend／Backend／packagesのimport境界を守る。BackendはRouter→Service→Repository→Model/databaseを分離する。</li><li>HTTP入力・環境変数・外部レスポンスを信用せず、既存Zod Schemaと共通API契約を使う。</li><li><code>any</code>、<code>@ts-ignore</code>、二重castによる検査回避、未処理Promise、デバッグログを追加しない。日時の日本時間wall-clock契約、秘密情報の非ログ・非保存を守る。</li><li>承認済みSchema変更がある場合だけ<code>pnpm db:generate</code>、SQL確認、ローカル<code>pnpm db:migrate</code>、必要なintegration testを行う。変更がなければmigrationを作らない。</li><li>各Phaseでtypecheck→testの順に確認し、plan.mdとwork.jsonを更新する。</li></ol>
-    <h3>禁止事項</h3><p>計画外のDB／依存／API／権限／仕様／設定変更、秘密情報のGit・ログ出力、任意shell実行、mainへのpush、force push、branch削除、DB削除、本番DB操作、<code>docker compose down -v</code>を行わない。</p>
-    <h3>成果物／完了条件</h3><p>計画範囲の5タスクファイル、更新された<code>AGENTS-DETAILS.md</code>と必要範囲の関連文書差分、必要時のみmigration、更新済みplan.md/work.json、テスト結果と未実行検証の報告。全Phaseの実装が終わり、技術QA・仕様QAへ渡せる状態で完了（PASS判定はしない）。HTMLは計画書として単一ファイルのまま維持する。</p>
-    <h3>失敗時／差戻し／引き継ぎ</h3><p>verify失敗は原因を修正して同じPhaseを再実行する。計画外の必要事項はREPLANで停止。QAへ、変更ファイル・実装内容・テスト・DB/migration/依存/設定/生成物の有無・実行コマンドと結果・未実行検証・未解決事項・計画外変更の有無を渡す。</p>
-  </section>
+      <section class="task">
+        <h2>3. 実装タスク <span>承認済み範囲をPhase単位で変更</span></h2>
+        <h3>目的／担当・権限</h3>
+        <p>
+          目的は承認済み計画を最小差分で実装すること。高モデル時は小規模をLuna、中・大規模をTerraへ委譲し、メインが計画と品質判定を保持する。実装対象は<code>.agents/instructions/tasks/</code>の5ファイルと、共通契約・索引を持つ<code>AGENTS-DETAILS.md</code>、およびPhaseで同期対象と確定した関連箇所に限る。書込みサブエージェントは同時に1つだけとし、他者の変更を巻き戻さない。
+        </p>
+        <h3>開始条件／入力</h3>
+        <p>
+          計画承認済みで、work.json→plan.md→branch/HEAD/差分の順に確認済み。入力は計画、既存コード、共通API契約、既存テスト、必要なDocker手順。
+        </p>
+        <h3>詳細手順</h3>
+        <ol>
+          <li>
+            対象ファイルと非対象ファイルを再確認し、Phaseごとに小さく実装する。
+          </li>
+          <li>
+            Frontend／Backend／packagesのimport境界を守る。BackendはRouter→Service→Repository→Model/databaseを分離する。
+          </li>
+          <li>
+            HTTP入力・環境変数・外部レスポンスを信用せず、既存Zod
+            Schemaと共通API契約を使う。
+          </li>
+          <li>
+            <code>any</code
+            >、<code>@ts-ignore</code>、二重castによる検査回避、未処理Promise、デバッグログを追加しない。日時の日本時間wall-clock契約、秘密情報の非ログ・非保存を守る。
+          </li>
+          <li>
+            承認済みSchema変更がある場合だけ<code>pnpm db:generate</code
+            >、SQL確認、ローカル<code>pnpm db:migrate</code>、必要なintegration
+            testを行う。変更がなければmigrationを作らない。
+          </li>
+          <li>
+            各Phaseでtypecheck→testの順に確認し、plan.mdとwork.jsonを更新する。
+          </li>
+        </ol>
+        <h3>禁止事項</h3>
+        <p>
+          計画外のDB／依存／API／権限／仕様／設定変更、秘密情報のGit・ログ出力、任意shell実行、mainへのpush、force
+          push、branch削除、DB削除、本番DB操作、<code
+            >docker compose down -v</code
+          >を行わない。
+        </p>
+        <h3>成果物／完了条件</h3>
+        <p>
+          計画範囲の5タスクファイル、更新された<code>AGENTS-DETAILS.md</code>と必要範囲の関連文書差分、必要時のみmigration、更新済みplan.md/work.json、テスト結果と未実行検証の報告。全Phaseの実装が終わり、技術QA・仕様QAへ渡せる状態で完了（PASS判定はしない）。HTMLは計画書として単一ファイルのまま維持する。
+        </p>
+        <h3>失敗時／差戻し／引き継ぎ</h3>
+        <p>
+          verify失敗は原因を修正して同じPhaseを再実行する。計画外の必要事項はREPLANで停止。QAへ、変更ファイル・実装内容・テスト・DB/migration/依存/設定/生成物の有無・実行コマンドと結果・未実行検証・未解決事項・計画外変更の有無を渡す。
+        </p>
+      </section>
 
-  <section class="task">
-    <h2>4. 技術品質管理タスク <span>独立した技術判定</span></h2>
-    <h3>目的／担当・権限</h3><p>目的は実装の技術的安全性と再現可能性を判定すること。各Phaseの計画時にテストで担保可能と判定された項目は、実装者と別の読み取り専用技術QAサブエージェントが担当し、それ以外（設計判断や計画外変更の判断など）はメインが担当する。最終PASSはメインが保持し、修正が必要なら実装へ差し戻す。</p>
-    <h3>開始条件／入力</h3><p>実装タスクの引き継ぎ一式、Gitの差分・branch・HEAD、計画と受入条件、テスト結果。QA担当区分（サブエージェント／メイン）と判定理由が開始時に記録されていること。差分が不明な場合は判定を止めてメインへ返す。</p>
-    <h3>詳細手順／判定</h3><ol><li>対象外ファイル・不要な生成物・計画外変更がないか差分を確認する。</li><li>アーキテクチャ境界、入力検証、秘密情報、日時、Promise処理、依存の安全性を検査する。</li><li>必要なDB migrationの条件とSQLを確認する。不要なmigrationがないことも確認する。</li><li>正式コマンド <code>docker compose -f compose.dev.yml run --rm application sh -c 'pnpm install --frozen-lockfile &amp;&amp; pnpm verify:phase'</code> を実行する。<code>verify:phase</code>は<code>pnpm typecheck &amp;&amp; pnpm test</code>であり、typecheck失敗中はtestへ進めない。</li><li>E2Eの実行は仕様QAの責務とし、技術QAではE2Eを代行しない。</li><li>全根拠が揃ったらPASS/FAILを記録する。</li></ol>
-    <h3>禁止事項／成果物／差戻し</h3><p>仕様を技術都合で変更しない。成果物は検査対象、コマンド、結果、懸念、PASS/FAIL記録。FAILは該当ファイルと再現条件を添えて実装へ戻し、修正後に再verifyする。PASSでも仕様QAの代替にはならない。</p>
-    <h3>完了条件／引き継ぎ</h3><p>差分・設計・セキュリティ・テスト・Docker正式verifyがPASS。技術QA記録と証跡をメインへ返す。仕様QAは技術QA結果を入力にせず、実装タスクから受けた同じ確定差分を独立に判定する。</p>
-  </section>
+      <section class="task">
+        <h2>4. 技術品質管理タスク <span>独立した技術判定</span></h2>
+        <h3>目的／担当・権限</h3>
+        <p>
+          目的は実装の技術的安全性と再現可能性を判定すること。各Phaseの計画時にテストで担保可能と判定された項目は、実装者と別の読み取り専用技術QAサブエージェントが担当し、それ以外（設計判断や計画外変更の判断など）はメインが担当する。最終PASSはメインが保持し、修正が必要なら実装へ差し戻す。
+        </p>
+        <h3>開始条件／入力</h3>
+        <p>
+          実装タスクの引き継ぎ一式、Gitの差分・branch・HEAD、計画と受入条件、テスト結果。QA担当区分（サブエージェント／メイン）と判定理由が開始時に記録されていること。差分が不明な場合は判定を止めてメインへ返す。
+        </p>
+        <h3>詳細手順／判定</h3>
+        <ol>
+          <li>
+            対象外ファイル・不要な生成物・計画外変更がないか差分を確認する。
+          </li>
+          <li>
+            アーキテクチャ境界、入力検証、秘密情報、日時、Promise処理、依存の安全性を検査する。
+          </li>
+          <li>
+            必要なDB
+            migrationの条件とSQLを確認する。不要なmigrationがないことも確認する。
+          </li>
+          <li>
+            正式コマンド
+            <code
+              >docker compose -f compose.dev.yml run --rm application sh -c
+              'pnpm install --frozen-lockfile &amp;&amp; pnpm
+              verify:phase'</code
+            >
+            を実行する。<code>verify:phase</code>は<code
+              >pnpm typecheck &amp;&amp; pnpm test</code
+            >であり、typecheck失敗中はtestへ進めない。
+          </li>
+          <li>E2Eの実行は仕様QAの責務とし、技術QAではE2Eを代行しない。</li>
+          <li>全根拠が揃ったらPASS/FAILを記録する。</li>
+        </ol>
+        <h3>禁止事項／成果物／差戻し</h3>
+        <p>
+          仕様を技術都合で変更しない。成果物は検査対象、コマンド、結果、懸念、PASS/FAIL記録。FAILは該当ファイルと再現条件を添えて実装へ戻し、修正後に再verifyする。PASSでも仕様QAの代替にはならない。
+        </p>
+        <h3>完了条件／引き継ぎ</h3>
+        <p>
+          差分・設計・セキュリティ・テスト・Docker正式verifyがPASS。技術QA記録と証跡をメインへ返す。仕様QAは技術QA結果を入力にせず、実装タスクから受けた同じ確定差分を独立に判定する。
+        </p>
+      </section>
 
-  <section class="task">
-    <h2>5. 仕様品質管理タスク <span>独立した要件適合判定</span></h2>
-    <h3>目的／担当・権限</h3><p>目的は成果物が要件・計画・受入条件に適合し、利用者体験と契約を壊していないことを判定すること。各Phaseの計画時にテストで担保可能と判定された項目は、実装者と独立した読み取り専用仕様QAサブエージェントが担当し、それ以外（UX判断、要件解釈、計画外変更の判断など）はメインが担当する。最終PASSはメインが保持する。</p>
-    <h3>開始条件／入力</h3><p>実装タスクの引き継ぎ一式、計画、要件、受入条件、UX/API契約、同じ確定差分。QA担当区分（サブエージェント／メイン）と判定理由が開始時に記録されていること。技術QAとは独立・並行に仕様適合を検証する。</p>
-    <h3>詳細手順／判定</h3><ol><li>要件ごとに実装箇所と検証結果を対応付ける。</li><li>計画書の範囲、Phase、受入条件を満たすか確認する。</li><li>画面遷移・文言・エラー時のUX、APIの入力／出力／日時契約を確認する。</li><li>計画で必要としたE2Eを既存手順で実行し、要件・受入条件・UX/API契約を検証する。不要な場合（今回の文書再編を含む）は、その理由を記録する。</li><li>計画外変更、隠れた仕様追加、対象外ファイルの変更がないか確認する。</li><li>不足・曖昧さ・未解決の確認事項をFAILまたは確認事項として記録する。</li></ol>
-    <h3>禁止事項／成果物／差戻し</h3><p>受入条件を黙って緩和しない。成果物は要件対応表、UX/API確認、計画外変更確認、E2E実行結果（不要時は理由）、PASS/FAIL記録。FAILは実装へ戻し、要件・計画の修正が必要ならREPLANとしてメインの判断を待つ。</p>
-    <h3>完了条件／引き継ぎ</h3><p>要件、計画、受入条件、UX/API契約、計画外変更の全項目がPASS。技術QAのPASSと併せてメインへ返し、両方揃うまで公開タスクを開始しない。</p>
-  </section>
+      <section class="task">
+        <h2>5. 仕様品質管理タスク <span>独立した要件適合判定</span></h2>
+        <h3>目的／担当・権限</h3>
+        <p>
+          目的は成果物が要件・計画・受入条件に適合し、利用者体験と契約を壊していないことを判定すること。各Phaseの計画時にテストで担保可能と判定された項目は、実装者と独立した読み取り専用仕様QAサブエージェントが担当し、それ以外（UX判断、要件解釈、計画外変更の判断など）はメインが担当する。最終PASSはメインが保持する。
+        </p>
+        <h3>開始条件／入力</h3>
+        <p>
+          実装タスクの引き継ぎ一式、計画、要件、受入条件、UX/API契約、同じ確定差分。QA担当区分（サブエージェント／メイン）と判定理由が開始時に記録されていること。技術QAとは独立・並行に仕様適合を検証する。
+        </p>
+        <h3>詳細手順／判定</h3>
+        <ol>
+          <li>要件ごとに実装箇所と検証結果を対応付ける。</li>
+          <li>計画書の範囲、Phase、受入条件を満たすか確認する。</li>
+          <li>
+            画面遷移・文言・エラー時のUX、APIの入力／出力／日時契約を確認する。
+          </li>
+          <li>
+            計画で必要としたE2Eを既存手順で実行し、要件・受入条件・UX/API契約を検証する。不要な場合（今回の文書再編を含む）は、その理由を記録する。
+          </li>
+          <li>
+            計画外変更、隠れた仕様追加、対象外ファイルの変更がないか確認する。
+          </li>
+          <li>
+            不足・曖昧さ・未解決の確認事項をFAILまたは確認事項として記録する。
+          </li>
+        </ol>
+        <h3>禁止事項／成果物／差戻し</h3>
+        <p>
+          受入条件を黙って緩和しない。成果物は要件対応表、UX/API確認、計画外変更確認、E2E実行結果（不要時は理由）、PASS/FAIL記録。FAILは実装へ戻し、要件・計画の修正が必要ならREPLANとしてメインの判断を待つ。
+        </p>
+        <h3>完了条件／引き継ぎ</h3>
+        <p>
+          要件、計画、受入条件、UX/API契約、計画外変更の全項目がPASS。技術QAのPASSと併せてメインへ返し、両方揃うまで公開タスクを開始しない。
+        </p>
+      </section>
 
-  <section class="task">
-    <h2>6. PUSH・PR作成タスク <span>公開可能な状態への引き継ぎ</span></h2>
-    <h3>目的／担当・権限</h3><p>目的は両QA PASS済みの差分を正しいbranchへ通常公開すること。担当は公開担当／メイン。<code>feature/vX.Y.Z</code>はpush後の同一SHA CI成功確認まで、<code>feature/&lt;slug&gt;-vX.Y.Z</code>はpush・通常PR作成・head/base/SHA確認までをAIの完了境界とし、レビュー・承認・merge・merge後監視は人間の業務とする。</p>
-    <h3>開始条件／入力</h3><p>技術QAと仕様QAがともにPASS、Docker正式verifyの成功、変更報告、計画外変更なし。通常作業は<code>feature/vX.Y.Z</code>、大規模のみ承認後に<code>feature/&lt;slug&gt;-vX.Y.Z</code>を作る。</p>
-    <h3>詳細手順／禁止事項</h3><ol><li>branch・HEAD・差分をGitから再確認する。</li><li>正式Docker verify PASS後に公開正本 <code>./.agents/tools/pr-agent-publish</code> だけを使う。</li><li><code>feature/vX.Y.Z</code>は同名originへ通常pushし、同一SHAのCI成功を確認する。機能branchは同名originへpushし、対応する<code>feature/vX.Y.Z</code>をbaseに通常PRを作り、head/base/SHAを確認する。</li></ol><p class="note">正式Docker verify PASS前の公開、version branchで同一SHAのCI成功確認前の完了判定、main push、force push、任意remote/refspec、branch削除、mergeを禁止。host Node.js 20ではpnpmを起動しない。<code>pnpm agent:publish</code>はNode.js 22が有効な人間terminalのaliasである。</p>
-    <h3>成果物／完了条件／失敗時</h3><p><code>feature/vX.Y.Z</code>は通常push・同一SHAのCI成功確認、<code>feature/&lt;slug&gt;-vX.Y.Z</code>は通常push・対応version branchをbaseとする通常PR作成・head/base/SHA確認までを成果物と完了条件とする。URL／branch／SHA／CI結果を引き継ぐ。失敗や権限不足は公開を止め、メインへ返す。レビュー・承認・mergeは人間へ引き継ぐ。</p>
-  </section>
+      <section class="task">
+        <h2>6. PUSH・PR作成タスク <span>公開可能な状態への引き継ぎ</span></h2>
+        <h3>目的／担当・権限</h3>
+        <p>
+          目的は両QA
+          PASS済みの差分を正しいbranchへ通常公開すること。担当は公開担当／メイン。<code>feature/vX.Y.Z</code>はpush後の同一SHA
+          CI成功確認まで、<code>feature/&lt;slug&gt;-vX.Y.Z</code>はpush・通常PR作成・head/base/SHA確認までをAIの完了境界とし、レビュー・承認・merge・merge後監視は人間の業務とする。
+        </p>
+        <h3>開始条件／入力</h3>
+        <p>
+          技術QAと仕様QAがともにPASS、Docker正式verifyの成功、変更報告、計画外変更なし。通常作業は<code>feature/vX.Y.Z</code>、大規模のみ承認後に<code>feature/&lt;slug&gt;-vX.Y.Z</code>を作る。
+        </p>
+        <h3>詳細手順／禁止事項</h3>
+        <ol>
+          <li>branch・HEAD・差分をGitから再確認する。</li>
+          <li>
+            正式Docker verify PASS後に公開正本
+            <code>./.agents/tools/pr-agent-publish</code> だけを使う。
+          </li>
+          <li>
+            <code>feature/vX.Y.Z</code
+            >は同名originへ通常pushし、同一SHAのCI成功を確認する。機能branchは同名originへpushし、対応する<code>feature/vX.Y.Z</code>をbaseに通常PRを作り、head/base/SHAを確認する。
+          </li>
+        </ol>
+        <p class="note">
+          正式Docker verify PASS前の公開、version
+          branchで同一SHAのCI成功確認前の完了判定、main push、force
+          push、任意remote/refspec、branch削除、mergeを禁止。host Node.js
+          20ではpnpmを起動しない。<code>pnpm agent:publish</code>はNode.js
+          22が有効な人間terminalのaliasである。
+        </p>
+        <h3>成果物／完了条件／失敗時</h3>
+        <p>
+          <code>feature/vX.Y.Z</code
+          >は通常push・同一SHAのCI成功確認、<code>feature/&lt;slug&gt;-vX.Y.Z</code>は通常push・対応version
+          branchをbaseとする通常PR作成・head/base/SHA確認までを成果物と完了条件とする。URL／branch／SHA／CI結果を引き継ぐ。失敗や権限不足は公開を止め、メインへ返す。レビュー・承認・mergeは人間へ引き継ぐ。
+        </p>
+      </section>
 
-  <section>
-    <h2>7. 反復、戻り先、移行方針</h2>
-    <h3>Phase反復とREPLAN</h3><p>各Phaseは「実装 → 必要なDB migration → Docker正式verify → PASSなら次Phase／FAILなら原因修正→verify再実行」。新しいDB、依存、API、権限、仕様、設定が必要になった時だけREPLANで停止し、計画を直して再承認を得る。QA FAILは実装へ、要件や受入条件の変更は計画書作成へ戻る。</p>
-    <table><thead><tr><th>検出地点</th><th>戻り先</th><th>再開条件</th></tr></thead><tbody><tr><td>計画レビュー</td><td>計画書作成</td><td>範囲・受入条件を明文化し承認</td></tr><tr><td>Phase verify</td><td>同じ実装Phase</td><td>原因修正後に正式verify PASS</td></tr><tr><td>技術QA FAIL</td><td>実装</td><td>技術QA再判定 PASS</td></tr><tr><td>仕様QA FAIL</td><td>実装、またはREPLAN</td><td>仕様QA再判定 PASS／計画再承認</td></tr><tr><td>公開時の不整合</td><td>公開タスク</td><td>branch・SHA・CIを再確認</td></tr></tbody></table>
-    <h3>既存ルールからの移行方針</h3><p><code>AGENTS-DETAILS.md</code>の正本性、work.jsonの6項目、plan.mdチェック更新、引き継ぎ順、Luna/Terra分担、Docker正式verify、typecheck→test、migration／E2E条件、コード規則、branch規則、公開正本、禁止操作、AI完了境界は変更せず、共通契約として<code>AGENTS-DETAILS.md</code>に残す。5タスク固有ルールは同じディレクトリの5ファイルへ分け、同文の共通ルールを各ファイルへ重複コピーしない。既存のrun履歴と<code>docs/**</code>は変更・削除しない。</p>
-    <p class="note">今回の計画はドキュメント／ルール再編であり、DB Schema、migration、依存、API、権限、設定の変更はない。したがってmigration作成・適用およびE2Eは不要とし、不要である理由を引き継ぎ報告へ記録する。</p>
-    <h3>今回の実装対象ファイルと段階的Phase</h3><p>決定した実装対象は、同じディレクトリに置く<code>.agents/instructions/tasks/01-planning.md</code>、<code>02-implementation.md</code>、<code>03-technical-qa.md</code>、<code>04-specification-qa.md</code>、<code>05-publish-pr.md</code>の5ファイルと、共通契約・5ファイルへの索引を持つ<code>.agents/instructions/AGENTS-DETAILS.md</code>。Phase 1は共通契約と索引、および5ファイルの骨格への再編、Phase 2は各タスクの固有ルール・入出力・担当区分・差戻し・二重QAゲートの記述、Phase 3は<code>AGENTS.md</code>、<code>ai/templates/IMPLEMENTATION_PLAN_TEMPLATE.md</code>、参照文書、ルール検査テストのうち、入口・契約・参照・検査対象としてつながりが必要な箇所だけを同期し、参照切れ・重複・矛盾を確認する。無関係な記述は変更しない。既存run履歴と<code>docs/**</code>は非変更とする。</p>
-  </section>
+      <section>
+        <h2>7. 反復、戻り先、移行方針</h2>
+        <h3>Phase反復とREPLAN</h3>
+        <p>
+          各Phaseは「実装 → 必要なDB migration → Docker正式verify →
+          PASSなら次Phase／FAILなら原因修正→verify再実行」。新しいDB、依存、API、権限、仕様、設定が必要になった時だけREPLANで停止し、計画を直して再承認を得る。QA
+          FAILは実装へ、要件や受入条件の変更は計画書作成へ戻る。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>検出地点</th>
+              <th>戻り先</th>
+              <th>再開条件</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>計画レビュー</td>
+              <td>計画書作成</td>
+              <td>範囲・受入条件を明文化し承認</td>
+            </tr>
+            <tr>
+              <td>Phase verify</td>
+              <td>同じ実装Phase</td>
+              <td>原因修正後に正式verify PASS</td>
+            </tr>
+            <tr>
+              <td>技術QA FAIL</td>
+              <td>実装</td>
+              <td>技術QA再判定 PASS</td>
+            </tr>
+            <tr>
+              <td>仕様QA FAIL</td>
+              <td>実装、またはREPLAN</td>
+              <td>仕様QA再判定 PASS／計画再承認</td>
+            </tr>
+            <tr>
+              <td>公開時の不整合</td>
+              <td>公開タスク</td>
+              <td>branch・SHA・CIを再確認</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>既存ルールからの移行方針</h3>
+        <p>
+          <code>AGENTS-DETAILS.md</code
+          >の正本性、work.jsonの6項目、plan.mdチェック更新、引き継ぎ順、Luna/Terra分担、Docker正式verify、typecheck→test、migration／E2E条件、コード規則、branch規則、公開正本、禁止操作、AI完了境界は変更せず、共通契約として<code>AGENTS-DETAILS.md</code>に残す。5タスク固有ルールは同じディレクトリの5ファイルへ分け、同文の共通ルールを各ファイルへ重複コピーしない。既存のrun履歴と<code>docs/**</code>は変更・削除しない。
+        </p>
+        <p class="note">
+          今回の計画はドキュメント／ルール再編であり、DB
+          Schema、migration、依存、API、権限、設定の変更はない。したがってmigration作成・適用およびE2Eは不要とし、不要である理由を引き継ぎ報告へ記録する。
+        </p>
+        <h3>今回の実装対象ファイルと段階的Phase</h3>
+        <p>
+          決定した実装対象は、同じディレクトリに置く<code>.agents/instructions/tasks/01-planning.md</code>、<code>02-implementation.md</code>、<code>03-technical-qa.md</code>、<code>04-specification-qa.md</code>、<code>05-publish-pr.md</code>の5ファイルと、共通契約・5ファイルへの索引を持つ<code>.agents/instructions/AGENTS-DETAILS.md</code>。Phase
+          1は共通契約と索引、および5ファイルの骨格への再編、Phase
+          2は各タスクの固有ルール・入出力・担当区分・差戻し・二重QAゲートの記述、Phase
+          3は<code>AGENTS.md</code>、<code>ai/templates/IMPLEMENTATION_PLAN_TEMPLATE.md</code>、参照文書、ルール検査テストのうち、入口・契約・参照・検査対象としてつながりが必要な箇所だけを同期し、参照切れ・重複・矛盾を確認する。無関係な記述は変更しない。既存run履歴と<code>docs/**</code>は非変更とする。
+        </p>
+      </section>
 
-  <section>
-    <h2>8. 受入条件とレビューで確定した事項</h2>
-    <h3>受入条件</h3><ul><li>5タスクの目的、担当／権限、開始条件、入力、手順、禁止事項、成果物、完了条件、失敗時／差戻し、引き継ぎが各々明記されている。</li><li>5ファイルが<code>.agents/instructions/tasks/</code>の同じディレクトリに存在し、<code>AGENTS-DETAILS.md</code>が共通契約と索引を持つ。</li><li>各Phaseでテスト担保可否に応じたQA担当区分が記録され、テスト担保可能なQAは読み取り専用サブエージェント、それ以外はメインが担当する。最終PASSはメインが保持する。</li><li>仕様QAが必要なE2Eを既存手順で実行し、不要時は理由を記録する。技術QAはE2Eを代行しない。</li><li>技術QA・仕様QAの両方のPASS後だけ公開へ進む。</li><li>work.json 6項目、plan.mdチェック更新、引継ぎ順、Luna/Terra、Docker正式verify、typecheck→test、migration／E2E、コード／branch／公開／禁止操作／AI完了境界が保持されている。</li><li><code>AGENTS.md</code>、テンプレート、参照文書、ルール検査テストは、入口・契約・参照・検査対象として必要な範囲だけ同期され、無関係な記述は変更されない。</li><li>HTMLは計画成果物として単一ファイル、外部依存なし、レスポンシブ、印刷対応で、ブラウザで内容を読める。</li></ul>
-    <h3>確定事項</h3><ul><li>5タスクは同じ<code>.agents/instructions/tasks/</code>ディレクトリの5ファイルへ分割し、共通ルールの重複コピーを避ける。</li><li>仕様QAがE2E実行責務を持ち、今回の文書再編はE2E不要として理由を記録する。</li><li>QAはPhaseごとにテスト担保可否で担当を決め、テスト可能なら読み取り専用サブエージェント、困難ならメインが担当する。修正は実装へ差し戻す。</li><li>関連文書はつながりが必要な範囲まで同期する。</li></ul>
-    <p class="small">この文書はフロー分割の計画成果物であり、AGENTS-DETAILS.md、スクリプト、アプリケーションコードを変更するものではない。</p>
-  </section>
-</main>
-</body>
+      <section>
+        <h2>8. 受入条件とレビューで確定した事項</h2>
+        <h3>受入条件</h3>
+        <ul>
+          <li>
+            5タスクの目的、担当／権限、開始条件、入力、手順、禁止事項、成果物、完了条件、失敗時／差戻し、引き継ぎが各々明記されている。
+          </li>
+          <li>
+            5ファイルが<code>.agents/instructions/tasks/</code>の同じディレクトリに存在し、<code>AGENTS-DETAILS.md</code>が共通契約と索引を持つ。
+          </li>
+          <li>
+            各Phaseでテスト担保可否に応じたQA担当区分が記録され、テスト担保可能なQAは読み取り専用サブエージェント、それ以外はメインが担当する。最終PASSはメインが保持する。
+          </li>
+          <li>
+            仕様QAが必要なE2Eを既存手順で実行し、不要時は理由を記録する。技術QAはE2Eを代行しない。
+          </li>
+          <li>技術QA・仕様QAの両方のPASS後だけ公開へ進む。</li>
+          <li>
+            work.json
+            6項目、plan.mdチェック更新、引継ぎ順、Luna/Terra、Docker正式verify、typecheck→test、migration／E2E、コード／branch／公開／禁止操作／AI完了境界が保持されている。
+          </li>
+          <li>
+            <code>AGENTS.md</code
+            >、テンプレート、参照文書、ルール検査テストは、入口・契約・参照・検査対象として必要な範囲だけ同期され、無関係な記述は変更されない。
+          </li>
+          <li>
+            HTMLは計画成果物として単一ファイル、外部依存なし、レスポンシブ、印刷対応で、ブラウザで内容を読める。
+          </li>
+        </ul>
+        <h3>確定事項</h3>
+        <ul>
+          <li>
+            5タスクは同じ<code>.agents/instructions/tasks/</code>ディレクトリの5ファイルへ分割し、共通ルールの重複コピーを避ける。
+          </li>
+          <li>
+            仕様QAがE2E実行責務を持ち、今回の文書再編はE2E不要として理由を記録する。
+          </li>
+          <li>
+            QAはPhaseごとにテスト担保可否で担当を決め、テスト可能なら読み取り専用サブエージェント、困難ならメインが担当する。修正は実装へ差し戻す。
+          </li>
+          <li>関連文書はつながりが必要な範囲まで同期する。</li>
+        </ul>
+        <p class="small">
+          この文書はフロー分割の計画成果物であり、AGENTS-DETAILS.md、スクリプト、アプリケーションコードを変更するものではない。
+        </p>
+      </section>
+    </main>
+  </body>
 </html>

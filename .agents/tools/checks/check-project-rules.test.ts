@@ -1,9 +1,4 @@
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -34,7 +29,9 @@ describe("workflow document file discovery", () => {
     writeFileSync(join(root, ".agents/instructions/AGENTS-DETAILS.md"), "共通");
     writeFileSync(join(root, ".agents/instructions/tasks/01.md"), "task");
 
-    expect(collectMarkdownFiles(join(root, ".agents/instructions"))).toHaveLength(2);
+    expect(
+      collectMarkdownFiles(join(root, ".agents/instructions")),
+    ).toHaveLength(2);
     expect(collectWorkflowDocumentFiles(root)).toEqual(
       expect.arrayContaining([
         join(root, "AGENTS.md"),
@@ -61,6 +58,8 @@ describe("workflow document file discovery", () => {
 
     const missingInstructionsRoot = fixtureRoot();
     writeFileSync(join(missingInstructionsRoot, "AGENTS.md"), "入口");
-    expect(() => collectWorkflowDocumentFiles(missingInstructionsRoot)).toThrow();
+    expect(() =>
+      collectWorkflowDocumentFiles(missingInstructionsRoot),
+    ).toThrow();
   });
 });

@@ -59,6 +59,10 @@ Phase 3初回QA FAIL：テンプレートのbranch完了条件が総称的で、
 
 Phase 3再技術QA残存P2：全Phase完了条件の公開記述を、version branchはpush後の同一SHA CI成功、機能branchはpush後の通常PR作成とhead/base/SHA確認というbranch別条件へ統一した。最終結果は正式Docker verify PASS、独立技術QA PASS（P1/P2なし）、メイン仕様QA PASS、E2E不要（文書・ルール検査のみ）、計画外変更なし。
 
+初回公開CIは`format:check`でFAILし、対象7ファイルをPrettier整形のため実装へ差し戻した。plan.mdとwork.jsonはformat対象外の書式を維持し、整形後の再QA・正式verify待ちとする。
+
+再検証結果：Dockerで`pnpm format:check` PASS、Node 22.23.1／pnpm 11.20.0、Project rules OK、全typecheck PASS、33 test files PASS + 1 skipped、174 tests PASS + 6 skipped。独立技術QA PASS（機械整形のみ、P1/P2なし）、メイン仕様QA PASS、E2E不要、計画外変更なし。再公開待ちとする。
+
 ### 実装チェックリスト
 
 - [x] `AGENTS.md`、テンプレート、参照文書、ルール検査テストを、入口・契約・参照・検査対象としてつながりが必要な範囲だけ同期する。
