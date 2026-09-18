@@ -29,8 +29,29 @@ function collectSourceFiles(directory: string): string[] {
   return files;
 }
 
+export function collectMarkdownFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return collectMarkdownFiles(path);
+    return entry.name.endsWith(".md") ? [path] : [];
+  });
+}
+
 function normalized(path: string): string {
   return path.split(sep).join("/");
+}
+
+export function collectWorkflowDocumentFiles(root: string): string[] {
+  const agentsPath = join(root, "AGENTS.md");
+  const codxReadmePath = join(root, "codx/README.md");
+  if (!existsSync(agentsPath)) {
+    throw new Error(`必須の入口文書が存在しません: ${agentsPath}`);
+  }
+  return [
+    agentsPath,
+    ...(existsSync(codxReadmePath) ? [codxReadmePath] : []),
+    ...collectMarkdownFiles(join(root, ".agents/instructions")),
+  ];
 }
 
 function resolveRelativeImport(file: string, specifier: string): string {
@@ -186,34 +207,25 @@ function inspectTsconfigPaths(): RuleViolation[] {
 
 function inspectInstructionPaths(): RuleViolation[] {
   const directory = resolve(projectRoot, ".agents/instructions");
-  return readdirSync(directory)
-    .filter((file) => file.endsWith(".md"))
-    .flatMap((file) => {
-      const path = join(directory, file);
-      const text = readFileSync(path, "utf8");
-      return text.split("\n").flatMap((line, index) =>
-        /(docs\/html|docs\/agent-runs)/.test(line) &&
-        !/legacy|read-only|履歴/.test(line)
-          ? [
-              {
-                file: normalized(relative(projectRoot, path)),
-                line: index + 1,
-                message: "新規成果物をlegacy docsへ書き込めません",
-              },
-            ]
-          : [],
-      );
-    });
+  return collectMarkdownFiles(directory).flatMap((path) => {
+    const text = readFileSync(path, "utf8");
+    return text.split("\n").flatMap((line, index) =>
+      /(docs\/html|docs\/agent-runs)/.test(line) &&
+      !/legacy|read-only|履歴/.test(line)
+        ? [
+            {
+              file: normalized(relative(projectRoot, path)),
+              line: index + 1,
+              message: "新規成果物をlegacy docsへ書き込めません",
+            },
+          ]
+        : [],
+    );
+  });
 }
 
 function inspectMarkdownLinks(): RuleViolation[] {
-  const files = [
-    join(projectRoot, "AGENTS.md"),
-    join(projectRoot, "codx/README.md"),
-    ...readdirSync(resolve(projectRoot, ".agents/instructions"))
-      .filter((file) => file.endsWith(".md"))
-      .map((file) => join(projectRoot, ".agents/instructions", file)),
-  ];
+  const files = collectWorkflowDocumentFiles(projectRoot);
   const pattern = /\[[^\]]*\]\(([^)#?]+)\)/g;
   const violations: RuleViolation[] = [];
   for (const file of files) {
@@ -235,13 +247,7 @@ function inspectMarkdownLinks(): RuleViolation[] {
 }
 
 function inspectWorkflowDocumentPaths(): RuleViolation[] {
-  const files = [
-    join(projectRoot, "AGENTS.md"),
-    join(projectRoot, "codx/README.md"),
-    ...readdirSync(resolve(projectRoot, ".agents/instructions"))
-      .filter((file) => file.endsWith(".md"))
-      .map((file) => join(projectRoot, ".agents/instructions", file)),
-  ];
+  const files = collectWorkflowDocumentFiles(projectRoot);
   const legacyPattern = /docs\/(?:html|agent-runs)/;
   return files.flatMap((file) => {
     const text = readFileSync(file, "utf8");
@@ -276,20 +282,25 @@ function inspectDockerIgnore(): RuleViolation[] {
   );
 }
 
-const violations = [
-  ...sourceRoots.flatMap(collectSourceFiles).flatMap(inspectSourceFile),
-  ...inspectTsconfigPaths(),
-  ...inspectInstructionPaths(),
-  ...inspectMarkdownLinks(),
-  ...inspectWorkflowDocumentPaths(),
-  ...inspectDockerIgnore(),
-];
-
-if (violations.length > 0) {
-  for (const violation of violations) {
-    console.error(`${violation.file}:${violation.line} ${violation.message}`);
-  }
-  process.exit(1);
+export function runChecks(): RuleViolation[] {
+  return [
+    ...sourceRoots.flatMap(collectSourceFiles).flatMap(inspectSourceFile),
+    ...inspectTsconfigPaths(),
+    ...inspectInstructionPaths(),
+    ...inspectMarkdownLinks(),
+    ...inspectWorkflowDocumentPaths(),
+    ...inspectDockerIgnore(),
+  ];
 }
 
-console.log("Project rules OK");
+if (process.argv[1]?.endsWith("check-project-rules.ts")) {
+  const violations = runChecks();
+  if (violations.length > 0) {
+    for (const violation of violations) {
+      console.error(`${violation.file}:${violation.line} ${violation.message}`);
+    }
+    process.exit(1);
+  }
+
+  console.log("Project rules OK");
+}
