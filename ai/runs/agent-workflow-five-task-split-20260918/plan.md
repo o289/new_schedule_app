@@ -79,7 +79,7 @@ Phase 3再技術QA残存P2：全Phase完了条件の公開記述を、version br
 - [x] 全Phaseの実装チェックリストを満たす。
 - [x] Docker正式環境で`pnpm verify:phase`がPASSする。
 - [x] 計画外の不要な差分がない。
-- [ ] 両QA PASS後、version branchはpush後の同一SHA CI成功、機能branchはpush後の通常PR作成とhead/base/SHA確認まで完了する。
+- [x] 両QA PASS後、version branchはpush後の同一SHA CI成功、機能branchはpush後の通常PR作成とhead/base/SHA確認まで完了する。公開正本のpush_onlyと同一SHA CI成功を確認し、version branchのためPRは不要。
 
 ## 今回のPhase 1の制約
 
