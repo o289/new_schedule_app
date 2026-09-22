@@ -5,6 +5,7 @@
 ## タスク索引
 
 - [01 計画書作成](tasks/01-planning.md)
+  - [01.1 Mock UI作成（新規UI機能のみ）](tasks/01.1-create_mock.md)
 - [02 実装](tasks/02-implementation.md)
 - [03 技術品質管理](tasks/03-technical-qa.md)
 - [04 仕様品質管理](tasks/04-specification-qa.md)
