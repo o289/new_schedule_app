@@ -158,3 +158,4 @@
 - Node 22 host typecheck、unit test 201、frontend build、対象ファイルformat checkもPASS。compose.dev/e2e/test構文確認PASS。stg/prod Composeは実環境変数`MIGRATION_IMAGE`未注入のためconfig確認対象外。
 - 独立技術QAの指摘2点（恒久失敗時attemptCount改変、Provider前DB例外によるpending放置）を修正し、回帰テストで確認。独立QA agentの再開はagent thread limitで拒否されたため、親が最終ソース/UIのread-only確認を行い、仕様QA・品質判定をPASSとした。
 - staging実メール受信とprod通常配信はユーザーが今回明示した対象外。外部環境操作をしていないため、全Phase完了条件の該当2項目は未完了のままとする。
+- 初回push後の同一SHA CIはPrettier確認だけが失敗し、対象は`drizzle/meta/_journal.json`、`drizzle/meta/0009_snapshot.json`、`pnpm-lock.yaml`。3ファイルだけを整形し、JSON/YAMLのparse結果が整形前と同一で依存version・schema値に変更がないことを確認。Node.js 22で全体`pnpm format:check`と`pnpm rules:check`がPASSした。修正commitと正本publisher再実行後、同一SHA CIの成功を確認する。
