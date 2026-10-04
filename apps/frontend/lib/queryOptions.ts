@@ -1,8 +1,20 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { GroupCalendarResponse } from "#schemas/group";
-import { authApi, categoryApi, groupApi, scheduleApi } from "./api";
+import {
+  authApi,
+  categoryApi,
+  emailNotificationApi,
+  groupApi,
+  scheduleApi,
+} from "./api";
 import { ApiClientError } from "./apiError";
-import { authKeys, categoryKeys, groupKeys, scheduleKeys } from "./queryKeys";
+import {
+  authKeys,
+  categoryKeys,
+  emailNotificationKeys,
+  groupKeys,
+  scheduleKeys,
+} from "./queryKeys";
 
 export type GroupCalendarRange = { startDate: string; endDate: string };
 
@@ -64,5 +76,13 @@ export const authQueries = {
     queryOptions({
       queryKey: authKeys.me(),
       queryFn: ({ signal }) => authApi.me(signal),
+    }),
+};
+
+export const emailNotificationQueries = {
+  settings: () =>
+    queryOptions({
+      queryKey: emailNotificationKeys.settings(),
+      queryFn: ({ signal }) => emailNotificationApi.settings(signal),
     }),
 };

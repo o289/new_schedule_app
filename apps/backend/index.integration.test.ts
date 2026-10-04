@@ -20,6 +20,11 @@ import {
 } from "./features/group/model";
 import { scheduleDates, schedules } from "./features/schedule/model";
 import { authSessions } from "./features/auth-session/model";
+import {
+  emailDeliveryLogs,
+  emailNotificationPreferences,
+  emailNotificationWeekdayRules,
+} from "./features/email-notification/model";
 import { users } from "./features/user/model";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -114,10 +119,14 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     insert: Function;
     select: Function;
     delete: Function;
+    update: Function;
   };
   let closeDatabase: () => Promise<void>;
+  let EmailNotificationRepository: typeof import("./features/email-notification/repository").EmailNotificationRepository;
   let GroupRepository: typeof import("./features/group/repository").GroupRepository;
   let GroupCalendarRepository: typeof import("./features/group/calendar-repository").GroupCalendarRepository;
+  let runDailyEmailOnce: typeof import("./workers/daily-email").runDailyEmailOnce;
+  let FakeEmailProvider: typeof import("./features/email-notification/provider").FakeEmailProvider;
 
   beforeAll(async () => {
     if (!testDatabaseUrl) {
@@ -138,6 +147,8 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     const database = await import("./database/client");
     db = database.db;
     closeDatabase = database.closeDatabase;
+    ({ EmailNotificationRepository } =
+      await import("./features/email-notification/repository"));
     await migrate(db as never, {
       migrationsFolder: resolve(import.meta.dirname, "../../drizzle"),
     });
@@ -145,6 +156,9 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     ({ GroupRepository } = await import("./features/group/repository"));
     ({ GroupCalendarRepository } =
       await import("./features/group/calendar-repository"));
+    ({ runDailyEmailOnce } = await import("./workers/daily-email"));
+    ({ FakeEmailProvider } =
+      await import("./features/email-notification/provider"));
     app = (await import("./app")).app;
   });
 
@@ -855,5 +869,210 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       method: "DELETE",
     });
     expect(deleted.status).toBe(204);
+  });
+
+  it("通知設定は未設定なら安全な既定値を返す", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "notification-default@example.com", name: "Default" })
+      .returning();
+    if (!user) throw new Error("通知設定テストユーザーを作成できません");
+
+    const settings = await new EmailNotificationRepository().getByUser(user.id);
+
+    expect(settings).toEqual({
+      globalEnabled: false,
+      timezone: "Asia/Tokyo",
+      weekdays: Array.from({ length: 7 }, (_, index) => ({
+        dayOfWeek: index + 1,
+        enabled: false,
+        deliveryTime: "09:00",
+      })),
+    });
+  });
+
+  it("通知設定は7曜日を一つのtransactionで置き換える", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "notification-update@example.com", name: "Update" })
+      .returning();
+    if (!user) throw new Error("通知設定テストユーザーを作成できません");
+
+    const settings = await new EmailNotificationRepository().replace(user.id, {
+      globalEnabled: true,
+      timezone: "Asia/Tokyo",
+      weekdays: Array.from({ length: 7 }, (_, index) => ({
+        dayOfWeek: index + 1,
+        enabled: index === 0,
+        deliveryTime: "07:30",
+      })),
+    });
+
+    expect(settings.globalEnabled).toBe(true);
+    expect(settings.weekdays).toHaveLength(7);
+    expect(settings.weekdays[0]).toMatchObject({
+      dayOfWeek: 1,
+      enabled: true,
+      deliveryTime: "07:30",
+    });
+  });
+
+  it("workerは有効sessionとJST当日予定を確認して一度だけ送信する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "worker@example.com", name: "Worker" })
+      .returning();
+    if (!user) throw new Error("worker test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({ userId: user.id, name: "仕事" })
+      .returning();
+    if (!category) throw new Error("worker test category was not created");
+    const [schedule] = await db
+      .insert(schedules)
+      .values({
+        userId: user.id,
+        categoryId: category.id,
+        title: "朝の予定",
+        isTentative: false,
+      })
+      .returning();
+    if (!schedule) throw new Error("worker test schedule was not created");
+    await db.insert(scheduleDates).values({
+      scheduleId: schedule.id,
+      startDate: "2026-09-15T23:30:00",
+      endDate: "2026-09-16T10:00:00",
+    });
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: "worker-test-refresh-token-digest",
+      expiresAt: new Date("2026-09-17T00:00:00.000Z"),
+    });
+    await db.insert(emailNotificationPreferences).values({
+      userId: user.id,
+      globalEnabled: true,
+      timezone: "Asia/Tokyo",
+    });
+    await db.insert(emailNotificationWeekdayRules).values(
+      Array.from({ length: 7 }, (_, index) => ({
+        userId: user.id,
+        dayOfWeek: index + 1,
+        enabled: index === 2,
+        deliveryTime: "09:00",
+      })),
+    );
+
+    const provider = new FakeEmailProvider();
+    const summaries = await Promise.all(
+      [
+        new EmailNotificationRepository(),
+        new EmailNotificationRepository(),
+      ].map((repository) =>
+        runDailyEmailOnce({
+          repository,
+          provider,
+          now: () => new Date("2026-09-16T00:05:00.000Z"),
+        }),
+      ),
+    );
+    const first = summaries[0]!;
+    const second = summaries[1]!;
+
+    expect(
+      [first, second].filter((summary) => summary.sent === 1),
+    ).toHaveLength(1);
+    expect(first.claimed + second.claimed).toBe(1);
+    expect(provider.messages).toHaveLength(1);
+    expect(provider.messages[0]?.subject).toBe("2026年9月16日（水）の予定");
+
+    const repository = new EmailNotificationRepository();
+    await db.insert(emailDeliveryLogs).values({
+      userId: user.id,
+      localDate: "2026-09-17",
+      status: "pending",
+      attemptCount: 1,
+    });
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-17",
+        new Date("2026-09-16T00:05:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
+
+    await db
+      .update(authSessions)
+      .set({ revokedAt: new Date("2026-09-16T00:06:00.000Z") })
+      .where(eq(authSessions.userId, user.id));
+    await expect(
+      repository.hasActiveSession(
+        user.id,
+        new Date("2026-09-16T00:07:00.000Z"),
+      ),
+    ).resolves.toBe(false);
+
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: "worker-test-expired-refresh-token-digest",
+      expiresAt: new Date("2026-09-16T00:07:00.000Z"),
+    });
+    await expect(
+      repository.hasActiveSession(
+        user.id,
+        new Date("2026-09-16T00:07:00.000Z"),
+      ),
+    ).resolves.toBe(false);
+
+    await db.insert(emailDeliveryLogs).values([
+      {
+        userId: user.id,
+        localDate: "2026-09-18",
+        status: "failed",
+        attemptCount: 3,
+        lastError: "temporary",
+      },
+      {
+        userId: user.id,
+        localDate: "2026-09-19",
+        status: "failed",
+        attemptCount: 1,
+        lastError: "quota",
+      },
+    ]);
+    await db.insert(emailDeliveryLogs).values({
+      userId: user.id,
+      localDate: "2026-09-20",
+      status: "pending",
+      attemptCount: 1,
+    });
+    await repository.markFailed(
+      user.id,
+      "2026-09-20",
+      new Date("2026-09-16T00:08:00.000Z"),
+      "permanent",
+    );
+    const [permanentFailure] = await db
+      .select({ attemptCount: emailDeliveryLogs.attemptCount })
+      .from(emailDeliveryLogs)
+      .where(eq(emailDeliveryLogs.localDate, "2026-09-20"));
+    expect(permanentFailure?.attemptCount).toBe(1);
+
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-18",
+        new Date("2026-09-16T00:07:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-19",
+        new Date("2026-09-16T00:07:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
   });
 });

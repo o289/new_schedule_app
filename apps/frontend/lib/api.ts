@@ -12,6 +12,8 @@ import type {
   GroupJoin,
   GroupResponse,
 } from "#schemas/group";
+import type { EmailNotificationSettingsUpdate } from "#schemas/email-notification";
+import { emailNotificationSettingsSchema } from "#schemas/email-notification";
 import type { ScheduleForm, ScheduleResponse } from "../types/schedule";
 import { apiClient } from "./apiClient";
 
@@ -146,4 +148,21 @@ export const authApi = {
     }),
   logoutAll: () =>
     apiClient.authenticated<void>("/auth/logout-all", { method: "POST" }),
+};
+
+export const emailNotificationApi = {
+  settings: (signal?: AbortSignal) =>
+    apiClient
+      .authenticated<unknown>("/email-notification/settings", {
+        method: "GET",
+        ...(signal ? { signal } : {}),
+      })
+      .then((response) => emailNotificationSettingsSchema.parse(response)),
+  updateSettings: (settings: EmailNotificationSettingsUpdate) =>
+    apiClient
+      .authenticated<unknown>("/email-notification/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
+      })
+      .then((response) => emailNotificationSettingsSchema.parse(response)),
 };

@@ -7,6 +7,7 @@ import { alreadyGroupMemberErrorSchema } from "#schemas/group";
 import { AlreadyGroupMemberError, ApiError } from "./core/api-error";
 import { authRouter } from "./features/auth/router";
 import { categoryRouter } from "./features/category/router";
+import { emailNotificationRouter } from "./features/email-notification/router";
 import { groupRouter } from "./features/group/router";
 import { scheduleRouter } from "./features/schedule/router";
 import { userRouter } from "./features/user/router";
@@ -49,10 +50,12 @@ app.use("/auth/*", noStore);
 app.use("/categories/*", noStore);
 app.use("/schedules/*", noStore);
 app.use("/groups/*", noStore);
+app.use("/email-notification/*", noStore);
 
 app.route("/", authRouter);
 app.route("/", userRouter);
 app.route("/", categoryRouter);
+app.route("/", emailNotificationRouter);
 app.route("/", scheduleRouter);
 app.route("/", groupRouter);
 

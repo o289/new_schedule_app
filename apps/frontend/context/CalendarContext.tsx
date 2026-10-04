@@ -14,6 +14,7 @@ export type AsideMode =
   | "category"
   | "group-list"
   | "group-detail"
+  | "notification"
   | null;
 
 export type CalendarSelection =

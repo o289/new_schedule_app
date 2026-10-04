@@ -20,6 +20,7 @@ import type { GroupResponse } from "#schemas/group";
 import { useGroupList } from "../groups/useGroupManagement";
 import GroupManagementAside from "../groups/GroupManagementAside";
 import GroupDetailAside from "../groups/GroupDetailAside";
+import EmailNotificationSettings from "../user/EmailNotificationSettings";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type {
   CategoryResponse,
@@ -201,6 +202,8 @@ export default function CalendarAside({
             <GroupDetailAside />
           </>
         );
+      case "notification":
+        return <EmailNotificationSettings onClose={() => setAsideMode(null)} />;
       default:
         return (
           <>
@@ -315,6 +318,14 @@ export default function CalendarAside({
 
                 <span className="text-lg text-[#6b7280]">›</span>
               </button>
+
+              <Button
+                variant="outlined"
+                onClick={() => setAsideMode("notification")}
+                className="!mt-2 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
+              >
+                今日の予定メール
+              </Button>
             </div>
           </>
         );

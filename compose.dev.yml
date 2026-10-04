@@ -28,6 +28,40 @@ services:
     depends_on:
       database:
         condition: service_healthy
+  email-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: sh -c "pnpm install --frozen-lockfile && pnpm worker:dev"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@database:5432/app
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_NAME: Schedule App DEV
+      WEBAUTHN_ORIGIN: http://localhost:3001
+      SECRET_KEY: local-secret-key
+      ACCESS_TOKEN_EXPIRES_IN: "5"
+      REFRESH_TOKEN_EXPIRES_IN: "7"
+      ALGORITHM: HS256
+      EMAIL_PROVIDER: fake
+      WORKER_HEARTBEAT_FILE: /tmp/daily-email-worker.heartbeat
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "const fs=require(''fs'');try{process.exit(Date.now()-fs.statSync(''/tmp/daily-email-worker.heartbeat'').mtimeMs < 90000 ? 0 : 1)}catch{process.exit(1)}"',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      database:
+        condition: service_healthy
   database:
     image: postgres:15
     restart: always
