@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AIタスクとフローの分離計画案（修正版）</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <section class="doc-hero">
+        <span class="doc-badge">AI Workflow Proposal / Luna</span>
+        <p class="doc-eyebrow">Task / Flow Separation / Revision</p>
+        <h1>AIタスクとフローの<br />分離計画案</h1>
+        <p>
+          単独で再利用できる作業を「タスク」、複数タスクを順番に実行する手順を「フロー」として整理する提案です。人間向け計画書を先に作成・承認し、その内容をAI向け計画書へ反映してから、実装フローが承認済みの計画書を参照します。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>この資料の位置づけと進行順</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>成果物</strong>
+            <p>
+              計画書（論理単位）＝人間向けHTML計画書＋AI向けMarkdown計画書です。このHTMLが人間向け計画書に当たります。従来の
+              <code>plan.html</code>・<code>plan.md</code>
+              の必要項目を両計画書へ移し、独立planファイルを廃止する提案です。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-special">
+            <strong>承認順</strong>
+            <p>
+              ①人間向け計画書を作成 → ②ユーザー本人がチャットで承認 →
+              ③承認内容をAI向け計画書へ記述 →
+              ④AI向け計画書を使ってMarkdown正本を再編します。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>現行契約との関係</strong>
+            <p>
+              この計画で提案したMarkdown正本の再編と契約移行は完了しました。現在の実装フローは人間向けHTML計画書、AI向けMarkdown計画書、チャット承認、Git実体を引き継ぎます。個別runのplanファイルとwork
+              stateは必須ではなく、追跡済みの歴史run記録は保持します。
+            </p>
+          </article>
+        </div>
+        <div class="doc-flow doc-flow-columns-five">
+          <div class="doc-flow-node doc-flow-node-status-special">
+            <strong>人間向け計画書</strong><br />内容を決めて記述
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            <strong>本人のチャット承認</strong>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <strong>AI向け計画書</strong><br />記述
+          </div>
+        </div>
+        <div class="alert-info">
+          <strong>分担:</strong>
+          人間向け計画書作成タスクが、要求・規模・対象・構成を判断し、その内容をHTMLへ記述します。AI向け計画書作成タスクは、承認済みの人間向け計画書を実行可能なMarkdownへ変換します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>1. タスクとフローの境界</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>タスク</strong>
+            <p>
+              目的・入力・出力・完了条件を1つに持つ単独作業です。人間向け計画書作成、AI向け計画書作成、計画書読み取り、UIモック画像作成、コード生成、テスト、レビュー、PR作成を個別に定義します。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>フロー</strong>
+            <p>
+              タスクを順番に呼び、前タスクの出力を次タスクの入力に束ねる制御文書です。フローは各
+              <code>~task.md</code>
+              のリンク、順序、引継ぎ、停止条件だけを持ちます。
+            </p>
+          </article>
+        </div>
+        <div class="alert-info">
+          <strong>実装フローの固定順:</strong> 計画書読み取り → コード生成 →
+          テスト → PR作成 → レビュー。計画書作成は、その前の準備です。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>2. 現状から提案へのファイル対応</h2>
+        <p class="doc-muted">
+          下表は8タスクへ分割する対応案です。既存ファイルの移行・削除は人間承認後に実施します。現行の個別
+          <code>plan.html</code>・<code>plan.md</code>
+          は、内容を計画書へ統合した後に単独成果物として廃止する対象です。
+        </p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>現状</th>
+                <th>提案するタスク</th>
+                <th>提案する役割</th>
+                <th>扱い</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>今回の設計資料と現行 <code>plan.html</code> の内容</td>
+                <td>人間向け計画書作成</td>
+                <td><code>human-plan-task.md</code></td>
+                <td>
+                  要求、規模、対象・非対象、受入条件、Phaseを判断し、その内容を人間が承認できるHTML計画書へ記述する
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  承認済み人間向け計画書と現行 <code>plan.md</code> の内容
+                </td>
+                <td>AI向け計画書作成</td>
+                <td><code>ai-plan-task.md</code></td>
+                <td>
+                  承認済み内容とplan.mdの必要要素を実行可能なAI向けMarkdown計画書へ統合する。独立plan.mdは廃止する
+                </td>
+              </tr>
+              <tr>
+                <td>（<code>02-implementation.md</code> の開始条件部分）</td>
+                <td>計画書読み取り</td>
+                <td><code>plan-reading-task.md</code></td>
+                <td>
+                  承認済み人間向け計画書と、その内容を写し整合確認済みのAI向け計画書を読み、実装入力を確定する
+                </td>
+              </tr>
+              <tr>
+                <td><code>tasks/01.1-create_mock.md</code></td>
+                <td>UIモック画像作成</td>
+                <td><code>ui-mock-task.md</code></td>
+                <td>新規UI機能のPNGと再現条件を作成する</td>
+              </tr>
+              <tr>
+                <td>（<code>tasks/02-implementation.md</code> の実装部分）</td>
+                <td>コード生成</td>
+                <td><code>code-generation-task.md</code></td>
+                <td>承認済み計画書と計画書読み取り結果を最小差分で実装する</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>tasks/03-technical-qa.md</code>、<code
+                    >04-specification-qa.md</code
+                  >
+                </td>
+                <td>テスト</td>
+                <td><code>test-task.md</code></td>
+                <td>
+                  typecheck→test、必要なDocker
+                  verify、技術QA・仕様QAを独立判定する
+                </td>
+              </tr>
+              <tr>
+                <td><code>tasks/05-publish-pr.md</code></td>
+                <td>PR作成</td>
+                <td><code>pr-creation-task.md</code></td>
+                <td>両QA PASS後のpush、CI確認、通常PR作成まで</td>
+              </tr>
+              <tr>
+                <td><code>03/04</code>のレビュー観点</td>
+                <td>レビュー</td>
+                <td><code>review-task.md</code></td>
+                <td>
+                  AIがdiffをタスク別に整理し、変更内容・変更理由・証跡を人間へ提示する。人間が最終レビューを行う
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert-warning">
+          <strong>移行方針:</strong>
+          現行の複合文書は責務を8ファイルへ移行する。既存run履歴とlegacy
+          <code>docs/**</code>
+          は変更しない。人間向け計画書の承認前にAI向け計画書やAI指示Markdown正本を作成しない。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>3. 8タスクの契約</h2>
+        <p>
+          各タスク文書は「目的、担当・権限、開始条件／入力、手順、禁止事項、成果物／完了条件、失敗時、次タスクへの引き継ぎ」を持ちます。
+        </p>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-special">
+            <span class="doc-badge-status-special doc-badge">01</span>
+            <h3>人間向け計画書作成</h3>
+            <p>
+              <strong>入力:</strong>
+              依頼、契約、既存コード、Git状態、現行計画のHTML内容。<br /><strong
+                >出力:</strong
+              >
+              要求、規模、対象・非対象、Phase、受入条件、QA/E2E判断を決め、計画書の人間向け要素を内包したHTML計画書（本資料）。このタスクが内容の判断と計画書の記述を両方担当する。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <span class="doc-badge-status-success doc-badge">02</span>
+            <h3>AI向け計画書作成</h3>
+            <p>
+              <strong>入力:</strong> 承認済み人間向け計画書、現行
+              <code>plan.md</code> の必要内容。<br /><strong>出力:</strong>
+              計画書のAI向け要素を内包し、承認内容と整合するAI向けMarkdown計画書。独立した
+              <code>plan.md</code>
+              は作成・保持しない。人間向け計画書の承認前は開始しない。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">03</span>
+            <h3>計画書読み取り</h3>
+            <p>
+              <strong>入力:</strong>
+              承認済み人間向け計画書とAI向け計画書、Git実体。<br /><strong
+                >出力:</strong
+              >
+              実装対象、受入条件、制約、引継ぎ可能な実装コンテキスト。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">04</span>
+            <h3>UIモック画像作成</h3>
+            <p>
+              <strong>入力:</strong>
+              新規UIの要件、既存部品・トークン・表示幅。<br /><strong
+                >出力:</strong
+              >
+              <code>human/images/mock-*.png</code>
+              と再現条件。製品コードや依存は変更しない。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">05</span>
+            <h3>コード生成</h3>
+            <p>
+              <strong>入力:</strong>
+              計画書読み取り結果、承認済みモック、既存コード。<br /><strong
+                >出力:</strong
+              >
+              計画範囲の差分、実行結果、未解決事項。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <span class="doc-badge-status-success doc-badge">06</span>
+            <h3>テスト</h3>
+            <p>
+              <strong>入力:</strong>
+              実装差分、受入条件、QA担当区分。<br /><strong>出力:</strong>
+              typecheck→test、正式verify、必要なE2E、技術QA・仕様QAの根拠と両PASS。
+            </p>
+          </article>
+          <article class="doc-card">
+            <span class="doc-badge">07</span>
+            <h3>PR作成</h3>
+            <p>
+              <strong>入力:</strong> 技術QA・仕様QA両PASS、正式verify
+              PASS、cleanな対象差分。<br /><strong>出力:</strong>
+              許可されたbranchへのpush、必要なPR、branch・SHA・CI結果。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-special">
+            <span class="doc-badge">08</span>
+            <h3>レビュー</h3>
+            <p>
+              <strong>入力:</strong> 公開結果（PRがある場合はURL、<code
+                >feature/vX.Y.Z</code
+              >
+              ではbranch・SHA・CI結果）、差分、計画書、テスト／QA証跡。<br /><strong
+                >出力:</strong
+              >
+              変更をタスクごとに分割した人間向けdiff資料。各タスクの変更内容、変更理由、関連計画書、検証結果、未解決事項を記載して人間へ渡す。最終レビュー、承認、merge、merge後監視は人間業務。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>4. 旧plan要素を計画書へ統合</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>人間向け計画書に内包する計画要素</strong>
+            <p>
+              Phase
+              2で一時作成したrun引継ぎ用plan.htmlの「概要と範囲」「変更対象／対象外」「Phase」「受入条件」「QA担当区分」「品質ゲート」「引継ぎ／差戻し」を本資料へ統合しました。移行用run記録は統合後に削除しました。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>AI向け計画書に内包する計画要素</strong>
+            <p>
+              Phase
+              2で一時作成したrun引継ぎ用plan.mdの目的、Phase、変更対象、実装内容、完了条件、品質ゲート、未実行検証、REPLAN条件を本計画へ統合しました。移行用run記録は統合後に削除しました。
+            </p>
+          </article>
+        </div>
+        <div class="alert-warning">
+          <strong>移行時の契約上の注意:</strong> 承認時点では旧契約が個別の
+          <code>plan.html</code>・<code>plan.md</code>・<code>work.json</code>
+          を要求していました。本提案に基づくMarkdown正本の再編は完了しています。現在のフローでは個別runファイルを必須にせず、追跡済みの歴史run記録は保持し、現在の引継ぎや状態管理のためには更新しません。Phase
+          2で作成した未追跡のrun引継ぎコピーは、内容統合後に削除しました。
+        </div>
+        <div class="doc-card doc-card-status-warning" style="margin-top: 14px">
+          <strong>承認の入力源</strong>
+          <p>
+            承認はユーザー本人からのチャットメッセージだけを受け取ります。<code>approval.json</code>、<code>work.json</code>、HTMLの承認欄、外部ファイル、AIの推測は承認として扱いません。チャット履歴を確認できない場合は承認済みと推定せず、本人へ確認します。
+          </p>
+        </div>
+        <div class="doc-grid doc-grid-two" style="margin-top: 14px">
+          <article class="doc-card">
+            <strong>取り込む品質ゲート</strong>
+            <p>
+              Node.js 22.23.1のDocker環境、<code>pnpm typecheck</code>、<code
+                >pnpm test</code
+              >、技術QA・仕様QAの独立PASS、<code>pnpm verify:phase</code
+              >を実施し、両QAと正式verifyのPASS後に公開します。E2Eは画面・API変更がないため不要と記録します。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>取り込む公開・引継ぎ条件</strong>
+            <p>
+              <code>feature/vX.Y.Z</code> はpush後の同一SHA
+              CI確認、機能branchは通常PRのhead/base/SHA確認までを公開範囲とします。変更、検証結果、未実行検証、未解決事項はレビュー用diff資料と実行記録へ引き継ぎ、merge・承認・merge後監視は人間へ渡します。
+            </p>
+          </article>
+        </div>
+        <div class="doc-card" style="margin-top: 14px">
+          <strong>runを簡素化する移行案</strong>
+          <p>
+            新規runId、run配下の <code>work.json</code>、独立
+            <code>plan.html</code
+            >・<code>plan.md</code>、旧runの承認状態ファイルを新しい作業単位では作成しません。実装フローへは、承認済み人間向け計画書、そこから写したAI向け計画書、Git実体、チャット上の明示承認だけを引き継ぎます。追跡済みの歴史run履歴は読み取り専用で保全します。
+          </p>
+          <p>
+            ただし、公開前のbranch、clean tree、origin、HEAD SHA、Docker
+            verify、同一SHAのCI、PRのhead/base/SHA確認は残します。<code
+              >pr-agent-publish.ts</code
+            >
+            の実行ガードは維持し、legacy handoff
+            schemaや各タスクのrun/work参照を移行時に洗い出して計画書参照へ更新します。
+          </p>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>5. PR作成・計画書作成の表示方式に関する提案</h2>
+        <h3>現状</h3>
+        <ul>
+          <li>
+            計画書には
+            <code>templates/IMPLEMENTATION_PLAN_TEMPLATE.html</code> と
+            <code>templates/IMPLEMENTATION_PLAN_TEMPLATE.md</code> があります。
+          </li>
+          <li>
+            PR専用の
+            <code>.github/PULL_REQUEST_TEMPLATE.md</code> はありません。
+          </li>
+          <li>
+            <code>.agents/tools/pr-agent-publish.ts</code> は、<code
+              >gh pr create --body</code
+            >
+            に「品質ゲートとGitHub Actions
+            CIを通過した変更です。レビューとマージは人間が行います。」という固定文言を渡します。
+          </li>
+          <li>ここでいうPRの雛形は、固定本文と公開ツールの構造を指します。</li>
+        </ul>
+        <h3>根拠</h3>
+        <p>公式資料の説明と、このリポジトリへの適用判断を分けて確認します。</p>
+        <ul>
+          <li>
+            Vercel AI SDKの<a
+              href="https://ai-sdk.dev/docs/ai-sdk-ui/generative-user-interfaces"
+              >Generative UIの説明</a
+            >は、ツール結果などをReactコンポーネントとして表示する仕組みを説明しています。
+          </li>
+          <li>
+            OpenAIの<a
+              href="https://developers.openai.com/api/docs/guides/structured-outputs"
+              >Structured Outputs</a
+            >は、指定したスキーマに準拠した生成を扱います。
+          </li>
+          <li>
+            GitHubの<a
+              href="https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository"
+              >PRテンプレート説明</a
+            >は、リポジトリにPR本文の雛形を置く機能を説明しています。
+          </li>
+        </ul>
+        <p>
+          これらは可変表示やスキーマ準拠の導入候補を示します。現行リポジトリで、そのまま置換できることまでは示していません。
+        </p>
+        <h3>方式の比較</h3>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>方式</th>
+                <th>利点</th>
+                <th>懸念</th>
+                <th>適用案</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>既存雛形を維持</td>
+                <td>項目、リンク、必須条件が固定され、差分と検証が安定する</td>
+                <td>案件ごとの情報量や読み手に合わせた表示調整がしにくい</td>
+                <td>契約・正本・機械検査の基盤として維持</td>
+              </tr>
+              <tr>
+                <td>Generative UIへ全面置換</td>
+                <td>
+                  入力内容に応じて表示や要約を変えられ、初見の読みやすさを改善できる
+                </td>
+                <td>
+                  表示の揺れ、再現性、必須項目の欠落、レビュー時の比較困難さが増す
+                </td>
+                <td>現時点では採用しない</td>
+              </tr>
+              <tr>
+                <td>雛形＋Generative UI表示層</td>
+                <td>
+                  構造化契約を維持しながら、状況別の要約・ナビゲーション・レビュー表示を追加できる
+                </td>
+                <td>二重の表示検証と、正本との同期ルールが必要</td>
+                <td>段階導入し、出力の一致検証を必須にする</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>懸念</h3>
+        <ul>
+          <li>
+            Generative
+            UIへ全面置換すると、表示の揺れや必須項目の欠落が起きる可能性があります。
+          </li>
+          <li>表示結果が毎回変わると、レビュー時の比較が難しくなります。</li>
+          <li>雛形と生成表示を併用する場合は、正本との同期確認が必要です。</li>
+        </ul>
+        <div class="alert-success">
+          <strong>結論・推奨:</strong>
+          <ol>
+            <li>計画書は、必須項目と承認ゲートの固定契約を維持します。</li>
+            <li>Generative UIは、表示・編集の補助に限定して試行します。</li>
+            <li>
+              PRは、まず固定1文を、タスク別の変更内容・変更理由・検証結果を含む構造化内容へ改善します。
+            </li>
+            <li>
+              その後、Generative UIを人間向けレビュー表示へ段階導入します。
+            </li>
+          </ol>
+          <p>
+            必須項目、リンク、差分、検証結果が正本と一致する自動確認を用意できるまで、全面置換は勧めません。
+          </p>
+        </div>
+        <h3>共通の表示原則</h3>
+        <p>
+          この資料で使う書式を、今後作成する人間向け計画HTMLと人間レビューPR向けHTMLにも適用します。
+        </p>
+        <ul>
+          <li>
+            長い説明は「結論」「変更内容」「理由」「懸念」「確認事項」などの小見出しで分けます。
+          </li>
+          <li>
+            項目の列挙には箇条書き、作業順や手順には数字付きリストを使います。
+          </li>
+          <li>
+            必須項目、リンク、差分、検証結果、変更理由を追跡できる構造を保ちます。
+          </li>
+        </ul>
+        <h3>受入条件</h3>
+        <ul class="doc-muted">
+          <li>生成表示に欠落・改変があった場合、固定雛形へ戻せる。</li>
+          <li>
+            人間向けHTMLとAI向けMarkdownを、同一の計画書要素から再生成できる。
+          </li>
+          <li>人間がタスク単位の変更理由を追跡できる。</li>
+        </ul>
+        <p class="doc-muted">
+          上表のリポジトリへの適用案は、公式資料の機能説明を踏まえたこの設計資料の推論です。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>6. 実装フロー（提案）</h2>
+        <p class="doc-muted">
+          計画書作成は実装フロー前の準備です。人間向け計画書の承認とAI向け計画書の作成が完了してから、実装フローを開始します。
+        </p>
+        <div class="doc-flow doc-flow-columns-five">
+          <div class="doc-flow-node doc-flow-node-status-special">
+            <span class="doc-badge">準備</span><strong>人間向け計画書</strong
+            ><br />内容決定・記述
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">条件付き準備</span><strong>UIモック</strong
+            ><br />新規UI機能のみ
+          </div>
+        </div>
+        <div class="doc-flow doc-flow-columns-nine" style="margin-top: 10px">
+          <div class="doc-flow-node doc-flow-node-status-success">
+            <strong>本人のチャット承認</strong>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">準備</span><strong>AI向け計画書</strong>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node"><strong>計画書読み取り</strong></div>
+        </div>
+        <p class="doc-muted">
+          新規UI機能がある場合は、UIモック画像作成タスクを人間向け計画書の承認前に完了し、そのPNGと再現条件を人間向け計画書から参照します。モックが未作成または参照できない場合は計画書承認へ進みません。新規UI機能がない場合は、この準備タスクを省略します。承認は本人のチャットメッセージだけで受け取ります。
+        </p>
+        <div class="doc-flow doc-flow-columns-seven" style="margin-top: 10px">
+          <div class="doc-flow-node"><strong>コード生成</strong></div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            <strong>テスト</strong>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node"><strong>PR作成</strong></div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-special">
+            <strong>レビュー</strong><br />AIが人間向けdiff資料を生成<br />→
+            人間が最終レビュー
+          </div>
+        </div>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>フローが参照する文書</strong>
+            <pre><code>flows/implementation-flow.md
+  ├─ tasks/plan-reading-task.md
+  ├─ tasks/code-generation-task.md
+  ├─ tasks/test-task.md
+  ├─ tasks/pr-creation-task.md
+  └─ tasks/review-task.md</code></pre>
+            <p class="doc-muted">
+              計画書読み取りの対象は、承認済み人間向け計画書と、その内容を写し整合確認済みのAI向け計画書です。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>停止条件</strong>
+            <p>
+              新規UI機能でUIモックPNGまたは再現条件が未作成・未参照、本人のチャット承認がない、AI向け計画書が未作成または人間向け計画書と不整合、入力成果物が不足、テスト両QAがPASSでない場合は次タスクへ進みません。外部ファイルや状態JSONを承認とみなさず、計画外変更はREPLANとして停止します。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>7. テスト、QA、レビューの境界</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>段階</th>
+                <th>確認すること</th>
+                <th>判定者・扱い</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>テストタスク</td>
+                <td>
+                  typecheck→test、正式Docker
+                  verify、計画適合、技術安全性、要件・受入条件・E2E
+                </td>
+                <td>
+                  技術QAと仕様QAは独立・並行。両PASSをPR作成の公開前ゲートにする
+                </td>
+              </tr>
+              <tr>
+                <td>PR作成タスク</td>
+                <td>branch、HEAD、差分、両QA PASS、CI、PRのhead/base/SHA</td>
+                <td>公開正本に従う。merge・承認は行わず、レビューへ引き継ぐ</td>
+              </tr>
+              <tr>
+                <td>レビュータスク</td>
+                <td>
+                  タスクごとに分割したdiff、各変更内容・変更理由、関連計画書、テスト／QA証跡、必要な修正
+                </td>
+                <td>
+                  人間向けレビュー資料を生成して人間へ渡す。最終レビュー、承認、merge、merge後監視は現行契約のまま
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="alert-success">
+          <strong>境界:</strong>
+          AI向け計画書は承認済み人間向け計画書の内容を実行向けに写したものです。AI向け計画書が独自に仕様判断を追加せず、差異があれば停止して人間向け計画書へ差し戻します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>8. Phase、受入条件、検証</h2>
+        <div class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <h3>人間向け計画書</h3>
+            <p>
+              人間向け計画書作成タスクで内容を判断し、<code>plan.html</code>
+              の必要要素を統合したHTMLを記述する。
+            </p>
+            <p>
+              <strong>受入条件:</strong>
+              人間が対象、順序、受入条件、リスク、現行契約との関係を承認できる。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <h3>AI向け計画書</h3>
+            <p>
+              Phase 1の承認後、AI向け計画書作成タスクで
+              <code>plan.md</code>
+              の内容を取り込み、承認済み人間向け計画書と一致するMarkdownを作成する。
+            </p>
+            <p>
+              <strong>受入条件:</strong>
+              AI向け計画書に独自の仕様判断がなく、計画・完了条件・品質ゲート・REPLAN条件が人間向け計画書と一致する。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">2.5</div>
+          <div>
+            <h3>`.env.dev` なしでのローカル開発・verify</h3>
+            <h4>目的</h4>
+            <p>
+              <code>.env.dev</code>
+              がなくてもローカル開発と既存verifyを実行できるようにする。
+            </p>
+            <h4>変更</h4>
+            <ol>
+              <li>
+                <code>compose.dev.yml</code> の
+                <code>env_file: .env.dev</code> を削除する。
+              </li>
+              <li>
+                ローカル専用の固定値を <code>environment</code> に直接設定する。
+              </li>
+              <li>
+                DB接続先をCompose内の <code>database</code> serviceに固定する。
+              </li>
+              <li>WebAuthn設定をlocalhostにする。</li>
+              <li>本番・ステージングのSecretsは変更しない。</li>
+              <li>既存verify方法はそのまま使う。</li>
+            </ol>
+            <h4>確認</h4>
+            <ol>
+              <li><code>.env.dev</code> がなくてもローカル起動できる。</li>
+              <li>既存verifyが通る。</li>
+              <li>
+                本番用Secretsが <code>compose.dev.yml</code> に入っていない。
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">3</div>
+          <div>
+            <h3>Markdown正本の再編・参照移行</h3>
+            <p>
+              <strong>開始条件:</strong> Phase
+              2.5の変更と3項目の確認が完了していること。
+            </p>
+            <h4>作業順</h4>
+            <ol>
+              <li>
+                Phase
+                2で作成したAI向け計画書と人間向け計画書の整合を再確認する。
+              </li>
+              <li>8タスク文書と実装フローを作成する。</li>
+              <li>
+                入口、共通契約、必要なテンプレートの参照を新構成へ同期する。
+              </li>
+            </ol>
+            <h4>移行対象</h4>
+            <ul>
+              <li>
+                <code>AGENTS.md</code> と
+                <code>.agents/instructions/AGENTS-DETAILS.md</code>
+              </li>
+              <li>現行のtasks文書</li>
+              <li>計画テンプレートのrun/work/plan参照</li>
+              <li><code>work-schema.ts</code> と関連テストの新規run状態管理</li>
+              <li>
+                <code>pr-agent-publish.ts</code> のlegacy handoff schema利用箇所
+              </li>
+            </ul>
+            <p>
+              Phase 3では新構成の作成と参照移行だけを行い、旧機能の削除はPhase
+              4で依存を確認してから行う。
+            </p>
+            <h4>受入条件</h4>
+            <ul>
+              <li>
+                新規runId、<code>work.json</code>、<code>approval.json</code>、独立planファイルを作成しない。
+              </li>
+              <li>
+                フローから全task文書へリンクでき、指定順、入力・出力、停止条件、人間レビュー境界が一致する。
+              </li>
+              <li>
+                承認は本人のチャットメッセージだけで受け取り、既存run履歴は変更しない。
+              </li>
+              <li>
+                既存の正式verifyとCIのbranch、SHA、PR確認、QA安全ゲートを保つ。
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">4</div>
+          <div>
+            <h3>廃止機能の残骸削除・最終検証</h3>
+            <h4>作業順</h4>
+            <ol>
+              <li>
+                Phase
+                3の参照移行後に、削除候補の実際の依存・参照・実行経路を調査する。
+              </li>
+              <li>不要と確定した廃止機能の残骸だけを削除する。</li>
+              <li>
+                削除後にHTML構造・相対リンク、Markdownリンク、計画書間の一致、共通契約との矛盾、対象外差分を検証する。
+              </li>
+            </ol>
+            <h4>削除候補</h4>
+            <ul>
+              <li>
+                新規 <code>runId</code>、<code>work.json</code>、独立
+                <code>plan.html</code>・<code>plan.md</code>、<code
+                  >approval.json</code
+                >
+                を作る仕組み
+              </li>
+              <li>
+                <code>work-schema.ts</code>
+                と、新規run状態管理だけに依存する関連テスト
+              </li>
+              <li>
+                旧run・plan参照、使われないlegacy handoff
+                schemaや雛形、旧task文書
+              </li>
+            </ul>
+            <p>
+              候補は依存調査で不要と確定した場合だけ削除し、実際の利用が残るものは削除せず参照を更新する。
+            </p>
+            <h4>残すもの</h4>
+            <ul>
+              <li>既存run履歴とlegacy <code>docs/**</code></li>
+              <li>
+                公開正本の現役ガード、<code>pr-agent-publish.ts</code>
+                のbranch・SHA・Docker verify・CI・PR確認
+              </li>
+              <li>必要なDocker、QA、branch、CIの仕組み</li>
+            </ul>
+            <h4>受入条件</h4>
+            <ul>
+              <li>
+                廃止機能の参照・依存・実行経路が残っていないことを確認する。
+              </li>
+              <li>
+                既存run履歴、legacy
+                <code>docs/**</code>、公開正本の現役ガードを変更しない。
+              </li>
+              <li>
+                未解決事項と未実行検証を記録し、計画外変更はREPLANとして停止する。
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>9. ファイル構成と未切替事項</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>将来の構成案</strong>
+            <pre><code>.agents/instructions/
+  tasks/
+    human-plan-task.md
+    ai-plan-task.md
+    plan-reading-task.md
+    ui-mock-task.md
+    code-generation-task.md
+    test-task.md
+    pr-creation-task.md
+    review-task.md
+  flows/implementation-flow.md</code></pre>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>移行後の現行契約</strong>
+            <p>
+              現在の実装フローは承認済み人間向けHTML計画書、AI向けMarkdown計画書、チャット承認、Git実体を引き継ぎます。個別runの
+              <code>plan.html</code>・<code>plan.md</code>・<code
+                >work.json</code
+              >
+              は新規作業の必須入力や状態管理には使いません。追跡済みの歴史run配下の記録は保持し、現在フローのために同期・更新しません。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="doc-panel">
+        <p class="doc-muted">
+          参照: <a href="../../AGENTS.md">AGENTS.md</a>、<a
+            href="../../.agents/instructions/AGENTS-DETAILS.md"
+            >共通契約</a
+          >。移行元として参照した旧タスク文書（計画作成、UIモック、実装、技術QA、仕様QA、PR作成）はPhase
+          4で廃止。
+        </p>
+        <p class="doc-muted">
+          作成担当: Luna　／　成果物: 修正版HTML設計資料　／　更新日: 2026-09-30
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
