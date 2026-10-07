@@ -3,3 +3,5 @@ ai/runs/**/agent-plan.md
 ai/runs/**/manifest.json
 ai/runs/**/approval.json
 human/runs/**/plan-review.html
+drizzle/meta/*.json
+pnpm-lock.yaml
