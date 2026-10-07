@@ -297,10 +297,18 @@ export default function CalendarAside({
                 グループ
               </Button>
 
+              <Button
+                variant="outlined"
+                onClick={() => setAsideMode("notification")}
+                className="!mt-4 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
+              >
+                今日の予定メール
+              </Button>
+
               <button
                 type="button"
                 onClick={() => navigate("/setting")}
-                className="mt-4 flex w-full items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#f9fafb]"
+                className="mt-2 flex w-full items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#f9fafb]"
               >
                 <div className="flex items-center gap-3">
                   <ProfileAvatar
@@ -318,14 +326,6 @@ export default function CalendarAside({
 
                 <span className="text-lg text-[#6b7280]">›</span>
               </button>
-
-              <Button
-                variant="outlined"
-                onClick={() => setAsideMode("notification")}
-                className="!mt-2 !h-14 !w-full !justify-start !rounded-xl !border-[#e5e7eb] !bg-white !px-5 !text-[#374151] shadow-sm"
-              >
-                今日の予定メール
-              </Button>
             </div>
           </>
         );

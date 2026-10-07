@@ -11,6 +11,7 @@ import { emailNotificationApi } from "#frontend/lib/api";
 import { getApiErrorCode } from "#frontend/lib/apiError";
 import { emailNotificationQueries } from "#frontend/lib/queryOptions";
 import { emailNotificationKeys } from "#frontend/lib/queryKeys";
+import CalendarBackButton from "./CalendarBackButton";
 
 const weekdayLabels = [
   "月曜日",
@@ -143,15 +144,7 @@ export default function EmailNotificationSettings({
       className="mt-8 border-t border-[#e5e7eb] pt-6"
     >
       <div>
-        {onClose && (
-          <Button
-            variant="text"
-            onClick={onClose}
-            sx={{ padding: 0, minWidth: 0, textTransform: "none" }}
-          >
-            カレンダーに戻る
-          </Button>
-        )}
+        {onClose && <CalendarBackButton onClick={onClose} />}
         <h2
           id="email-notification-heading"
           className="text-base font-semibold text-[#111827]"
