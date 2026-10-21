@@ -37,7 +37,7 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
     dateOffsets: [0],
   });
   const allowOverwrite = page.getByRole("switch", {
-    name: "この予定が後から登録される予定に上書きされることを許可",
+    name: "上書きされることを許可",
   });
   await expect(allowOverwrite).not.toBeChecked();
   await allowOverwrite.check();
@@ -66,7 +66,7 @@ test("予定を作成・更新・削除し、カレンダーと詳細へ反映�
 
   await page.getByRole("button", { name: "編集" }).click();
   const editAllowOverwrite = page.getByRole("switch", {
-    name: "この予定が後から登録される予定に上書きされることを許可",
+    name: "上書きされることを許可",
   });
   await expect(editAllowOverwrite).toBeChecked();
   await editAllowOverwrite.uncheck();
@@ -136,6 +136,21 @@ test("複数日程の仮押さえを日跨ぎで登録する", async ({
   await page.getByText(title, { exact: true }).first().click();
   await expect(page.getByLabel("仮押さえ・未確定の予定")).toBeVisible();
   await expect(page.getByText("他の日程", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "編集" }).click();
+  const tentativeRadio = page.getByRole("radio", { name: "仮押さえ" });
+  const confirmedRadio = page.getByRole("radio", { name: "本登録" });
+  await expect(tentativeRadio).toBeChecked();
+  await confirmedRadio.check();
+
+  const updateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/schedules/") &&
+      response.request().method() === "PUT",
+  );
+  await page.getByRole("button", { name: "完了" }).click();
+  const updateResponse = await updateResponsePromise;
+  expect((await updateResponse.json()).isTentative).toBe(false);
 });
 
 test("後発予定の作成で既存予定の重複日程だけを置き換え画面へ反映する", async ({
@@ -220,7 +235,7 @@ test("後発予定の作成で既存予定の重複日程だけを置き換え�
   });
   await expect(
     page.getByRole("switch", {
-      name: "この予定が後から登録される予定に上書きされることを許可",
+      name: "上書きされることを許可",
     }),
   ).not.toBeChecked();
 

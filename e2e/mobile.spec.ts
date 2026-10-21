@@ -33,8 +33,11 @@ test("モバイルでは月表示、日表示、Drawerを操作できる", async
 
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "予定を追加" }).click();
+  await expect(page.getByRole("radio", { name: "本登録" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "本登録" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "仮押さえ" })).toBeVisible();
   const allowOverwrite = page.getByRole("switch", {
-    name: "この予定が後から登録される予定に上書きされることを許可",
+    name: "上書きされることを許可",
   });
   await expect(allowOverwrite).not.toBeChecked();
   await expect(page.getByText(/すべての日付がなくなると/)).toBeVisible();

@@ -109,7 +109,7 @@ export async function fillScheduleForm(
   }
 
   if (schedule.tentative) {
-    await page.getByRole("switch", { name: "本登録" }).check();
+    await page.getByRole("radio", { name: "仮押さえ" }).check();
   }
 
   await page.getByLabel("予定メモ").fill(schedule.note);

@@ -15,6 +15,8 @@ import {
   FormControlLabel,
   FormHelperText,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Switch,
   TextField,
@@ -247,23 +249,33 @@ export default function ScheduleAsideForm({
         </div>
 
         <div className="mb-6">
-          <FormControlLabel
-            control={
-              <Switch
-                checked={draftSchedule.isTentative}
-                onChange={(event) =>
-                  onChange({
-                    target: {
-                      name: "isTentative",
-                      value: event.target.checked,
-                    },
-                  })
-                }
-                inputProps={{ "aria-label": "仮押さえとして登録" }}
+          <FormControl>
+            <RadioGroup
+              row
+              name="use-radio-group"
+              value={String(draftSchedule.isTentative)}
+              onChange={(event) =>
+                onChange({
+                  target: {
+                    name: "isTentative",
+                    value: event.target.value === "true",
+                  },
+                })
+              }
+              aria-label="登録方法"
+            >
+              <FormControlLabel
+                value="false"
+                control={<Radio />}
+                label="本登録"
               />
-            }
-            label={draftSchedule.isTentative ? "仮押さえ" : "本登録"}
-          />
+              <FormControlLabel
+                value="true"
+                control={<Radio />}
+                label="仮押さえ"
+              />
+            </RadioGroup>
+          </FormControl>
         </div>
 
         <div className="mb-6 rounded-xl border border-[#e5e7eb] bg-white px-4 py-3">
@@ -287,7 +299,7 @@ export default function ScheduleAsideForm({
             }
             label={
               <span className="text-sm font-medium leading-5 text-[#222]">
-                この予定が後から登録される予定に上書きされることを許可
+                上書きされることを許可
               </span>
             }
           />
