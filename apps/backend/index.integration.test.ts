@@ -19,6 +19,7 @@ import {
   groups,
 } from "./features/group/model";
 import { scheduleDates, schedules } from "./features/schedule/model";
+import { todos } from "./features/todo/model";
 import { authSessions } from "./features/auth-session/model";
 import {
   emailDeliveryLogs,
@@ -123,6 +124,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
   };
   let closeDatabase: () => Promise<void>;
   let EmailNotificationRepository: typeof import("./features/email-notification/repository").EmailNotificationRepository;
+  let ScheduleRepository: typeof import("./features/schedule/repository").ScheduleRepository;
   let GroupRepository: typeof import("./features/group/repository").GroupRepository;
   let GroupCalendarRepository: typeof import("./features/group/calendar-repository").GroupCalendarRepository;
   let runDailyEmailOnce: typeof import("./workers/daily-email").runDailyEmailOnce;
@@ -149,6 +151,7 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     closeDatabase = database.closeDatabase;
     ({ EmailNotificationRepository } =
       await import("./features/email-notification/repository"));
+    ({ ScheduleRepository } = await import("./features/schedule/repository"));
     await migrate(db as never, {
       migrationsFolder: resolve(import.meta.dirname, "../../drizzle"),
     });
@@ -165,6 +168,417 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE TABLE groups, users CASCADE`);
     vi.clearAllMocks();
+  });
+
+  it("schedule重複上書き設定をfalse既定で保存・更新する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "schedule-overwrite@example.com", name: "overwrite" })
+      .returning();
+    if (!user) throw new Error("schedule test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({
+        userId: user.id,
+        name: "重複上書きテスト",
+        color: "blue",
+        icon: "tag",
+      })
+      .returning();
+    if (!category) throw new Error("schedule test category was not created");
+
+    const repository = new ScheduleRepository(db as never);
+    const created = await repository.create(
+      {
+        title: "上書き設定テスト",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-21T10:00:00",
+            endDate: "2026-10-21T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    expect(created.allowOverwrite).toBe(false);
+
+    await expect(
+      repository.update(created.id, { allowOverwrite: true }, user.id),
+    ).resolves.toMatchObject({ allowOverwrite: true });
+    await expect(repository.get(created.id)).resolves.toMatchObject({
+      allowOverwrite: true,
+    });
+  });
+
+  it("新規予定だけが許可済み予定の重複日行を置き換え、失敗時は全件保持する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: "schedule-overwrite-flow@example.com",
+        name: "overwrite",
+      })
+      .returning();
+    if (!user) throw new Error("schedule test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({
+        userId: user.id,
+        name: "重複上書きフロー",
+        color: "blue",
+        icon: "tag",
+      })
+      .returning();
+    if (!category) throw new Error("schedule test category was not created");
+
+    const repository = new ScheduleRepository(db as never);
+    const oldSchedule = await repository.create(
+      {
+        title: "既存の複数日予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-21T10:00:00",
+            endDate: "2026-10-21T11:00:00",
+          },
+          {
+            startDate: "2026-10-22T10:00:00",
+            endDate: "2026-10-22T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const newSchedule = await repository.create(
+      {
+        title: "後発予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-21T10:30:00",
+            endDate: "2026-10-21T11:30:00",
+          },
+        ],
+      },
+      user.id,
+    );
+
+    await expect(repository.get(oldSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-22T10:00:00",
+          endDate: "2026-10-22T11:00:00",
+        },
+      ],
+    });
+    await expect(repository.get(newSchedule.id)).resolves.toMatchObject({
+      title: "後発予定",
+    });
+
+    const protectedSchedule = await repository.create(
+      {
+        title: "上書き不可",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-23T10:00:00",
+            endDate: "2026-10-23T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const overwriteSchedule = await repository.create(
+      {
+        title: "混在する上書き可能予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-24T10:00:00",
+            endDate: "2026-10-24T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(
+      repository.create(
+        {
+          title: "拒否される後発",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-23T10:30:00",
+              endDate: "2026-10-23T11:30:00",
+            },
+            {
+              startDate: "2026-10-24T10:30:00",
+              endDate: "2026-10-24T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ).rejects.toThrow("SCHEDULE_TIME_OVERLAP");
+    await expect(repository.get(protectedSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-23T10:00:00",
+          endDate: "2026-10-23T11:00:00",
+        },
+      ],
+    });
+    await expect(repository.get(overwriteSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-24T10:00:00",
+          endDate: "2026-10-24T11:00:00",
+        },
+      ],
+    });
+
+    const emptyAfterOverwrite = await repository.create(
+      {
+        title: "全日上書きされる予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-25T10:00:00",
+            endDate: "2026-10-25T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await db.insert(todos).values({
+      scheduleId: emptyAfterOverwrite.id,
+      title: "cascade確認",
+    });
+    await repository.create(
+      {
+        title: "後発で全日置換",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-25T10:30:00",
+            endDate: "2026-10-25T11:30:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(repository.get(emptyAfterOverwrite.id)).resolves.toBeNull();
+    const [remainingTodos] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(todos)
+      .where(eq(todos.scheduleId, emptyAfterOverwrite.id));
+    expect(remainingTodos?.count).toBe(0);
+
+    const rollbackCandidate = await repository.create(
+      {
+        title: "失敗時に維持される予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-26T10:00:00",
+            endDate: "2026-10-26T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(
+      repository.create(
+        {
+          title: "外部キーで失敗する後発",
+          categoryId: "99999999-9999-4999-8999-999999999999",
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-26T10:30:00",
+              endDate: "2026-10-26T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    await expect(repository.get(rollbackCandidate.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-26T10:00:00",
+          endDate: "2026-10-26T11:00:00",
+        },
+      ],
+    });
+
+    const concurrentCandidate = await repository.create(
+      {
+        title: "同時登録で置換される予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-27T10:00:00",
+            endDate: "2026-10-27T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const concurrentCreates = await Promise.allSettled(
+      ["同時登録A", "同時登録B"].map((title) =>
+        repository.create(
+          {
+            title,
+            categoryId: category.id,
+            isTentative: false,
+            allowOverwrite: false,
+            dates: [
+              {
+                startDate: "2026-10-27T10:30:00",
+                endDate: "2026-10-27T11:30:00",
+              },
+            ],
+          },
+          user.id,
+        ),
+      ),
+    );
+    expect(
+      concurrentCreates.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      concurrentCreates.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    await expect(repository.get(concurrentCandidate.id)).resolves.toBeNull();
+
+    const concurrentUpdateCandidate = await repository.create(
+      {
+        title: "設定更新と同時登録",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-28T10:00:00",
+            endDate: "2026-10-28T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const [updateResult, createResult] = await Promise.allSettled([
+      repository.update(
+        concurrentUpdateCandidate.id,
+        { allowOverwrite: true },
+        user.id,
+      ),
+      repository.create(
+        {
+          title: "更新と競合する予定",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-28T10:30:00",
+              endDate: "2026-10-28T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ]);
+    expect(updateResult.status).toBe("fulfilled");
+    if (createResult.status === "fulfilled") {
+      await expect(
+        repository.get(concurrentUpdateCandidate.id),
+      ).resolves.toBeNull();
+    } else {
+      expect(createResult.reason).toMatchObject({
+        message: "SCHEDULE_TIME_OVERLAP",
+      });
+      await expect(
+        repository.get(concurrentUpdateCandidate.id),
+      ).resolves.toMatchObject({ allowOverwrite: true });
+    }
+
+    const concurrentDeleteCandidate = await repository.create(
+      {
+        title: "削除と同時登録",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-29T10:00:00",
+            endDate: "2026-10-29T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const [deleteResult, createWhileDeleting] = await Promise.allSettled([
+      repository.delete(concurrentDeleteCandidate.id, user.id),
+      repository.create(
+        {
+          title: "削除と競合する予定",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-29T10:30:00",
+              endDate: "2026-10-29T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ]);
+    expect(deleteResult).toMatchObject({
+      status: "fulfilled",
+      value: true,
+    });
+    await expect(
+      repository.get(concurrentDeleteCandidate.id),
+    ).resolves.toBeNull();
+    const remainingAfterDeleteRace = (await repository.getByUser(user.id))
+      .flatMap((schedule) => schedule.dates)
+      .filter(
+        (date) =>
+          date.startDate < "2026-10-29T11:30:00" &&
+          date.endDate > "2026-10-29T10:30:00",
+      );
+    if (createWhileDeleting.status === "fulfilled") {
+      expect(remainingAfterDeleteRace).toHaveLength(1);
+    } else {
+      expect(createWhileDeleting.reason).toMatchObject({
+        message: "SCHEDULE_TIME_OVERLAP",
+      });
+      expect(remainingAfterDeleteRace).toHaveLength(0);
+    }
   });
 
   afterAll(async () => {

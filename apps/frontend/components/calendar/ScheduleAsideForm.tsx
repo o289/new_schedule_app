@@ -13,6 +13,7 @@ import {
   Box,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   MenuItem,
   Select,
   Switch,
@@ -263,6 +264,36 @@ export default function ScheduleAsideForm({
             }
             label={draftSchedule.isTentative ? "仮押さえ" : "本登録"}
           />
+        </div>
+
+        <div className="mb-6 rounded-xl border border-[#e5e7eb] bg-white px-4 py-3">
+          <FormControlLabel
+            sx={{ alignItems: "flex-start", margin: 0 }}
+            control={
+              <Switch
+                checked={draftSchedule.allowOverwrite}
+                onChange={(event) =>
+                  onChange({
+                    target: {
+                      name: "allowOverwrite",
+                      value: event.target.checked,
+                    },
+                  })
+                }
+                inputProps={{
+                  "aria-label": "後発の予定による上書きを許可",
+                }}
+              />
+            }
+            label={
+              <span className="text-sm font-medium leading-5 text-[#222]">
+                この予定が後から登録される予定に上書きされることを許可
+              </span>
+            }
+          />
+          <FormHelperText sx={{ margin: 0, paddingLeft: "4px" }}>
+            重なった日付だけが削除されます。すべての日付がなくなると、この予定と紐づくToDoも削除されます。
+          </FormHelperText>
         </div>
 
         <div className="md-6">

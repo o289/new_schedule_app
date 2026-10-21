@@ -9,6 +9,7 @@ const schedule: ScheduleResponse = {
   url: "https://meet.google.com/abc-defg-hij",
   categoryId: "22222222-2222-4222-8222-222222222222",
   isTentative: true,
+  allowOverwrite: true,
   category: { name: "学校", color: "red", icon: "school" },
   dates: [
     {
@@ -30,6 +31,7 @@ describe("toScheduleForm", () => {
       url: "https://meet.google.com/abc-defg-hij",
       categoryId: schedule.categoryId,
       isTentative: true,
+      allowOverwrite: true,
       dates: schedule.dates,
     });
     expect(form.dates).not.toBe(schedule.dates);

@@ -20,6 +20,7 @@ function serializeSchedule(schedule: Schedule) {
     ...(schedule.url !== null && { url: schedule.url }),
     categoryId: schedule.categoryId,
     isTentative: schedule.isTentative,
+    allowOverwrite: schedule.allowOverwrite,
     category: schedule.category,
     dates: schedule.dates.map((date) => ({
       id: date.id,

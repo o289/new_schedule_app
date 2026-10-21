@@ -5,7 +5,7 @@ import { useAlert } from "#frontend/context/AlertContext";
 import { scheduleApi } from "#frontend/lib/api";
 import { getApiErrorCode } from "#frontend/lib/apiError";
 import { scheduleQueries } from "#frontend/lib/queryOptions";
-import { scheduleKeys } from "#frontend/lib/queryKeys";
+import { groupKeys, scheduleKeys } from "#frontend/lib/queryKeys";
 import { useScheduleForm } from "./useScheduleForm";
 
 export function useSchedule() {
@@ -48,13 +48,20 @@ export function useSchedule() {
       queryKey: scheduleQueries.list().queryKey,
     });
 
+  const invalidateScheduleViews = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: scheduleQueries.list().queryKey,
+      }),
+      queryClient.invalidateQueries({ queryKey: groupKeys.calendars() }),
+    ]);
+  };
+
   const handleScheduleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     await createSchedule.mutateAsync();
-    await queryClient.invalidateQueries({
-      queryKey: scheduleQueries.list().queryKey,
-    });
+    await invalidateScheduleViews();
 
     resetDraft();
     showAlert("CREATE_SUCCESS");
@@ -76,9 +83,7 @@ export function useSchedule() {
       id: draftSchedule.id,
       schedule: payload,
     });
-    await queryClient.invalidateQueries({
-      queryKey: scheduleQueries.list().queryKey,
-    });
+    await invalidateScheduleViews();
     showAlert("UPDATE_SUCCESS");
   };
 
@@ -89,9 +94,7 @@ export function useSchedule() {
     if (scheduleId) {
       queryClient.removeQueries({ queryKey: scheduleKeys.detail(scheduleId) });
     }
-    await queryClient.invalidateQueries({
-      queryKey: scheduleQueries.list().queryKey,
-    });
+    await invalidateScheduleViews();
     showAlert("DELETE_SUCCESS");
   };
 

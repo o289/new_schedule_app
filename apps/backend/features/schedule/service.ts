@@ -15,6 +15,7 @@ import type { User } from "../user/repository";
 import { CategoryRepository } from "../category/repository";
 import {
   ScheduleRepository,
+  ScheduleTimeOverlapError,
   type Schedule,
   type ScheduleDate,
 } from "./repository";
@@ -102,8 +103,26 @@ export class ScheduleService {
     }
   }
 
+  private assertInputDatesDoNotOverlap(dates: ScheduleDateCreate[]): void {
+    for (let index = 0; index < dates.length; index += 1) {
+      const candidate = dates[index]!;
+
+      for (const other of dates.slice(index + 1)) {
+        if (
+          candidate.startDate < other.endDate &&
+          candidate.endDate > other.startDate
+        ) {
+          throw new ConflictError("SCHEDULE_TIME_OVERLAP");
+        }
+      }
+    }
+  }
+
   private rethrowScheduleTimeOverlap(error: unknown): never {
-    if (hasDatabaseErrorCode(error, "23P01")) {
+    if (
+      error instanceof ScheduleTimeOverlapError ||
+      hasDatabaseErrorCode(error, "23P01")
+    ) {
       throw new ConflictError("SCHEDULE_TIME_OVERLAP");
     }
 
@@ -113,7 +132,7 @@ export class ScheduleService {
   async createSchedule(user: User, input: ScheduleCreate): Promise<Schedule> {
     this.validateDates(input.dates);
     await this.assertOwnedCategory(user.id, input.categoryId);
-    await this.assertDatesDoNotOverlap(user.id, input.dates);
+    this.assertInputDatesDoNotOverlap(input.dates);
 
     try {
       return await this.repository.create(input, user.id);
@@ -158,7 +177,7 @@ export class ScheduleService {
 
     let updated: Schedule | null;
     try {
-      updated = await this.repository.update(schedule.id, input);
+      updated = await this.repository.update(schedule.id, input, user.id);
     } catch (error) {
       return this.rethrowScheduleTimeOverlap(error);
     }
