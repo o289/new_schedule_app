@@ -2,6 +2,9 @@ import { isApiErrorCode, type ApiErrorCode } from "#contracts/api-error";
 import { alreadyGroupMemberErrorSchema } from "#schemas/group";
 import { ApiClientError } from "./apiError";
 import {
+  getSessionGeneration,
+  handleRefreshFailure,
+  StaleRefreshError,
   clearSession,
   getAccessToken,
   getRefreshToken,
@@ -78,11 +81,16 @@ async function refresh(refreshToken: string) {
 export const apiClient = {
   public: <T>(path: string, options?: RequestInit) => request<T>(path, options),
   authenticated: async <T>(path: string, options?: RequestInit) => {
+    const requestGeneration = getSessionGeneration();
     try {
       return await request<T>(path, options, getAccessToken());
     } catch (error) {
       if (!(error instanceof ApiClientError) || error.status !== 401) {
         throw error;
+      }
+
+      if (requestGeneration !== getSessionGeneration()) {
+        throw new StaleRefreshError();
       }
 
       if (!getRefreshToken()) {
@@ -92,9 +100,14 @@ export const apiClient = {
 
       try {
         const accessToken = await refreshAccessToken(refresh);
+        if (requestGeneration !== getSessionGeneration()) {
+          throw new StaleRefreshError();
+        }
         return request<T>(path, options, accessToken);
       } catch (refreshError) {
-        clearSession();
+        if (!(refreshError instanceof StaleRefreshError)) {
+          handleRefreshFailure(refreshError);
+        }
         throw refreshError;
       }
     }

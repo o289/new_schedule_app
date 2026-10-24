@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -168,6 +169,48 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE TABLE groups, users CASCADE`);
     vi.clearAllMocks();
+  });
+
+  it("refreshの期限切れ専用codeを実DB rowだけに返す", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "refresh-expiry@example.com", name: "refresh expiry" })
+      .returning();
+    if (!user) throw new Error("refresh expiry user was not created");
+
+    const expiredToken = "integration-expired-refresh-token";
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: createHash("sha256")
+        .update(expiredToken)
+        .digest("hex"),
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    const expiredResponse = await post(app, "/auth/refresh", {
+      refresh_token: expiredToken,
+    });
+    expect(expiredResponse.status).toBe(401);
+    await expect(expiredResponse.json()).resolves.toEqual({
+      code: "REFRESH_TOKEN_EXPIRED",
+    });
+
+    const revokedToken = "integration-revoked-refresh-token";
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: createHash("sha256")
+        .update(revokedToken)
+        .digest("hex"),
+      expiresAt: new Date(Date.now() - 1),
+      revokedAt: new Date(),
+    });
+    const revokedResponse = await post(app, "/auth/refresh", {
+      refresh_token: revokedToken,
+    });
+    expect(revokedResponse.status).toBe(401);
+    await expect(revokedResponse.json()).resolves.toEqual({
+      code: "INVALID_REFRESH_TOKEN",
+    });
   });
 
   it("schedule重複上書き設定をfalse既定で保存・更新する", async () => {

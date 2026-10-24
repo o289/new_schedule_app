@@ -386,11 +386,16 @@ export class AuthService {
     const currentRefreshTokenDigest = createHash("sha256")
       .update(refreshToken)
       .digest("hex");
-    const session =
-      await this.authSessionRepository.getActiveByRefreshTokenDigest(
-        currentRefreshTokenDigest,
-      );
+    const session = await this.authSessionRepository.getByRefreshTokenDigest(
+      currentRefreshTokenDigest,
+    );
     if (!session) throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
+    if (session.revokedAt) {
+      throw new UnauthorizedError("INVALID_REFRESH_TOKEN");
+    }
+    if (session.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedError("REFRESH_TOKEN_EXPIRED");
+    }
 
     const nextRefreshToken = createRefreshToken();
     const rotated = await this.authSessionRepository.rotateRefreshToken(

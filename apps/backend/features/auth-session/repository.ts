@@ -38,6 +38,18 @@ export class AuthSessionRepository extends BaseRepository {
     return session ?? null;
   }
 
+  async getByRefreshTokenDigest(
+    refreshTokenDigest: string,
+  ): Promise<AuthSession | null> {
+    const [session] = await this.database
+      .select()
+      .from(authSessions)
+      .where(eq(authSessions.refreshTokenDigest, refreshTokenDigest))
+      .limit(1);
+
+    return session ?? null;
+  }
+
   async getActiveById(id: string): Promise<AuthSession | null> {
     const [session] = await this.database
       .select()

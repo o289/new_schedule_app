@@ -1,8 +1,15 @@
 // src/context/AlertContext.jsx
-import { createContext, useCallback, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import type { AlertCode } from "../constants/alertMessages";
 import AlertToast from "../components/AlertToast";
+import { subscribeToRefreshExpiry } from "../lib/sessionManager";
 
 // Context 作成
 interface AlertState {
@@ -30,13 +37,21 @@ export const AlertProvider = ({ children }: { children: ReactNode }) => {
    * @param {string} code - backend から返ってきた code
    */
   const showAlert = useCallback((code: AlertCode) => {
-    if (!code) return;
+    if (!code || code === "REFRESH_TOKEN_EXPIRED") return;
 
     setAlertState({
       open: true,
       code,
     });
   }, []);
+
+  useEffect(
+    () =>
+      subscribeToRefreshExpiry(() => {
+        setAlertState({ open: true, code: "REFRESH_TOKEN_EXPIRED" });
+      }),
+    [],
+  );
 
   /**
    * alert を閉じる

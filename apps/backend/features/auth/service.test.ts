@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   },
   session: {
     create: vi.fn(),
+    getByRefreshTokenDigest: vi.fn(),
     getActiveByRefreshTokenDigest: vi.fn(),
     rotateRefreshToken: vi.fn(),
     revokeById: vi.fn(),
@@ -78,6 +79,7 @@ vi.mock("../challenge/repository", () => ({
 vi.mock("../auth-session/repository", () => ({
   AuthSessionRepository: class {
     create = mocks.session.create;
+    getByRefreshTokenDigest = mocks.session.getByRefreshTokenDigest;
     getActiveByRefreshTokenDigest = mocks.session.getActiveByRefreshTokenDigest;
     rotateRefreshToken = mocks.session.rotateRefreshToken;
     revokeById = mocks.session.revokeById;
@@ -393,9 +395,7 @@ describe("AuthService", () => {
   });
 
   it("refreshでトークンをローテーションする", async () => {
-    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(
-      activeSession,
-    );
+    mocks.session.getByRefreshTokenDigest.mockResolvedValue(activeSession);
     mocks.createRefreshToken.mockReturnValue("next-refresh-token");
     mocks.session.rotateRefreshToken.mockResolvedValue(activeSession);
     mocks.createAccessToken.mockResolvedValue("new-access-token");
@@ -421,7 +421,7 @@ describe("AuthService", () => {
   });
 
   it("使用済みまたは不正なrefresh tokenを401にする", async () => {
-    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(null);
+    mocks.session.getByRefreshTokenDigest.mockResolvedValue(null);
 
     await expectApiError(
       new AuthService().refresh("invalid"),
@@ -431,14 +431,46 @@ describe("AuthService", () => {
   });
 
   it("ローテーション競合時は401にする", async () => {
-    mocks.session.getActiveByRefreshTokenDigest.mockResolvedValue(
-      activeSession,
-    );
+    mocks.session.getByRefreshTokenDigest.mockResolvedValue(activeSession);
     mocks.createRefreshToken.mockReturnValue("next-refresh-token");
     mocks.session.rotateRefreshToken.mockResolvedValue(null);
 
     await expectApiError(
       new AuthService().refresh("plain-refresh-token"),
+      401,
+      "INVALID_REFRESH_TOKEN",
+    );
+  });
+
+  it("期限切れrowだけ専用401 codeにする", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-24T00:00:00.000Z"));
+    try {
+      mocks.session.getByRefreshTokenDigest.mockResolvedValue({
+        ...activeSession,
+        expiresAt: new Date("2026-10-24T00:00:00.000Z"),
+      });
+
+      await expectApiError(
+        new AuthService().refresh("expired-refresh-token"),
+        401,
+        "REFRESH_TOKEN_EXPIRED",
+      );
+      expect(mocks.session.rotateRefreshToken).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("期限切れでも失効済みrowはgeneric invalidを優先する", async () => {
+    mocks.session.getByRefreshTokenDigest.mockResolvedValue({
+      ...activeSession,
+      expiresAt: new Date(Date.now() - 1),
+      revokedAt: new Date(),
+    });
+
+    await expectApiError(
+      new AuthService().refresh("revoked-refresh-token"),
       401,
       "INVALID_REFRESH_TOKEN",
     );
