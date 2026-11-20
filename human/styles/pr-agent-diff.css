@@ -1,0 +1,48 @@
+#step-diff pre.diff-rendered {
+  padding: 0;
+  overflow-x: auto;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+#step-diff .diff-line {
+  display: block;
+  min-width: max-content;
+  padding: 0 1rem;
+  white-space: pre;
+}
+
+#step-diff .diff-line-prefix {
+  display: inline-block;
+  width: 1.5rem;
+  user-select: none;
+  color: #94a3b8;
+}
+
+#step-diff .diff-line-add {
+  background: #064e3b;
+  color: #d1fae5;
+}
+
+#step-diff .diff-line-add .diff-line-prefix {
+  color: #86efac;
+}
+
+#step-diff .diff-line-delete {
+  background: #7f1d1d;
+  color: #fee2e2;
+}
+
+#step-diff .diff-line-delete .diff-line-prefix {
+  color: #fca5a5;
+}
+
+#step-diff .diff-line-hunk {
+  background: #172554;
+  color: #bfdbfe;
+}
+
+#step-diff .diff-line-file {
+  color: #f8fafc;
+  font-weight: 700;
+}

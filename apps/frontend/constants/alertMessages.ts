@@ -122,6 +122,11 @@ export const ALERT_MESSAGES = {
     type: "warning",
     message: "認証に失敗しました。再度ログインをしてください",
   },
+  REFRESH_TOKEN_EXPIRED: {
+    type: "warning",
+    message:
+      "ログインの有効期限が切れたため、ログアウトします。再度ログインしてください。",
+  },
   ALREADY_LOGGED_OUT: {
     type: "warning",
     message: "すでにログアウトされています",

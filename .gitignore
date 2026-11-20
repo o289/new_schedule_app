@@ -38,3 +38,4 @@ e2e/.auth/
 # local-only files
 mock.html
 docs/*
+.agent-runs/

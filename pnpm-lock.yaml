@@ -31,6 +31,9 @@ importers:
       "@fullcalendar/timegrid":
         specifier: 6.1.21
         version: 6.1.21(@fullcalendar/core@6.1.21)
+      "@getbrevo/brevo":
+        specifier: 6.0.3
+        version: 6.0.3
       "@hono/node-server":
         specifier: 2.0.9
         version: 2.0.9(hono@4.12.30)
@@ -1159,6 +1162,13 @@ packages:
       }
     peerDependencies:
       "@fullcalendar/core": ~6.1.21
+
+  "@getbrevo/brevo@6.0.3":
+    resolution:
+      {
+        integrity: sha512-yWBLKoHC8P5HLZ8z6iRuqDYLpCRKPTUETnZOLZzNDWGFYL78y4SHOTxQVrKH5ROX7f4q+SQ19LD3GWtJlIuNXA==,
+      }
+    engines: { node: ">=18.0.0" }
 
   "@hexagon/base64@1.1.28":
     resolution:
@@ -3984,6 +3994,8 @@ snapshots:
     dependencies:
       "@fullcalendar/core": 6.1.21
       "@fullcalendar/daygrid": 6.1.21(@fullcalendar/core@6.1.21)
+
+  "@getbrevo/brevo@6.0.3": {}
 
   "@hexagon/base64@1.1.28": {}
 

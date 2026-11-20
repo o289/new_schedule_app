@@ -4,12 +4,14 @@ import { queryClient } from "./lib/queryClient";
 import {
   authKeys,
   categoryKeys,
+  emailNotificationKeys,
   groupKeys,
   scheduleKeys,
 } from "./lib/queryKeys";
 import {
   authQueries,
   categoryQueries,
+  emailNotificationQueries,
   groupQueries,
   scheduleQueries,
 } from "./lib/queryOptions";
@@ -31,11 +33,21 @@ describe("TanStack Query基盤", () => {
       "detail",
       "schedule-id",
     ]);
+    expect(emailNotificationKeys.settings()).toEqual([
+      "email-notification",
+      "settings",
+    ]);
   });
 
   it("予定・カテゴリー一覧のQuery定義を共通化する", () => {
     expect(scheduleQueries.list().queryKey).toEqual(scheduleKeys.lists());
     expect(categoryQueries.list().queryKey).toEqual(categoryKeys.lists());
+  });
+
+  it("今日の予定メール設定のQuery定義を共通化する", () => {
+    expect(emailNotificationQueries.settings().queryKey).toEqual(
+      emailNotificationKeys.settings(),
+    );
   });
 
   it("グループ・認証のQuery定義を共通化する", () => {

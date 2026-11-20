@@ -13,7 +13,10 @@ import {
   Box,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Switch,
   TextField,
@@ -246,23 +249,63 @@ export default function ScheduleAsideForm({
         </div>
 
         <div className="mb-6">
+          <FormControl>
+            <RadioGroup
+              row
+              name="use-radio-group"
+              value={String(draftSchedule.isTentative)}
+              onChange={(event) =>
+                onChange({
+                  target: {
+                    name: "isTentative",
+                    value: event.target.value === "true",
+                  },
+                })
+              }
+              aria-label="登録方法"
+            >
+              <FormControlLabel
+                value="false"
+                control={<Radio />}
+                label="本登録"
+              />
+              <FormControlLabel
+                value="true"
+                control={<Radio />}
+                label="仮押さえ"
+              />
+            </RadioGroup>
+          </FormControl>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-[#e5e7eb] bg-white px-4 py-3">
           <FormControlLabel
+            sx={{ alignItems: "flex-start", margin: 0 }}
             control={
               <Switch
-                checked={draftSchedule.isTentative}
+                checked={draftSchedule.allowOverwrite}
                 onChange={(event) =>
                   onChange({
                     target: {
-                      name: "isTentative",
+                      name: "allowOverwrite",
                       value: event.target.checked,
                     },
                   })
                 }
-                inputProps={{ "aria-label": "仮押さえとして登録" }}
+                inputProps={{
+                  "aria-label": "後発の予定による上書きを許可",
+                }}
               />
             }
-            label={draftSchedule.isTentative ? "仮押さえ" : "本登録"}
+            label={
+              <span className="text-sm font-medium leading-5 text-[#222]">
+                上書きされることを許可
+              </span>
+            }
           />
+          <FormHelperText sx={{ margin: 0, paddingLeft: "4px" }}>
+            重なった日付だけが削除されます。すべての日付がなくなると、この予定と紐づくToDoも削除されます。
+          </FormHelperText>
         </div>
 
         <div className="md-6">

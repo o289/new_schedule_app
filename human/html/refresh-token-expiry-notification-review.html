@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>リフレッシュトークン期限切れ通知・実装レビュー</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <p class="doc-eyebrow">Auth / 実装レビュー</p>
+        <h1>リフレッシュトークン期限切れ通知</h1>
+        <p>
+          refresh
+          tokenの次回使用時に期限切れを判定し、sessionを終了して既存Snackbarで再ログインを案内します。
+        </p>
+        <p class="doc-muted">feature/v3.2.3 · 承認済み計画の最終QA結果</p>
+      </header>
+
+      <section class="doc-section">
+        <h2>判断サマリー</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>最終QA PASS</strong>
+            <p>独立技術QA・仕様QAとメイン最終判定を確認。</p>
+          </article>
+          <article class="doc-card">
+            <strong>API・session動作</strong>
+            <p>専用401 code、世代ガード、単一通知、login遷移を実装。</p>
+          </article>
+          <article class="doc-card">
+            <strong>DB・依存変更なし</strong>
+            <p>migration、依存、設定の追加・変更なし。</p>
+          </article>
+        </div>
+        <p>
+          通知文：「ログインの有効期限が切れたため、ログアウトします。再度ログインしてください。」opaque
+          tokenの期限切れは次回refresh時に判定し、期限到達を監視するtimerやpollingは追加しません。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>変更内容と理由</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">digest一致rowを検索</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">revoked / expiryを判定</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">期限切れだけ専用401</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            session clear・通知1回
+          </div>
+        </div>
+        <p>
+          Backendはopaque tokenのdigestからsession
+          rowを取得します。rowなし・失効済み・rotation競合は既存の
+          <code>INVALID_REFRESH_TOKEN</code> を返し、未失効rowの
+          <code>expiresAt &lt;= now</code> の場合だけ
+          <code>REFRESH_TOKEN_EXPIRED</code>
+          を返します。期限内のrotation条件は維持します。
+        </p>
+        <p>
+          Frontendはrefresh attemptとsession
+          generationに失敗理由を結び付け、同じ失敗のcleanupと期限切れ通知を一度に抑えます。logout
+          requestは開始時のrefresh
+          tokenとgenerationを捕捉し、遅れて完了した古いrefresh/logoutが新しいsessionを上書き・消去しないようにします。期限切れ通知はRouter内・Routes外のAlertProviderから表示し、sessionQuery
+          errorとの重複を抑止します。network/5xx等の従来のclear挙動は維持し、期限切れ通知は出しません。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>変更ファイル</h2>
+        <h3>Backend・API契約</h3>
+        <ul>
+          <li>
+            <a href="../../apps/backend/features/auth-session/repository.ts"
+              >digest lookup</a
+            >、
+            <a href="../../apps/backend/features/auth/service.ts">refresh判定</a
+            >、
+            <a href="../../packages/contracts/api-error.ts">API error code</a>
+          </li>
+          <li>
+            <a href="../../apps/backend/features/auth/service.test.ts"
+              >service tests</a
+            >、
+            <a href="../../apps/backend/index.integration.test.ts"
+              >DB integration test</a
+            >
+          </li>
+        </ul>
+        <h3>Frontend・通知・競合制御</h3>
+        <ul>
+          <li>
+            <a href="../../apps/frontend/lib/sessionManager.ts"
+              >session generation / refresh failure管理</a
+            >、
+            <a href="../../apps/frontend/lib/apiClient.ts"
+              >401 refresh・retry処理</a
+            >、
+            <a href="../../apps/frontend/hooks/useSession.ts"
+              >logout mutationのgeneration guard</a
+            >
+          </li>
+          <li>
+            <a href="../../apps/frontend/context/AlertContext.tsx"
+              >AlertProvider通知購読</a
+            >、
+            <a href="../../apps/frontend/constants/alertMessages.ts">画面文言</a
+            >、
+            <a href="../../apps/frontend/lib/sessionManager.test.ts"
+              >session tests</a
+            >、
+            <a href="../../apps/frontend/lib/apiClient.test.ts"
+              >API client tests</a
+            >
+          </li>
+          <li>
+            <a href="../../e2e/network-state.spec.ts">画面遷移E2E</a>
+          </li>
+        </ul>
+        <h3>計画と実行結果</h3>
+        <ul>
+          <li>
+            <a href="../../ai/plans/refresh-token-expiry-notification.md"
+              >AI実装計画・QA記録</a
+            >、
+            <a
+              href="../../docs/html/リフレッシュトークン期限切れ通知_実装計画.html"
+              >承認済み人間向け計画</a
+            >（docs/htmlはGit追跡外）。
+          </li>
+        </ul>
+      </section>
+
+      <section class="doc-section">
+        <h2>QA・検証結果</h2>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>確認</th>
+              <th>結果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>独立技術QA</td>
+              <td>
+                PASS。row lookupと期限/失効優先順、rotation条件、session
+                generation guard、logout token capture、refresh
+                failureの単一cleanupを確認。実装bugなし。
+              </td>
+            </tr>
+            <tr>
+              <td>独立仕様QA</td>
+              <td>
+                PASS。承認済み計画との整合、期限切れだけの通知、generic
+                invalid/network時の通知抑止、login遷移後の表示を確認。仕様逸脱なし。
+              </td>
+            </tr>
+            <tr>
+              <td>正式Docker verify</td>
+              <td>
+                Node.js 22.23.1でtypecheck PASS、39 files / 209 tests
+                PASS。verify内のDB integrationは環境未設定でskip。
+              </td>
+            </tr>
+            <tr>
+              <td>専用DB integration</td>
+              <td>
+                12/12 PASS。期限切れrowとrevoked rowの401 code契約を実DBで確認。
+              </td>
+            </tr>
+            <tr>
+              <td>期限切れ画面E2E</td>
+              <td>
+                setup + Chromium 2/2 PASS。login遷移、token
+                clear、通知1件、refresh request 1回を確認。
+              </td>
+            </tr>
+            <tr>
+              <td>format・diff</td>
+              <td>全対象のformat checkとgit diff --check PASS。</td>
+            </tr>
+            <tr>
+              <td>計画外変更</td>
+              <td>
+                DB schema/migration、依存、設定の変更なし。対象は計画記載の13
+                source/test filesとAI計画、レビュー資料。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="doc-muted">
+          独立QAはread-onlyで、機能テストを再実行していません。検証結果は実装側の最終sourceに対する記録です。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>人間向けレビュー</h2>
+        <p>
+          人間向けの最終レビュー、承認、mergeは人間が行います。version
+          branchへの公開は公開正本
+          <code>./.agents/tools/pr-agent-publish</code>
+          を使い、同一SHAのCI成功を確認する手順です。stagingの自動deployはmainのCI完了を対象とし、このfeature
+          branchのpushでは起動しません。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

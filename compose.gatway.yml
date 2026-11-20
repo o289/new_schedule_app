@@ -4,7 +4,7 @@ name: schedule-gateway
 
 services:
   gateway:
-    image: nginx:alpine
+    image: nginx:1.30.7-alpine
     ports:
       - "80:80"
       - "443:443"

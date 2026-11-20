@@ -1,4 +1,3 @@
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import UndoIcon from "@mui/icons-material/Undo";
 import { Button, TextField } from "@mui/material";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +12,7 @@ import { getApiErrorCode } from "#frontend/lib/apiError";
 import { authKeys } from "#frontend/lib/queryKeys";
 import ConfirmDialog from "../ConfirmDialog";
 import { ProfileAvatar } from "../common/ProfileAvatar";
+import CalendarBackButton from "./CalendarBackButton";
 
 const avatarLabels: Record<AvatarKey, string> = {
   sky: "スカイ",
@@ -62,14 +62,7 @@ export default function EditUserPage() {
   return (
     <main className="min-h-screen bg-[#f7f9fc] px-4 py-8 sm:px-6 sm:py-12">
       <section className="mx-auto w-full max-w-xl rounded-3xl border border-white bg-white p-6 shadow-[0_18px_50px_rgba(31,73,125,0.12)] sm:p-8">
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="flex items-center gap-1 text-sm font-medium text-[#5f6b7a] hover:text-[#111827]"
-        >
-          <ArrowBackRoundedIcon fontSize="small" />
-          カレンダーに戻る
-        </button>
+        <CalendarBackButton onClick={() => navigate("/dashboard")} />
 
         <h1 className="mt-6 text-2xl font-bold text-[#111827]">
           プロフィールを編集

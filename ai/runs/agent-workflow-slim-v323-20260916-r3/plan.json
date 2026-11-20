@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 2,
+  "planId": "agent-workflow-slim-v323-20260916-r3",
+  "runId": "agent-workflow-slim-v323-20260916-r3",
+  "objective": "AI runフローを簡素化・run単位化し、隔離実装から品質確認、feature branchのpush、同一SHA CI PASS、通常PR作成までをAIのPhase 5責務として機械的に完了できるようにする。レビューとmergeは人間専用とする。",
+  "assumptions": [],
+  "openDecisions": [],
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "run単位path整理",
+      "objective": "runごとの箱に分ける",
+      "allowedPaths": [
+        ".agents/**"
+      ],
+      "qualityGates": [
+        "typecheck",
+        "test"
+      ],
+      "acceptanceCriteria": [
+        "run単位になる"
+      ],
+      "stopConditions": [
+        "不一致"
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "canonical整備",
+      "objective": "正本を一つにする",
+      "allowedPaths": [
+        ".agents/**",
+        "ai/**"
+      ],
+      "qualityGates": [
+        "typecheck",
+        "test"
+      ],
+      "acceptanceCriteria": [
+        "canonicalを使う"
+      ],
+      "stopConditions": [
+        "不一致"
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "公開条件",
+      "objective": "公開条件を確認する",
+      "allowedPaths": [
+        ".agents/**"
+      ],
+      "qualityGates": [
+        "typecheck",
+        "test"
+      ],
+      "acceptanceCriteria": [
+        "証跡を残す"
+      ],
+      "stopConditions": [
+        "失敗"
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "移行経路",
+      "objective": "古いrunを安全に扱う",
+      "allowedPaths": [
+        ".agents/**",
+        "ai/**"
+      ],
+      "qualityGates": [
+        "typecheck",
+        "test"
+      ],
+      "acceptanceCriteria": [
+        "旧記録を壊さない"
+      ],
+      "stopConditions": [
+        "上書き"
+      ]
+    },
+    {
+      "id": "phase-5",
+      "name": "公開",
+      "objective": "pushとPRを検証する",
+      "allowedPaths": [
+        ".agents/**"
+      ],
+      "qualityGates": [
+        "typecheck",
+        "test"
+      ],
+      "acceptanceCriteria": [
+        "PRを作成する"
+      ],
+      "stopConditions": [
+        "不一致"
+      ]
+    }
+  ],
+  "allowedPaths": [
+    ".agents/**",
+    "ai/**",
+    "human/**",
+    "codx/**",
+    ".dockerignore",
+    "AGENTS.md",
+    "package.json",
+    "tools/**",
+    "tsconfig.tools.json",
+    "vitest.config.ts"
+  ],
+  "forbiddenPaths": [
+    ".git/**",
+    ".env*",
+    "main",
+    "docs/agent-runs/**"
+  ],
+  "apiChanges": [],
+  "dbChanges": [],
+  "dependencyChanges": [],
+  "permissionChanges": [],
+  "secretChanges": [],
+  "externalSideEffects": [],
+  "qualityGates": [
+    "Node22 typecheck/test",
+    "Project Rules PASS"
+  ],
+  "failurePolicy": "stop",
+  "limits": {
+    "maxRetries": 3,
+    "maxDurationMinutes": 120,
+    "maxCostYen": 0
+  },
+  "branch": {
+    "source": "feature/v3.2.3",
+    "worktree": "run",
+    "mode": "pull_request"
+  },
+  "acceptanceCriteria": [
+    "Phase 5まで公開状態を検証する"
+  ]
+}

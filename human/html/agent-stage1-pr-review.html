@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Canonical Plan Stage 1 実装レビュー</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <p class="doc-eyebrow">AI Agent Safety / Stage 1</p>
+        <h1>Canonical Plan生成と<br />承認検証を導入</h1>
+        <p>
+          自由記述の計画を型付きplanへ移し、同じ入力からレビュー資料と実装指示を生成します。承認hash・期限・artifact整合が成立しない場合は、Git操作前に開始を拒否します。
+        </p>
+      </header>
+      <section class="doc-section">
+        <h2>判断サマリー</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>品質 PASS</strong>
+            <p>Node 22.23.1、型検査、全Unit 285件、書式確認が成功。</p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>リスク HIGH</strong>
+            <p>
+              開発開始契約をv2へ変更。v1は新規拒否し、completed
+              recordだけ履歴互換。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>アプリ影響なし</strong>
+            <p>DB・API・認証・UI・依存・CIは変更していません。</p>
+          </article>
+        </div>
+      </section>
+      <section class="doc-section">
+        <h2>処理フロー</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">plan input</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">Zod・hash</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">JSON／HTML／MD</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">approval</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">start v2</div>
+        </div>
+        <div class="alert-warning">
+          <strong>暫定境界:</strong> worktree隔離、state machine、trusted
+          runnerはStage 2以降であり、現時点では版branch上で実装します。
+        </div>
+      </section>
+      <section class="doc-section">
+        <h2>Phase別変更</h2>
+        <div class="doc-phase">
+          <span class="doc-phase-number">1</span>
+          <div>
+            <strong>Schema・hash</strong
+            ><br />計画判断、path、上限、決定的hashを検証。
+          </div>
+        </div>
+        <div class="doc-phase">
+          <span class="doc-phase-number">2</span>
+          <div>
+            <strong>Generator</strong><br />同一view
+            modelからJSON、HTML、Markdownを生成。
+          </div>
+        </div>
+        <div class="doc-phase">
+          <span class="doc-phase-number">3</span>
+          <div>
+            <strong>Approval・start v2</strong><br />最大7日の承認と3
+            artifactの一致をGit操作前に検証。
+          </div>
+        </div>
+        <div class="doc-phase">
+          <span class="doc-phase-number">4</span>
+          <div>
+            <strong>開発フロー接続</strong><br />役割文書と開始契約をcanonical
+            planへ移行。
+          </div>
+        </div>
+      </section>
+      <section class="doc-section">
+        <h2>品質証跡</h2>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>確認</th>
+              <th>結果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>format:check</td>
+              <td>PASS</td>
+            </tr>
+            <tr>
+              <td>typecheck</td>
+              <td>PASS</td>
+            </tr>
+            <tr>
+              <td>Vitest</td>
+              <td>285 PASS</td>
+            </tr>
+            <tr>
+              <td>DB Integration／E2E</td>
+              <td>アプリ・DB不変のため不要</td>
+            </tr>
+            <tr>
+              <td>未分類diff</td>
+              <td>0 / 30 hunk</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="doc-section" id="step-diff">
+        <h2>全差分</h2>
+        <p>
+          全20ファイル・30
+          hunkの原本を省略せず保存しています。レビュー時は分類表と原本を併読してください。
+        </p>
+        <p>
+          <a href="../task-full.diff">完全なbinary/full-index diffを開く</a> /
+          <a href="../agent-stage1-classification.md">Phase別分類を開く</a>
+        </p>
+        <div class="alert-info">
+          原本SHA-256:
+          <code
+            >c5c6f748c02930ab1bd40f02ae904642496c9a4a2b9cf257779ddba157e5d283</code
+          >
+        </div>
+      </section>
+      <section class="doc-section">
+        <h2>Rollback</h2>
+        <p>
+          対象commitを通常revertします。reset、force push、remote
+          branch削除は行いません。生成された非追跡run資料は自動削除しません。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

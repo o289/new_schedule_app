@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -19,7 +20,13 @@ import {
   groups,
 } from "./features/group/model";
 import { scheduleDates, schedules } from "./features/schedule/model";
+import { todos } from "./features/todo/model";
 import { authSessions } from "./features/auth-session/model";
+import {
+  emailDeliveryLogs,
+  emailNotificationPreferences,
+  emailNotificationWeekdayRules,
+} from "./features/email-notification/model";
 import { users } from "./features/user/model";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -114,10 +121,15 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     insert: Function;
     select: Function;
     delete: Function;
+    update: Function;
   };
   let closeDatabase: () => Promise<void>;
+  let EmailNotificationRepository: typeof import("./features/email-notification/repository").EmailNotificationRepository;
+  let ScheduleRepository: typeof import("./features/schedule/repository").ScheduleRepository;
   let GroupRepository: typeof import("./features/group/repository").GroupRepository;
   let GroupCalendarRepository: typeof import("./features/group/calendar-repository").GroupCalendarRepository;
+  let runDailyEmailOnce: typeof import("./workers/daily-email").runDailyEmailOnce;
+  let FakeEmailProvider: typeof import("./features/email-notification/provider").FakeEmailProvider;
 
   beforeAll(async () => {
     if (!testDatabaseUrl) {
@@ -138,6 +150,9 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     const database = await import("./database/client");
     db = database.db;
     closeDatabase = database.closeDatabase;
+    ({ EmailNotificationRepository } =
+      await import("./features/email-notification/repository"));
+    ({ ScheduleRepository } = await import("./features/schedule/repository"));
     await migrate(db as never, {
       migrationsFolder: resolve(import.meta.dirname, "../../drizzle"),
     });
@@ -145,12 +160,468 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
     ({ GroupRepository } = await import("./features/group/repository"));
     ({ GroupCalendarRepository } =
       await import("./features/group/calendar-repository"));
+    ({ runDailyEmailOnce } = await import("./workers/daily-email"));
+    ({ FakeEmailProvider } =
+      await import("./features/email-notification/provider"));
     app = (await import("./app")).app;
   });
 
   beforeEach(async () => {
     await db.execute(sql`TRUNCATE TABLE groups, users CASCADE`);
     vi.clearAllMocks();
+  });
+
+  it("refreshの期限切れ専用codeを実DB rowだけに返す", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "refresh-expiry@example.com", name: "refresh expiry" })
+      .returning();
+    if (!user) throw new Error("refresh expiry user was not created");
+
+    const expiredToken = "integration-expired-refresh-token";
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: createHash("sha256")
+        .update(expiredToken)
+        .digest("hex"),
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    const expiredResponse = await post(app, "/auth/refresh", {
+      refresh_token: expiredToken,
+    });
+    expect(expiredResponse.status).toBe(401);
+    await expect(expiredResponse.json()).resolves.toEqual({
+      code: "REFRESH_TOKEN_EXPIRED",
+    });
+
+    const revokedToken = "integration-revoked-refresh-token";
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: createHash("sha256")
+        .update(revokedToken)
+        .digest("hex"),
+      expiresAt: new Date(Date.now() - 1),
+      revokedAt: new Date(),
+    });
+    const revokedResponse = await post(app, "/auth/refresh", {
+      refresh_token: revokedToken,
+    });
+    expect(revokedResponse.status).toBe(401);
+    await expect(revokedResponse.json()).resolves.toEqual({
+      code: "INVALID_REFRESH_TOKEN",
+    });
+  });
+
+  it("schedule重複上書き設定をfalse既定で保存・更新する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "schedule-overwrite@example.com", name: "overwrite" })
+      .returning();
+    if (!user) throw new Error("schedule test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({
+        userId: user.id,
+        name: "重複上書きテスト",
+        color: "blue",
+        icon: "tag",
+      })
+      .returning();
+    if (!category) throw new Error("schedule test category was not created");
+
+    const repository = new ScheduleRepository(db as never);
+    const created = await repository.create(
+      {
+        title: "上書き設定テスト",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-21T10:00:00",
+            endDate: "2026-10-21T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    expect(created.allowOverwrite).toBe(false);
+
+    await expect(
+      repository.update(created.id, { allowOverwrite: true }, user.id),
+    ).resolves.toMatchObject({ allowOverwrite: true });
+    await expect(repository.get(created.id)).resolves.toMatchObject({
+      allowOverwrite: true,
+    });
+  });
+
+  it("新規予定だけが許可済み予定の重複日行を置き換え、失敗時は全件保持する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: "schedule-overwrite-flow@example.com",
+        name: "overwrite",
+      })
+      .returning();
+    if (!user) throw new Error("schedule test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({
+        userId: user.id,
+        name: "重複上書きフロー",
+        color: "blue",
+        icon: "tag",
+      })
+      .returning();
+    if (!category) throw new Error("schedule test category was not created");
+
+    const repository = new ScheduleRepository(db as never);
+    const oldSchedule = await repository.create(
+      {
+        title: "既存の複数日予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-21T10:00:00",
+            endDate: "2026-10-21T11:00:00",
+          },
+          {
+            startDate: "2026-10-22T10:00:00",
+            endDate: "2026-10-22T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const newSchedule = await repository.create(
+      {
+        title: "後発予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-21T10:30:00",
+            endDate: "2026-10-21T11:30:00",
+          },
+        ],
+      },
+      user.id,
+    );
+
+    await expect(repository.get(oldSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-22T10:00:00",
+          endDate: "2026-10-22T11:00:00",
+        },
+      ],
+    });
+    await expect(repository.get(newSchedule.id)).resolves.toMatchObject({
+      title: "後発予定",
+    });
+
+    const protectedSchedule = await repository.create(
+      {
+        title: "上書き不可",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-23T10:00:00",
+            endDate: "2026-10-23T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const overwriteSchedule = await repository.create(
+      {
+        title: "混在する上書き可能予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-24T10:00:00",
+            endDate: "2026-10-24T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(
+      repository.create(
+        {
+          title: "拒否される後発",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-23T10:30:00",
+              endDate: "2026-10-23T11:30:00",
+            },
+            {
+              startDate: "2026-10-24T10:30:00",
+              endDate: "2026-10-24T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ).rejects.toThrow("SCHEDULE_TIME_OVERLAP");
+    await expect(repository.get(protectedSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-23T10:00:00",
+          endDate: "2026-10-23T11:00:00",
+        },
+      ],
+    });
+    await expect(repository.get(overwriteSchedule.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-24T10:00:00",
+          endDate: "2026-10-24T11:00:00",
+        },
+      ],
+    });
+
+    const emptyAfterOverwrite = await repository.create(
+      {
+        title: "全日上書きされる予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-25T10:00:00",
+            endDate: "2026-10-25T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await db.insert(todos).values({
+      scheduleId: emptyAfterOverwrite.id,
+      title: "cascade確認",
+    });
+    await repository.create(
+      {
+        title: "後発で全日置換",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-25T10:30:00",
+            endDate: "2026-10-25T11:30:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(repository.get(emptyAfterOverwrite.id)).resolves.toBeNull();
+    const [remainingTodos] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(todos)
+      .where(eq(todos.scheduleId, emptyAfterOverwrite.id));
+    expect(remainingTodos?.count).toBe(0);
+
+    const rollbackCandidate = await repository.create(
+      {
+        title: "失敗時に維持される予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-26T10:00:00",
+            endDate: "2026-10-26T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    await expect(
+      repository.create(
+        {
+          title: "外部キーで失敗する後発",
+          categoryId: "99999999-9999-4999-8999-999999999999",
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-26T10:30:00",
+              endDate: "2026-10-26T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ).rejects.toMatchObject({ cause: { code: "23503" } });
+    await expect(repository.get(rollbackCandidate.id)).resolves.toMatchObject({
+      dates: [
+        {
+          startDate: "2026-10-26T10:00:00",
+          endDate: "2026-10-26T11:00:00",
+        },
+      ],
+    });
+
+    const concurrentCandidate = await repository.create(
+      {
+        title: "同時登録で置換される予定",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: true,
+        dates: [
+          {
+            startDate: "2026-10-27T10:00:00",
+            endDate: "2026-10-27T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const concurrentCreates = await Promise.allSettled(
+      ["同時登録A", "同時登録B"].map((title) =>
+        repository.create(
+          {
+            title,
+            categoryId: category.id,
+            isTentative: false,
+            allowOverwrite: false,
+            dates: [
+              {
+                startDate: "2026-10-27T10:30:00",
+                endDate: "2026-10-27T11:30:00",
+              },
+            ],
+          },
+          user.id,
+        ),
+      ),
+    );
+    expect(
+      concurrentCreates.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      concurrentCreates.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    await expect(repository.get(concurrentCandidate.id)).resolves.toBeNull();
+
+    const concurrentUpdateCandidate = await repository.create(
+      {
+        title: "設定更新と同時登録",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-28T10:00:00",
+            endDate: "2026-10-28T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const [updateResult, createResult] = await Promise.allSettled([
+      repository.update(
+        concurrentUpdateCandidate.id,
+        { allowOverwrite: true },
+        user.id,
+      ),
+      repository.create(
+        {
+          title: "更新と競合する予定",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-28T10:30:00",
+              endDate: "2026-10-28T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ]);
+    expect(updateResult.status).toBe("fulfilled");
+    if (createResult.status === "fulfilled") {
+      await expect(
+        repository.get(concurrentUpdateCandidate.id),
+      ).resolves.toBeNull();
+    } else {
+      expect(createResult.reason).toMatchObject({
+        message: "SCHEDULE_TIME_OVERLAP",
+      });
+      await expect(
+        repository.get(concurrentUpdateCandidate.id),
+      ).resolves.toMatchObject({ allowOverwrite: true });
+    }
+
+    const concurrentDeleteCandidate = await repository.create(
+      {
+        title: "削除と同時登録",
+        categoryId: category.id,
+        isTentative: false,
+        allowOverwrite: false,
+        dates: [
+          {
+            startDate: "2026-10-29T10:00:00",
+            endDate: "2026-10-29T11:00:00",
+          },
+        ],
+      },
+      user.id,
+    );
+    const [deleteResult, createWhileDeleting] = await Promise.allSettled([
+      repository.delete(concurrentDeleteCandidate.id, user.id),
+      repository.create(
+        {
+          title: "削除と競合する予定",
+          categoryId: category.id,
+          isTentative: false,
+          allowOverwrite: false,
+          dates: [
+            {
+              startDate: "2026-10-29T10:30:00",
+              endDate: "2026-10-29T11:30:00",
+            },
+          ],
+        },
+        user.id,
+      ),
+    ]);
+    expect(deleteResult).toMatchObject({
+      status: "fulfilled",
+      value: true,
+    });
+    await expect(
+      repository.get(concurrentDeleteCandidate.id),
+    ).resolves.toBeNull();
+    const remainingAfterDeleteRace = (await repository.getByUser(user.id))
+      .flatMap((schedule) => schedule.dates)
+      .filter(
+        (date) =>
+          date.startDate < "2026-10-29T11:30:00" &&
+          date.endDate > "2026-10-29T10:30:00",
+      );
+    if (createWhileDeleting.status === "fulfilled") {
+      expect(remainingAfterDeleteRace).toHaveLength(1);
+    } else {
+      expect(createWhileDeleting.reason).toMatchObject({
+        message: "SCHEDULE_TIME_OVERLAP",
+      });
+      expect(remainingAfterDeleteRace).toHaveLength(0);
+    }
   });
 
   afterAll(async () => {
@@ -855,5 +1326,210 @@ describe.skipIf(!testDatabaseUrl)("認証API統合テスト", () => {
       method: "DELETE",
     });
     expect(deleted.status).toBe(204);
+  });
+
+  it("通知設定は未設定なら安全な既定値を返す", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "notification-default@example.com", name: "Default" })
+      .returning();
+    if (!user) throw new Error("通知設定テストユーザーを作成できません");
+
+    const settings = await new EmailNotificationRepository().getByUser(user.id);
+
+    expect(settings).toEqual({
+      globalEnabled: false,
+      timezone: "Asia/Tokyo",
+      weekdays: Array.from({ length: 7 }, (_, index) => ({
+        dayOfWeek: index + 1,
+        enabled: false,
+        deliveryTime: "09:00",
+      })),
+    });
+  });
+
+  it("通知設定は7曜日を一つのtransactionで置き換える", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "notification-update@example.com", name: "Update" })
+      .returning();
+    if (!user) throw new Error("通知設定テストユーザーを作成できません");
+
+    const settings = await new EmailNotificationRepository().replace(user.id, {
+      globalEnabled: true,
+      timezone: "Asia/Tokyo",
+      weekdays: Array.from({ length: 7 }, (_, index) => ({
+        dayOfWeek: index + 1,
+        enabled: index === 0,
+        deliveryTime: "07:30",
+      })),
+    });
+
+    expect(settings.globalEnabled).toBe(true);
+    expect(settings.weekdays).toHaveLength(7);
+    expect(settings.weekdays[0]).toMatchObject({
+      dayOfWeek: 1,
+      enabled: true,
+      deliveryTime: "07:30",
+    });
+  });
+
+  it("workerは有効sessionとJST当日予定を確認して一度だけ送信する", async () => {
+    const [user] = await db
+      .insert(users)
+      .values({ email: "worker@example.com", name: "Worker" })
+      .returning();
+    if (!user) throw new Error("worker test user was not created");
+    const [category] = await db
+      .insert(categoryTable)
+      .values({ userId: user.id, name: "仕事" })
+      .returning();
+    if (!category) throw new Error("worker test category was not created");
+    const [schedule] = await db
+      .insert(schedules)
+      .values({
+        userId: user.id,
+        categoryId: category.id,
+        title: "朝の予定",
+        isTentative: false,
+      })
+      .returning();
+    if (!schedule) throw new Error("worker test schedule was not created");
+    await db.insert(scheduleDates).values({
+      scheduleId: schedule.id,
+      startDate: "2026-09-15T23:30:00",
+      endDate: "2026-09-16T10:00:00",
+    });
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: "worker-test-refresh-token-digest",
+      expiresAt: new Date("2026-09-17T00:00:00.000Z"),
+    });
+    await db.insert(emailNotificationPreferences).values({
+      userId: user.id,
+      globalEnabled: true,
+      timezone: "Asia/Tokyo",
+    });
+    await db.insert(emailNotificationWeekdayRules).values(
+      Array.from({ length: 7 }, (_, index) => ({
+        userId: user.id,
+        dayOfWeek: index + 1,
+        enabled: index === 2,
+        deliveryTime: "09:00",
+      })),
+    );
+
+    const provider = new FakeEmailProvider();
+    const summaries = await Promise.all(
+      [
+        new EmailNotificationRepository(),
+        new EmailNotificationRepository(),
+      ].map((repository) =>
+        runDailyEmailOnce({
+          repository,
+          provider,
+          now: () => new Date("2026-09-16T00:05:00.000Z"),
+        }),
+      ),
+    );
+    const first = summaries[0]!;
+    const second = summaries[1]!;
+
+    expect(
+      [first, second].filter((summary) => summary.sent === 1),
+    ).toHaveLength(1);
+    expect(first.claimed + second.claimed).toBe(1);
+    expect(provider.messages).toHaveLength(1);
+    expect(provider.messages[0]?.subject).toBe("2026年9月16日（水）の予定");
+
+    const repository = new EmailNotificationRepository();
+    await db.insert(emailDeliveryLogs).values({
+      userId: user.id,
+      localDate: "2026-09-17",
+      status: "pending",
+      attemptCount: 1,
+    });
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-17",
+        new Date("2026-09-16T00:05:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
+
+    await db
+      .update(authSessions)
+      .set({ revokedAt: new Date("2026-09-16T00:06:00.000Z") })
+      .where(eq(authSessions.userId, user.id));
+    await expect(
+      repository.hasActiveSession(
+        user.id,
+        new Date("2026-09-16T00:07:00.000Z"),
+      ),
+    ).resolves.toBe(false);
+
+    await db.insert(authSessions).values({
+      userId: user.id,
+      refreshTokenDigest: "worker-test-expired-refresh-token-digest",
+      expiresAt: new Date("2026-09-16T00:07:00.000Z"),
+    });
+    await expect(
+      repository.hasActiveSession(
+        user.id,
+        new Date("2026-09-16T00:07:00.000Z"),
+      ),
+    ).resolves.toBe(false);
+
+    await db.insert(emailDeliveryLogs).values([
+      {
+        userId: user.id,
+        localDate: "2026-09-18",
+        status: "failed",
+        attemptCount: 3,
+        lastError: "temporary",
+      },
+      {
+        userId: user.id,
+        localDate: "2026-09-19",
+        status: "failed",
+        attemptCount: 1,
+        lastError: "quota",
+      },
+    ]);
+    await db.insert(emailDeliveryLogs).values({
+      userId: user.id,
+      localDate: "2026-09-20",
+      status: "pending",
+      attemptCount: 1,
+    });
+    await repository.markFailed(
+      user.id,
+      "2026-09-20",
+      new Date("2026-09-16T00:08:00.000Z"),
+      "permanent",
+    );
+    const [permanentFailure] = await db
+      .select({ attemptCount: emailDeliveryLogs.attemptCount })
+      .from(emailDeliveryLogs)
+      .where(eq(emailDeliveryLogs.localDate, "2026-09-20"));
+    expect(permanentFailure?.attemptCount).toBe(1);
+
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-18",
+        new Date("2026-09-16T00:07:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      repository.claim(
+        user.id,
+        "2026-09-19",
+        new Date("2026-09-16T00:07:00.000Z"),
+        3,
+      ),
+    ).resolves.toBe(false);
   });
 });

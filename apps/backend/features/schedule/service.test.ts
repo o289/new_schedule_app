@@ -51,6 +51,7 @@ describe("ScheduleService", () => {
       title: "A",
       categoryId: category.id,
       isTentative: false,
+      allowOverwrite: false,
       dates: [
         {
           startDate: "2026-03-10T22:00:00",
@@ -66,14 +67,15 @@ describe("ScheduleService", () => {
   });
 
   it("ほかの予定と重なる日時は作成しない", async () => {
-    const hasOverlappingDate = vi.fn().mockResolvedValue(true);
-    const { service, repository } = createService({ hasOverlappingDate });
+    const create = vi.fn().mockRejectedValue({ cause: { code: "23P01" } });
+    const { service, repository } = createService({ create });
 
     await expect(
       service.createSchedule(user, {
         title: "A",
         categoryId: category.id,
         isTentative: false,
+        allowOverwrite: false,
         dates: [
           {
             startDate: "2026-03-12T15:00:00",
@@ -86,13 +88,17 @@ describe("ScheduleService", () => {
       status: 409,
     });
 
-    expect(hasOverlappingDate).toHaveBeenCalledWith(
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dates: [
+          {
+            startDate: "2026-03-12T15:00:00",
+            endDate: "2026-03-12T16:00:00",
+          },
+        ],
+      }),
       user.id,
-      "2026-03-12T15:00:00",
-      "2026-03-12T16:00:00",
-      undefined,
     );
-    expect(repository.create).not.toHaveBeenCalled();
   });
 
   it("同じ登録内容内で重なる日時は作成しない", async () => {
@@ -103,6 +109,7 @@ describe("ScheduleService", () => {
         title: "A",
         categoryId: category.id,
         isTentative: false,
+        allowOverwrite: false,
         dates: [
           {
             startDate: "2026-03-12T14:00:00",
@@ -128,6 +135,7 @@ describe("ScheduleService", () => {
       title: "A",
       categoryId: category.id,
       isTentative: false,
+      allowOverwrite: false,
       dates: [
         {
           startDate: "2026-03-12T14:00:00",
@@ -197,6 +205,7 @@ describe("ScheduleService", () => {
         title: "A",
         categoryId: category.id,
         isTentative: false,
+        allowOverwrite: false,
         dates: [
           {
             startDate: "2026-03-12T15:00:00",
@@ -211,14 +220,15 @@ describe("ScheduleService", () => {
   });
 
   it("仮押さえも本登録と同じ時間重複ルールに従う", async () => {
-    const hasOverlappingDate = vi.fn().mockResolvedValue(true);
-    const { service, repository } = createService({ hasOverlappingDate });
+    const create = vi.fn().mockRejectedValue({ cause: { code: "23P01" } });
+    const { service, repository } = createService({ create });
 
     await expect(
       service.createSchedule(user, {
         title: "仮押さえ",
         categoryId: category.id,
         isTentative: true,
+        allowOverwrite: false,
         dates: [
           {
             startDate: "2026-03-12T15:00:00",
@@ -231,6 +241,9 @@ describe("ScheduleService", () => {
       status: 409,
     });
 
-    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ isTentative: true }),
+      user.id,
+    );
   });
 });

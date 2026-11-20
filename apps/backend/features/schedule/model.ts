@@ -32,6 +32,8 @@ export const schedules = pgTable(
 
     isTentative: boolean("is_tentative").notNull().default(false),
 
+    allowOverwrite: boolean("allow_overwrite").notNull().default(false),
+
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, {

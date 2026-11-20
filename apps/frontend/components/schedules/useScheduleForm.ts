@@ -22,6 +22,7 @@ const initialSchedule: ScheduleForm = {
   dates: [],
   categoryId: "",
   isTentative: false,
+  allowOverwrite: false,
 };
 
 export function useScheduleForm() {

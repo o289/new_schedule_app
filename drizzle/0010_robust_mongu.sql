@@ -1,0 +1,1 @@
+ALTER TABLE "schedules" ADD COLUMN "allow_overwrite" boolean DEFAULT false NOT NULL;

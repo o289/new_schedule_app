@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI実行フロー リファクタ提案</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <section class="doc-hero">
+        <p class="doc-eyebrow">Run Flow Audit / 2026-09-16</p>
+        <h1>AI実行フローの<br />リファクタ提案</h1>
+        <p>
+          調査対象は、計画を作り、承認し、実装を始めるまでの流れです。今回の停止原因と、次のrunを安全に始めるための整理案を、実際のファイルから説明します。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>結論</h2>
+        <div class="alert-danger">
+          <strong>一文でいうと:</strong>
+          runごとの箱と、全員で使う1枚の用紙が混ざっているため、古いrunが新しいrunの開始を止めています。
+        </div>
+        <p>
+          安全のために上書きを拒否する仕組みは正しいです。ただし、共有ファイルをrunごとの箱へ移し、runIdから場所を一つに決める必要があります。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>1. 小学生向けのたとえ</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>今の状態：共有の提出箱</strong>
+            <p>
+              クラスのみんなが使う「提出しました」という紙が1枚だけあります。太郎くんが提出した後、花子さんが新しい紙を置こうとすると、「もう紙があります」と止まります。前のrunを消さない安全策が、次のrunとぶつかります。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>提案：児童ごとのランドセル</strong>
+            <p>
+              runIdごとにランドセル（専用フォルダ）を用意します。計画、承認、開始、検証の記録を同じランドセルへ入れれば、別のrunと混ざりません。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>2. 現在の流れ</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge">計画</span>
+            <h3>agent-plan-input.json</h3>
+            <p>共有入力</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">生成</span>
+            <h3>agent-plan-generate</h3>
+            <p>runIdの箱を作る</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">計画箱</span>
+            <h3>docs/agent-runs/&lt;runId&gt;</h3>
+            <p>run専用</p>
+          </div>
+        </div>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge">承認</span>
+            <h3>agent-plan-approval-input.json</h3>
+            <p>共有入力</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">承認記録</span>
+            <h3>approval.json</h3>
+            <p>run専用</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">開始</span>
+            <h3>pr-agent-start-input.json</h3>
+            <p>共有入力</p>
+          </div>
+        </div>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-danger">衝突点</span>
+            <h3>docs/pr-agent-start-record.json</h3>
+            <p>全runで共有</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">作業印</span>
+            <h3>.agent-runs/worktrees/&lt;runId&gt;/.agent-run-marker.json</h3>
+            <p>run専用</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">状態記録</span>
+            <h3>.agent-runs/&lt;runId&gt;/events.jsonl</h3>
+            <p>run専用</p>
+          </div>
+        </div>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>ファイル・場所</th>
+                <th>役割</th>
+                <th>種類</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>docs/agent-plan-input.json</td>
+                <td>generatorが固定で読む計画入力</td>
+                <td><span class="doc-badge-status-warning">共有</span></td>
+              </tr>
+              <tr>
+                <td>docs/agent-runs/&lt;runId&gt;/</td>
+                <td>plan、HTML、MD、manifest</td>
+                <td><span class="doc-badge-status-success">run専用</span></td>
+              </tr>
+              <tr>
+                <td>docs/agent-plan-approval-input.json</td>
+                <td>approval toolが固定で読む入力</td>
+                <td><span class="doc-badge-status-warning">共有</span></td>
+              </tr>
+              <tr>
+                <td>docs/pr-agent-start-input.json</td>
+                <td>start toolが固定で読む入力</td>
+                <td><span class="doc-badge-status-warning">共有</span></td>
+              </tr>
+              <tr>
+                <td>docs/pr-agent-start-record.json</td>
+                <td>
+                  mainが最初に<code>wx</code>で作り、既存なら計画・hash・Git検証より前に停止する開始記録
+                </td>
+                <td><span class="doc-badge-status-danger">global共有</span></td>
+              </tr>
+              <tr>
+                <td>
+                  .agent-runs/worktrees/&lt;runId&gt;/.agent-run-marker.json
+                </td>
+                <td>worktreeの身元を示すmarker</td>
+                <td>
+                  <span class="doc-badge-status-success">run専用runtime</span>
+                </td>
+              </tr>
+              <tr>
+                <td>.agent-runs/&lt;runId&gt;/events.jsonl</td>
+                <td>状態を導出するevent log、lock、証跡</td>
+                <td>
+                  <span class="doc-badge-status-success">run専用runtime</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>3. 今回止まった直接原因</h2>
+        <div class="doc-phase">
+          <div class="doc-phase-number">1</div>
+          <div>
+            <h3>mainが最初に固定ファイルを開く</h3>
+            <p>
+              <code>tools/pr-agent-start.ts</code
+              >のmainは、<code>startTaskV2</code>の計画・hash・Git検証より先に<code>docs/pr-agent-start-record.json</code>を<code
+                >open(..., "wx")</code
+              >で作ります。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">2</div>
+          <div>
+            <h3>既存ならその場で停止する</h3>
+            <p>
+              書き込みflagが<code>wx</code>なので、同じファイルがすでにあると、計画・hash・Git検証より前に失敗します。別runの完了記録でも、現在runの開始を止めます。
+            </p>
+          </div>
+        </div>
+        <div class="alert-warning">
+          <strong>安全面:</strong>
+          古い記録を自動削除しない判断は正しいです。しかし保存先がglobal（全run共通）なので、run単位の安全設計と衝突しています。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>4. 根本原因</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>共有入力が複数ある</strong>
+            <p>
+              計画、承認、開始、agent-run
+              commandがそれぞれ固定pathのJSONです。入力を差し替える順番とrunIdを人がそろえる必要があります。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>記録の場所が分散する</strong>
+            <p>
+              計画成果物は<code>docs/agent-runs</code>、runtime状態は<code>.agent-runs</code>、開始記録は<code>docs</code>直下です。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>run専用とglobalが混ざる</strong>
+            <p>
+              runId付きの箱がある一方、start
+              recordは1枚だけです。完了済みrunが次runの入口を占有します。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>CLIが引数を受け取らない</strong>
+            <p>
+              generator、start、agent-run
+              commandは入力pathやrunIdを引数で渡せず、固定ファイルを順番に編集する運用になります。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>責務が重なっている</strong>
+            <p>
+              入力、生成物、承認、開始、runtime証跡を異なる場所で扱うため、ハッシュとpathを何度も手で準備します。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>文書とプログラムの二重ルール</strong>
+            <p>
+              AGENTS・codx/READMEとZod
+              schema・wrapperの両方が工程を説明します。片方だけ更新すると、実際の動きと説明がずれます。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>5. 良い点は残す</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>fail-closed</strong>
+            <p>分からない状態では止まる。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>hash照合</strong>
+            <p>別の計画を取り違えにくい。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>wx</strong>
+            <p>古い記録を上書きしない。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>marker</strong>
+            <p>worktreeの身元を確認する。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>append-only log</strong>
+            <p>eventsを後から書き換えにくい。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>秘密伏字</strong>
+            <p>証跡へ秘密を残さない。</p>
+          </article>
+        </div>
+        <p>
+          提案は安全機能を消すものではありません。共有部分をrun単位へ移し、安全な拒否をそのまま残します。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>6. 推奨リファクタ</h2>
+        <div class="alert-success">
+          <strong>run workspaceを単一入口にする:</strong>
+          <code>docs/agent-runs/&lt;runId&gt;</code
+          >（計画資料）と<code>.agent-runs/&lt;runId&gt;</code>（runtime）を1対1で結び、runIdから全pathを自動導出します。
+        </div>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>run単位の記録</th>
+                <th>保存方針</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>plan.source.json</td>
+                <td>入力の正本。sanitizedならGit追跡を検討</td>
+              </tr>
+              <tr>
+                <td>plan.json／plan-review.html／agent-plan.md</td>
+                <td>同じplanから生成</td>
+              </tr>
+              <tr>
+                <td>approval.json／start.json</td>
+                <td>run専用。global start recordを廃止</td>
+              </tr>
+              <tr>
+                <td>events.jsonl／evidence/</td>
+                <td>runtime証跡。保存期間と秘密伏字を定義</td>
+              </tr>
+              <tr>
+                <td>manifest.json</td>
+                <td>全artifactとhashの一覧</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>7. CLIと状態機械</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge">create</span>
+            <h3>agent run create &lt;runId&gt;</h3>
+            <p>run箱とlockを準備</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">approve</span>
+            <h3>agent run approve &lt;runId&gt;</h3>
+            <p>同じ箱を検証</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">start</span>
+            <h3>agent run start &lt;runId&gt;</h3>
+            <p>pathを内部導出</p>
+          </div>
+        </div>
+        <div class="doc-flow">
+          <div class="doc-flow-node">
+            <span class="doc-badge">DRAFT</span>
+            <p>計画作成</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-success">APPROVED</span>
+            <p>承認済み</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">READY</span>
+            <p>準備完了</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-special">RUNNING</span>
+            <p>実装中</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge">VERIFYING</span>
+            <p>品質確認</p>
+          </div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">
+            <span class="doc-badge-status-success">COMPLETED</span>
+            <p>完了</p>
+          </div>
+        </div>
+        <p>
+          例外は<code>REPLAN_REQUIRED</code>（計画を作り直す）、<code>INFRA_BLOCKED</code>（環境問題）、<code>QUARANTINED</code>（安全隔離）に絞ります。状態はeventsから導出し、AIや人が状態ファイルを直接編集しません。
+        </p>
+        <div class="alert-info">
+          <strong>CLIのルール:</strong>
+          runIdだけを受け取り、内部でpathを決めます。任意path、任意shell、任意のglobal
+          record名は受け付けません。同一runのlockと、版branch昇格時だけ必要な別lockを使います。active-run
+          registry（全run一覧）は、同一版branchで同時runを禁止する必要がなければ作らない簡素案を推奨します。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>8. 削除・統合するもの</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>廃止・統合候補</th>
+                <th>残す安全機能</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>global docs/*-input.jsonをrun入力へ統合</td>
+                <td>schema検証、path traversal拒否</td>
+              </tr>
+              <tr>
+                <td>
+                  docs/pr-agent-start-record.jsonをrun専用start.jsonへ統合
+                </td>
+                <td>hash、approval期限、runId照合</td>
+              </tr>
+              <tr>
+                <td>固定pathを使う複数CLIを単一CLIへ統合</td>
+                <td>worktree marker、Git実体照合</td>
+              </tr>
+              <tr>
+                <td>docs/.agent-runsの責務をmanifestで1対1対応</td>
+                <td>
+                  append-only event log、path／dependency guard、fail-closed
+                  cleanup
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          完了済みrecordは削除せずarchive／read-onlyにします。global
+          recordの廃止は「履歴を消す」ことではありません。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>9. 移行フェーズ</h2>
+        <div class="doc-phase">
+          <div class="doc-phase-number">A</div>
+          <div>
+            <h3>現状可視化テスト</h3>
+            <p>
+              別run開始、完了済みrecord、同runId再生成、hash不一致を再現する。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">B</div>
+          <div>
+            <h3>run-scoped CLI／path</h3>
+            <p>
+              runIdから入力・成果物・approval・start・eventsの場所を導出する。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">C</div>
+          <div>
+            <h3>legacy read-only移行</h3>
+            <p>旧global recordは読み取り専用でarchiveし、新CLIから書かない。</p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">D</div>
+          <div>
+            <h3>global files廃止</h3>
+            <p>
+              固定入力とglobal start recordを停止し、run箱だけを入口にする。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">E</div>
+          <div>
+            <h3>docs整理</h3>
+            <p>計画資料、runtime証跡、Git追跡範囲を整理する。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>10. 実装前に人が決めること</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card doc-card-status-warning">
+            <strong>保存</strong>
+            <p>
+              計画HTML・sanitized
+              plan・runtime証跡をどこまでGitへ入れるか、保持期間は何日か。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>run</strong>
+            <p>
+              runIdの命名、同時runの可否、同じ版branchの昇格lockをどうするか。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>互換</strong>
+            <p>
+              旧形式を何日読み取り可能にするか。completed
+              recordをどこへarchiveするか。
+            </p>
+          </article>
+          <article class="doc-card doc-card-status-warning">
+            <strong>公開</strong>
+            <p>検証済みSHAを版branchへ昇格する条件と、証跡の保管先。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>11. 最小案と理想案</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>最小案</th>
+                <th>理想案</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>変更</td>
+                <td>start input／recordだけrun単位化</td>
+                <td>
+                  plan・approval・start・eventsをrun workspace＋単一CLIへ統合
+                </td>
+              </tr>
+              <tr>
+                <td>利点</td>
+                <td>変更が小さく、今回の衝突を早く解消</td>
+                <td>入力取り違え、path分散、CLI順序依存を根本から減らす</td>
+              </tr>
+              <tr>
+                <td>弱点</td>
+                <td>共有plan／approval入力が残る</td>
+                <td>中〜大規模。参照更新と移行テストが必要</td>
+              </tr>
+              <tr>
+                <td>推奨</td>
+                <td>緊急回避として採用可能</td>
+                <td>
+                  <span class="doc-badge-status-success">最終推奨</span
+                  >安全な自動化の完成形
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>くわしい人向け：確認した主な根拠</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>ファイル</th>
+                <th>確認した事実</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>tools/agent-plan-generate.ts</td>
+                <td>docs/agent-plan-input.jsonを固定読み込み</td>
+              </tr>
+              <tr>
+                <td>tools/agent-plan-approve.ts</td>
+                <td>
+                  docs/agent-plan-approval-input.jsonを固定読み込み、run箱へwx出力
+                </td>
+              </tr>
+              <tr>
+                <td>tools/pr-agent-start.ts</td>
+                <td>
+                  docs/pr-agent-start-input.jsonを読み、docs/pr-agent-start-record.jsonをwx作成
+                </td>
+              </tr>
+              <tr>
+                <td>tools/agent-run-command.ts</td>
+                <td>
+                  docs/agent-run-command.jsonを読み、.agent-runs/&lt;runId&gt;/events.jsonlを利用
+                </td>
+              </tr>
+              <tr>
+                <td>tools/agent-run/plan-render.ts</td>
+                <td>
+                  docs/agent-runs/&lt;runId&gt;へplan・HTML・MD・manifestを生成
+                </td>
+              </tr>
+              <tr>
+                <td>tools/agent-run/orchestrator.ts</td>
+                <td>
+                  docsのcanonical計画と、.agent-runsのmarker／eventsを別々に照合
+                </td>
+              </tr>
+              <tr>
+                <td>package.json／codx/README.md</td>
+                <td>固定CLI、固定path、品質・公開手順を記載</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>12. 過剰設計の洗い出し</h2>
+        <div class="alert-warning">
+          <strong>ファイルが多いと感じるのは正しいです。</strong
+          >ただし本質は数だけではありません。同じ判断や名前が、違う場所・違う役割へ散っていることが、間違えやすさを生んでいます。
+        </div>
+        <p>
+          たとえば遠足へ行くたびに、先生ごとに同じ名前・許可証・持ち物を別の紙へ何度も書く状態です。紙が多いことより、「どの紙が本物か分からない」ことが困ります。
+        </p>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>確認時点 2026-09-16</th>
+                <th>実測数</th>
+                <th>数え方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>ルートのAIフローMD／AGENTS類</td>
+                <td>10</td>
+                <td>
+                  リポジトリ直下の.mdファイル。AGENTS、役割文書、フロー・テンプレートを含む
+                </td>
+              </tr>
+              <tr>
+                <td>tools全体</td>
+                <td>58</td>
+                <td>tools配下の全ファイル</td>
+              </tr>
+              <tr>
+                <td>対応test</td>
+                <td>23</td>
+                <td>tools配下の*.test.ts</td>
+              </tr>
+              <tr>
+                <td>agent-plan系</td>
+                <td>4</td>
+                <td>tools直下のagent-plan*（TS・実行wrapper）</td>
+              </tr>
+              <tr>
+                <td>pr-agent系</td>
+                <td>6</td>
+                <td>tools直下のpr-agent*（TS・wrapper・test）</td>
+              </tr>
+              <tr>
+                <td>agent-run系</td>
+                <td>24</td>
+                <td>tools/agent-run配下の全ファイル</td>
+              </tr>
+              <tr>
+                <td>trusted-runner系</td>
+                <td>17</td>
+                <td>tools/trusted-runner配下の全ファイル</td>
+              </tr>
+              <tr>
+                <td>docs直下のJSON</td>
+                <td>9</td>
+                <td>docs直下の*.json。固定input・record・handoff等を含む</td>
+              </tr>
+              <tr>
+                <td>run専用runtime</td>
+                <td>
+                  marker、events.jsonl、lock、implementation／quality／safety／publication証跡
+                </td>
+                <td>.agent-runs/&lt;runId&gt;をコードとtestから確認</td>
+              </tr>
+              <tr>
+                <td>状態／action／分類／actor</td>
+                <td>15状態、10 action、4分類、4 actor（reason codeは13）</td>
+                <td>
+                  state-schema.ts、orchestrator.ts、failure-classifier.tsのenum・unionを数えた値
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>13. どこが重なっているか</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>手作業の重複</strong>
+            <p>
+              計画→承認→startでrunId、path、planHash、branch、SHAを入力へ転記します。generator・approval・start・orchestratorが同じ値をそれぞれ確認します。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>入口の重複</strong>
+            <p>
+              package script→shell wrapper→TS entrypoint→Zod
+              schema→別moduleという段数があります。固定pathのJSONも複数あります。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>二重root</strong>
+            <p>
+              計画成果物はdocs/agent-runs、markerとeventsは.agent-runsです。1つのrunなのに箱が2か所に分かれます。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>schemaの小さな負担</strong>
+            <p>
+              変更がないAPI・DB・依存なども、各change
+              listが最低1件必要です。NOT_APPLICABLEのダミーを毎回書きます。
+            </p>
+          </article>
+        </div>
+        <p class="doc-muted">
+          これらは、schema/hash/approval/start/publish/cleanupで同じrunId、path、hash、branch、SHAを複数の境界で再検証していることから確認できます。正確な総回数ではなく、複数の安全境界で反復していると捉えるのが適切です。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>14. 過剰設計候補</h2>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>優先度</th>
+                <th>候補</th>
+                <th>理由</th>
+                <th>扱い</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="doc-badge-status-danger">P0</span></td>
+                <td>global固定input／record＋run専用artifact</td>
+                <td>今回の衝突原因。共有紙と個人の箱が混在</td>
+                <td>共有JSONをrun単位へ統合</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-danger">P0</span></td>
+                <td>計画→承認→startのhash／path転記</td>
+                <td>人が同じ値を何度も写し、取り違える</td>
+                <td>runIdから内部導出</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>shell→TS→schema→別moduleの細切れCLI</td>
+                <td>薄いwrapperが段数と参照先を増やす</td>
+                <td>薄いwrapperは統合候補。ただし安全検査は残す</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>docs/agent-runsと.agent-runsの二重root</td>
+                <td>同じrunの資料と状態を探す場所が違う</td>
+                <td>1対1のrun workspaceへ整理</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>状態・遷移・actor・actionが多い</td>
+                <td>単純な実装ループが見えにくい</td>
+                <td>通常6＋例外3程度へ段階整理</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge-status-warning">P1</span></td>
+                <td>文書ルールとprogram ruleの重複</td>
+                <td>意図と強制の境界が曖昧</td>
+                <td>文書は意図、programは拒否条件へ</td>
+              </tr>
+              <tr>
+                <td><span class="doc-badge">P2</span></td>
+                <td>NOT_APPLICABLEダミー、manifest／record重複</td>
+                <td>変更なしでも記述量が増える</td>
+                <td>空配列許可・UI導出を検討</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>15. 過剰ではないので残すもの</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>plan hash</strong>
+            <p>別の計画を使わないため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>approval expiry</strong>
+            <p>古い承認を永久に使わないため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>allowed／forbidden paths</strong>
+            <p>触ってよい場所を狭めるため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>worktree marker</strong>
+            <p>違う作業場所を消さないため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>append-only event hash</strong>
+            <p>状態の後改ざんを見つけるため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>secret redaction</strong>
+            <p>証跡に秘密を残さないため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>production／force push拒否</strong>
+            <p>取り返しのつかない操作を止めるため。</p>
+          </article>
+          <article class="doc-card doc-card-status-success">
+            <strong>cleanup fail-closed</strong>
+            <p>条件が揃わない削除を止めるため。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>16. 削減の判断基準とスリム案</h2>
+        <div class="doc-grid doc-grid-two">
+          <article class="doc-card">
+            <strong>判断基準</strong>
+            <p>
+              1つの事実に正本は1つ。CLIはrunIdだけ。状態は人が意味を説明できる数。同じ検証はtrust
+              boundary（安全の境界）でだけ行う。文書は意図、programは強制に分ける。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>入口</strong>
+            <p>
+              <code>agent run &lt;command&gt; &lt;runId&gt;</code
+              >に統合し、内部でpathを導出します。任意path／shellは受けません。
+            </p>
+          </article>
+        </div>
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>今の流れ</th>
+                <th>スリム案</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  共有inputを編集 → 複数wrapper → 各moduleへhash／path転記
+                </td>
+                <td>
+                  run単位の<code>plan.source.json、plan.json、approval.json、start.json、events.jsonl、evidence/</code>へ集約
+                </td>
+              </tr>
+              <tr>
+                <td>通常状態15＋action10＋actor4</td>
+                <td>
+                  通常6状態（DRAFT、APPROVED、READY、RUNNING、VERIFYING、COMPLETED）＋例外3程度
+                </td>
+              </tr>
+              <tr>
+                <td>change listを必ず1件記述</td>
+                <td>空配列を許可し、NOT_APPLICABLEはUIで表示</td>
+              </tr>
+              <tr>
+                <td>planner、runner、verifier、publisher</td>
+                <td>
+                  planner／implementer／verifierは維持。publisherをverifier／runnerと統合するかは比較検討するが、公開操作は誤push防止のため別境界を残す方が安全
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          正確な削減ファイル数は移行後の分類で変わるため、ここでは「削減候補」とします。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>17. 3段階の優先順位</h2>
+        <div class="doc-phase">
+          <div class="doc-phase-number">A</div>
+          <div>
+            <h3>衝突解消と共有JSON廃止</h3>
+            <p>
+              start
+              input／recordをrun単位にする。完了済みrecordはarchive／read-onlyで残す。まず今回の停止をなくす。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">B</div>
+          <div>
+            <h3>CLI・state・docsの統合</h3>
+            <p>
+              runIdだけの単一入口、run
+              workspace、状態の整理を行う。各段階で既存hash・path・branch検査を回帰テストする。
+            </p>
+          </div>
+        </div>
+        <div class="doc-phase">
+          <div class="doc-phase-number">C</div>
+          <div>
+            <h3>テスト・文書の重複整理</h3>
+            <p>
+              同じ境界で本当に必要な再検証だけ残し、意図説明と機械強制を整理する。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>18. 単純化しすぎる危険</h2>
+        <div class="alert-danger">
+          <strong>短くすること自体が安全ではありません。</strong
+          >hash照合を消すと別計画を実行し、path
+          guardを消すと無関係なファイルを変更し、publisherをrunnerへ混ぜると検証と公開を同じ権限で行う恐れがあります。
+        </div>
+        <p>
+          削減するのは転記、共有ファイル、薄いwrapper、説明の重複です。安全境界の再検証、秘密伏字、production拒否、force
+          push禁止、cleanupのfail-closedは残します。A→B→Cの各段階で回帰テストを通します。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>最終評価</h2>
+        <div class="alert-success">
+          <strong>推奨:</strong>
+          理想案を一度に全改修せず、まずAでglobal衝突を解消し、Bでrun単位CLIと状態・資料を統合し、Cで重複を整理します。安全機能は残し、変更ごとに回帰テストで確かめます。今回の資料は調査・追記のみで、アプリ・設定・既存MD・JSON・branch・worktreeは変更していません。
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

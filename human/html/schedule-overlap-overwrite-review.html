@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>予定重複上書き設定・実装レビュー</title>
+    <link rel="stylesheet" href="../styles/documentation.css" />
+  </head>
+  <body>
+    <main class="doc-page">
+      <header class="doc-hero">
+        <p class="doc-eyebrow">Schedule / 実装レビュー</p>
+        <h1>予定重複上書き設定</h1>
+        <p>
+          既存予定Aが上書きを許可しているとき、後発予定Bの作成で重複日程だけをAから除き、Bを登録します。
+        </p>
+        <p class="doc-muted">
+          feature/v3.2.3 · HEAD 7b028cd85dfbd488b2ea6f4f3e37b9b7426eb68c ·
+          未公開
+        </p>
+      </header>
+
+      <section class="doc-section">
+        <h2>判断サマリー</h2>
+        <div class="doc-grid doc-grid-three">
+          <article class="doc-card doc-card-status-success">
+            <strong>最終QA PASS</strong>
+            <p>独立技術・仕様QA、追加E2E、正式Docker verifyを確認。</p>
+          </article>
+          <article class="doc-card">
+            <strong>DB・API・UI変更</strong>
+            <p>
+              boolean設定、create時のtransaction処理、フォームとcacheを更新。
+            </p>
+          </article>
+          <article class="doc-card">
+            <strong>依存変更なし</strong>
+            <p>package.jsonとpnpm-lock.yamlに差分なし。</p>
+          </article>
+        </div>
+        <div class="alert-warning">
+          上書きを許可したAの日程rowは、Bの作成成功時に削除されます。Aの全日程がなくなる場合はA本体と既存cascadeによるToDoも削除されます。この仕様は承認済み計画の範囲です。
+        </div>
+      </section>
+
+      <section class="doc-section">
+        <h2>変更内容</h2>
+        <div class="doc-flow">
+          <div class="doc-flow-node">同一user lock</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">最新の重複確認</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node">false混在ならrollback</div>
+          <div class="doc-flow-arrow">→</div>
+          <div class="doc-flow-node doc-flow-node-status-success">
+            Aの日程調整後にB登録
+          </div>
+        </div>
+        <p>
+          DB transactionで既存triggerと同じadvisory
+          lockを取得します。trueのAに重なるdate
+          rowだけを削除し、残る日程がないAは親ごと削除してからBを作成します。false設定との衝突、B内重複、既存予定の編集衝突はConflictで拒否します。
+        </p>
+        <p>
+          APIはcreate時falseを既定値とし、updateは任意、responseは必須booleanです。フォームは初期OFF・編集時保存値を表示し、作成・更新・削除後にschedule
+          listとgroup calendarを無効化します。
+        </p>
+      </section>
+
+      <section class="doc-section">
+        <h2>変更ファイル</h2>
+        <h3>Backend・DB・契約</h3>
+        <ul>
+          <li>
+            <a href="../../apps/backend/features/schedule/model.ts"
+              >schedule model</a
+            >、<a href="../../packages/schemas/schedule.ts"
+              >request/response schema</a
+            >、<a href="../../apps/backend/features/schedule/router.ts"
+              >router response</a
+            >
+          </li>
+          <li>
+            <a href="../../apps/backend/features/schedule/repository.ts"
+              >repository transaction・advisory lock</a
+            >、<a href="../../apps/backend/features/schedule/service.ts"
+              >service validationとConflict変換</a
+            >
+          </li>
+          <li>
+            <a href="../../drizzle/0010_robust_mongu.sql">migration SQL</a>、<a
+              href="../../drizzle/meta/0010_snapshot.json"
+              >snapshot</a
+            >、<a href="../../drizzle/meta/_journal.json">journal</a>
+          </li>
+        </ul>
+        <h3>Frontend・cache</h3>
+        <ul>
+          <li>
+            <a
+              href="../../apps/frontend/components/calendar/ScheduleAsideForm.tsx"
+              >create/edit switchと説明</a
+            >、<a
+              href="../../apps/frontend/components/schedules/useScheduleForm.ts"
+              >初期値</a
+            >、<a
+              href="../../apps/frontend/components/schedules/scheduleFormAdapter.ts"
+              >編集値変換</a
+            >
+          </li>
+          <li>
+            <a href="../../apps/frontend/components/schedules/useSchedule.ts"
+              >schedule/group-calendar invalidation</a
+            >
+          </li>
+        </ul>
+        <h3>テストと計画</h3>
+        <ul>
+          <li>
+            <a href="../../apps/backend/features/schedule/router.test.ts"
+              >router test</a
+            >、<a href="../../apps/backend/features/schedule/schema.test.ts"
+              >schema test</a
+            >、<a href="../../apps/backend/features/schedule/service.test.ts"
+              >service test</a
+            >、<a href="../../apps/backend/index.integration.test.ts"
+              >DB integration test</a
+            >
+          </li>
+          <li>
+            <a
+              href="../../apps/frontend/components/calendar/ScheduleAsideDetail.test.tsx"
+              >detail fixture</a
+            >、<a
+              href="../../apps/frontend/components/schedules/scheduleFormAdapter.test.ts"
+              >form adapter test</a
+            >、<a href="../../e2e/schedule.spec.ts">schedule E2E</a>、<a
+              href="../../e2e/mobile.spec.ts"
+              >mobile E2E</a
+            >
+          </li>
+          <li>
+            <a href="../../ai/plans/schedule-overlap-overwrite.md">AI実装計画</a
+            >、<a href="../../docs/html/予定重複上書き設定_実装計画.html"
+              >承認済み人間向け計画</a
+            >（docs/htmlはGit追跡外）。
+          </li>
+        </ul>
+      </section>
+
+      <section class="doc-section">
+        <h2>QA・検証結果</h2>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>確認</th>
+              <th>結果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>独立技術QA</td>
+              <td>
+                PASS。transaction順序、triggerと同一lock
+                key、ownership、migration、API契約を確認。
+              </td>
+            </tr>
+            <tr>
+              <td>独立仕様QA</td>
+              <td>
+                PASS。false混在rollback、date row削除、親/todo
+                cascade、編集Conflict、UI初期値・説明・cacheを確認。
+              </td>
+            </tr>
+            <tr>
+              <td>専用DB integration</td>
+              <td>
+                11/11
+                PASS。部分日程、false混在、cascade、foreign-key失敗時rollback、create/create・create/update・create/delete競合を含む。
+              </td>
+            </tr>
+            <tr>
+              <td>新規A/B E2E</td>
+              <td>
+                setup込み2/2 PASS（retries
+                0）。APIでAを準備しUIでBを作成。reloadなしのcalendar反映とAPI上の残存日程を確認。
+              </td>
+            </tr>
+            <tr>
+              <td>schedule/mobile E2E</td>
+              <td>5/5 PASS（setup込み、retries 0）。</td>
+            </tr>
+            <tr>
+              <td>正式Docker verify</td>
+              <td>
+                exit 0。Node.js 22.23.1、typecheck PASS、201 tests
+                PASS。通常composeではintegration
+                11件が未接続DBのためskip。専用DB runは上記PASS。
+              </td>
+            </tr>
+            <tr>
+              <td>format・diff</td>
+              <td>全workspace format:check PASS、git diff --check PASS。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="doc-section">
+        <h2>公開境界・未実施事項</h2>
+        <p>
+          commit、push、PR、staging/prod操作は未実施です。branchはfeature/v3.2.3、upstreamはorigin/feature/v3.2.3です。staging
+          deploy
+          workflowはmainのCI成功または明示的workflow_dispatchで起動し、feature
+          branch pushはstaging deployを起動しません。Production
+          deployもworkflow_dispatchのみです。
+        </p>
+        <p>
+          公開時はNode.js 22が有効な人間terminalから
+          <code>pnpm agent:publish</code> を使います。正本は
+          <code>.agents/tools/pr-agent-publish</code> で、clean
+          worktree、許可branch名、originへの通常push、pushしたHEADと同一SHAのCI結果を確認します。現在は未コミット差分があるため公開条件を満たしません。
+        </p>
+        <p class="doc-muted">
+          追加E2Eの日付fixtureは月末に非重複日が翌月へ移らないよう、同月内の翌日または前日を使用します。正式verify後はこのE2E
+          fixtureの月境界対応とPrettier整形のみを変更し、新caseは再実行済みです。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

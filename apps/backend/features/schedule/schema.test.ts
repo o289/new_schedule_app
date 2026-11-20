@@ -32,6 +32,18 @@ describe("schedule schema", () => {
         dates,
       }).isTentative,
     ).toBe(false);
+    expect(
+      scheduleCreateSchema.parse({ title: "設定省略", categoryId, dates })
+        .allowOverwrite,
+    ).toBe(false);
+    expect(
+      scheduleCreateSchema.parse({
+        title: "上書き許可",
+        categoryId,
+        allowOverwrite: true,
+        dates,
+      }).allowOverwrite,
+    ).toBe(true);
   });
 
   it("Updateでは値を省略しても補完せず、真偽値だけを更新できる", () => {
@@ -41,6 +53,13 @@ describe("schedule schema", () => {
     });
     expect(scheduleUpdateSchema.parse({ isTentative: false })).toEqual({
       isTentative: false,
+    });
+    expect(scheduleUpdateSchema.parse({})).not.toHaveProperty("allowOverwrite");
+    expect(scheduleUpdateSchema.parse({ allowOverwrite: true })).toEqual({
+      allowOverwrite: true,
+    });
+    expect(scheduleUpdateSchema.parse({ allowOverwrite: false })).toEqual({
+      allowOverwrite: false,
     });
   });
 
@@ -75,7 +94,7 @@ describe("schedule schema", () => {
     ).toBe(false);
   });
 
-  it("Responseでは仮押さえ状態を必須にする", () => {
+  it("Responseでは仮押さえ状態と重複上書き許可を必須にする", () => {
     const baseResponse = {
       id: "11111111-1111-4111-8111-111111111111",
       title: "予定",
@@ -94,6 +113,13 @@ describe("schedule schema", () => {
       scheduleResponseSchema.safeParse({
         ...baseResponse,
         isTentative: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      scheduleResponseSchema.safeParse({
+        ...baseResponse,
+        isTentative: false,
+        allowOverwrite: false,
         url: "https://teams.microsoft.com/l/meetup-join/example",
       }).success,
     ).toBe(true);

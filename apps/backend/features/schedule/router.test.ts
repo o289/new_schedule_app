@@ -62,6 +62,7 @@ const schedule = {
   url: "https://meet.google.com/abc-defg-hij",
   categoryId: category.id,
   isTentative: false,
+  allowOverwrite: false,
   category,
   dates: [
     {
@@ -113,10 +114,12 @@ describe("schedule router", () => {
     expect(mocks.createSchedule).toHaveBeenCalledWith(user, {
       ...body,
       isTentative: false,
+      allowOverwrite: false,
     });
     await expect(response.json()).resolves.toMatchObject({
       id: schedule.id,
       isTentative: false,
+      allowOverwrite: false,
       url: "https://meet.google.com/abc-defg-hij",
       category: {
         name: "仕事",
@@ -133,12 +136,17 @@ describe("schedule router", () => {
     });
   });
 
-  it("POST /schedules は仮押さえを作成し、状態を返す", async () => {
-    mocks.createSchedule.mockResolvedValue({ ...schedule, isTentative: true });
+  it("POST /schedules は仮押さえと上書き許可を作成し、状態を返す", async () => {
+    mocks.createSchedule.mockResolvedValue({
+      ...schedule,
+      isTentative: true,
+      allowOverwrite: true,
+    });
     const body = {
       title: "tentative meeting",
       categoryId: category.id,
       isTentative: true,
+      allowOverwrite: true,
       dates: [
         {
           startDate: "2025-01-02T10:00:00",
@@ -157,33 +165,39 @@ describe("schedule router", () => {
     await expect(response.json()).resolves.toMatchObject({
       id: schedule.id,
       isTentative: true,
+      allowOverwrite: true,
     });
   });
 
-  it("GET /schedules は仮押さえ状態を含めて返す", async () => {
-    mocks.listSchedules.mockResolvedValue([{ ...schedule, isTentative: true }]);
+  it("GET /schedules は仮押さえと上書き許可を含めて返す", async () => {
+    mocks.listSchedules.mockResolvedValue([
+      { ...schedule, isTentative: true, allowOverwrite: true },
+    ]);
 
     const response = await request("/schedules");
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject([
-      { id: schedule.id, isTentative: true },
+      { id: schedule.id, isTentative: true, allowOverwrite: true },
     ]);
   });
 
-  it("PUT /schedules/:id は仮押さえ状態だけを更新できる", async () => {
-    mocks.updateSchedule.mockResolvedValue({ ...schedule, isTentative: true });
+  it("PUT /schedules/:id は上書き許可状態だけを更新できる", async () => {
+    mocks.updateSchedule.mockResolvedValue({
+      ...schedule,
+      allowOverwrite: true,
+    });
     const response = await request(`/schedules/${schedule.id}`, {
       method: "PUT",
-      body: JSON.stringify({ isTentative: true }),
+      body: JSON.stringify({ allowOverwrite: true }),
     });
 
     expect(response.status).toBe(200);
     expect(mocks.updateSchedule).toHaveBeenCalledWith(user, schedule.id, {
-      isTentative: true,
+      allowOverwrite: true,
     });
     await expect(response.json()).resolves.toMatchObject({
-      isTentative: true,
+      allowOverwrite: true,
     });
   });
 

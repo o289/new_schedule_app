@@ -68,6 +68,22 @@ const backendConfig = {
   },
 } satisfies UserConfig;
 
+const workerConfig = {
+  ...backendConfig,
+  build: {
+    ...backendConfig.build,
+    ssr: resolve(import.meta.dirname, "apps/backend/workers/daily-email.ts"),
+    emptyOutDir: false,
+    rollupOptions: {
+      external: ["hono", "@hono/node-server", "drizzle-orm", "pg"],
+      output: {
+        entryFileNames: "daily-email.js",
+        format: "es",
+      },
+    },
+  },
+} satisfies UserConfig;
+
 /* ========================================================================
  * Export
  * ------------------------------------------------------------------------
@@ -79,6 +95,10 @@ const backendConfig = {
 export default defineConfig(({ mode }) => {
   if (mode === "backend") {
     return backendConfig;
+  }
+
+  if (mode === "worker") {
+    return workerConfig;
   }
 
   return frontendConfig;

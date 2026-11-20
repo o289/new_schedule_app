@@ -3,6 +3,11 @@ export const authKeys = {
   me: () => [...authKeys.all, "me"] as const,
 };
 
+export const emailNotificationKeys = {
+  all: ["email-notification"] as const,
+  settings: () => [...emailNotificationKeys.all, "settings"] as const,
+};
+
 export const categoryKeys = {
   all: ["categories"] as const,
   lists: () => [...categoryKeys.all, "list"] as const,

@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI開発フロー簡素化 実装計画</title>
+    <style>
+      :root {
+        --ink: #182238;
+        --muted: #5d6a7d;
+        --line: #dbe3ee;
+        --bg: #f4f7fb;
+        --card: #fff;
+        --blue: #2563eb;
+        --green: #087443;
+        --amber: #956500;
+        --red: #b42318;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+          "Yu Gothic", sans-serif;
+        line-height: 1.75;
+      }
+      main {
+        max-width: 1120px;
+        margin: auto;
+        padding: 32px 20px 72px;
+      }
+      h1 {
+        font-size: clamp(28px, 4vw, 44px);
+        line-height: 1.25;
+        margin: 8px 0 12px;
+      }
+      h2 {
+        font-size: 25px;
+        margin: 40px 0 14px;
+        border-left: 6px solid var(--blue);
+        padding-left: 12px;
+      }
+      h3 {
+        font-size: 18px;
+        margin: 8px 0;
+      }
+      p {
+        margin: 7px 0;
+      }
+      .hero,
+      .card,
+      .callout,
+      table {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 5px 18px #1822380b;
+      }
+      .hero {
+        padding: 28px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--muted);
+      }
+      .small {
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        gap: 14px;
+      }
+      .card {
+        padding: 17px;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 99px;
+        background: #eaf1ff;
+        color: #1747a6;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .good {
+        background: #e7f7ee;
+        color: var(--green);
+      }
+      .warn {
+        background: #fff4d6;
+        color: var(--amber);
+      }
+      .bad {
+        background: #ffebe9;
+        color: var(--red);
+      }
+      .callout {
+        padding: 18px;
+        margin: 15px 0;
+        border-left: 5px solid var(--blue);
+      }
+      .callout.good {
+        border-left-color: var(--green);
+      }
+      .callout.warn {
+        border-left-color: #d99a00;
+      }
+      .callout.bad {
+        border-left-color: var(--red);
+      }
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        background: #edf2f8;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      code {
+        background: #eef1f6;
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-family: ui-monospace, monospace;
+        font-size: 0.9em;
+      }
+      .flow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .step {
+        padding: 10px 13px;
+        background: #edf3ff;
+        border: 1px solid #bdd0fa;
+        border-radius: 10px;
+        font-weight: 700;
+      }
+      .arrow {
+        font-size: 22px;
+        color: var(--blue);
+      }
+      .phase {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        padding: 18px;
+        margin: 15px 0;
+      }
+      .phase h3 {
+        color: #1747a6;
+      }
+      .label {
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .check {
+        list-style: none;
+        padding-left: 0;
+      }
+      .check li {
+        margin: 5px 0;
+      }
+      pre {
+        background: #111827;
+        color: #e5efff;
+        border-radius: 12px;
+        padding: 15px;
+        overflow: auto;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      @media (max-width: 720px) {
+        main {
+          padding: 18px 12px 50px;
+        }
+        .two {
+          grid-template-columns: 1fr;
+        }
+        th,
+        td {
+          padding: 9px 8px;
+          font-size: 14px;
+        }
+        .hero {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <span class="tag">調査結果から作る実装計画</span>
+        <h1>AI開発フローを、個人開発に合う大きさへ</h1>
+        <p class="lead">
+          たくさんの確認画面や道具を減らしながら、「安全に作る → 検査する →
+          branchの種類に合った公開」までAIが止まらず進めるようにします。
+        </p>
+        <p class="small">
+          前提：個人開発／並列タスクなし／mainへ直接変更しない／PR #11は現在
+          <code>feature/v3.2.3</code> にマージ済み（HEAD 0c6bac1）
+        </p>
+      </section>
+
+      <h2>1. 目的と、しないこと</h2>
+      <div class="two">
+        <div class="card">
+          <span class="tag good">目的</span>
+          <ul>
+            <li>AIが計画を読み、計画内の実装を最後まで行う。</li>
+            <li>FAILなら直して、検査をやり直す。</li>
+            <li>
+              版branchは同名へpushしてCI確認、機能branchはpushして通常PRを作る。
+            </li>
+            <li>人は計画を最初に承認し、最後にレビューとmergeをする。</li>
+            <li>安全を少ない仕組みで守る。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag bad">しないこと</span>
+          <ul>
+            <li>並列runや複数worktreeを前提にしない。</li>
+            <li>AI専用の別開発環境を作らない。</li>
+            <li>mainへのpush、force push、branch削除を許可しない。</li>
+            <li>実装中に人が毎回判断する運用にしない。</li>
+            <li>既存runの履歴を消さない。</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>2. 現状から目標へ</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>現在の状態</th>
+            <th>困ること</th>
+            <th>目標</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>canonical plan、approval、hash、期限、event log、15状態</td>
+            <td>計画だけでファイルと手順が増える</td>
+            <td>計画MD 1枚を人が承認し、<code>[ ]</code>を中心にする</td>
+          </tr>
+          <tr>
+            <td>trusted runner専用の公開経路</td>
+            <td>runnerが使えないのに直接公開も禁止され、push・PRが止まる</td>
+            <td>公開スクリプトを1つに集約し、検査後にpush・通常PRまで行う</td>
+          </tr>
+          <tr>
+            <td>runごとのJSON、snapshot、diff、evidenceが多数</td>
+            <td>どれが最新か分かりにくい</td>
+            <td>runの引き継ぎJSONは1枚。branch/SHAはGitから読む</td>
+          </tr>
+          <tr>
+            <td>worktree、marker、複雑なcleanup</td>
+            <td>非並列の個人開発には重い</td>
+            <td>通常のfeature branchを作業場所にする</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>先に直す問題：</strong>trusted
+        runner未実装を理由に直接公開を止める一方、直接のpushとPRも禁止するデッドロックです。Phase
+        1で公開経路を使える状態にします。
+      </div>
+
+      <h2>3. 目標の流れ</h2>
+      <div class="flow">
+        <div class="step">計画MD</div>
+        <div class="arrow">→</div>
+        <div class="step">人が承認</div>
+        <div class="arrow">→</div>
+        <div class="step">featureで実装</div>
+        <div class="arrow">→</div>
+        <div class="step">agent:publish内でverify</div>
+        <div class="arrow">→</div>
+        <div class="step">branch別にpush/PR</div>
+        <div class="arrow">→</div>
+        <div class="step">人がreview/merge</div>
+      </div>
+      <div class="callout good">
+        <strong>AIの完了：</strong
+        ><code>feature/vX.Y.Z</code
+        >は同名originへpushし、同じSHAのCI成功を確認したら完了（PR不要）。<code>feature/&lt;slug&gt;-vX.Y.Z</code>はpushして<code>feature/vX.Y.Z</code>向け通常PRを作成したら完了。レビュー、approve、mergeは人の仕事です。
+      </div>
+
+      <h2>4. 削除・統合・維持するもの</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>分類</th>
+            <th>対象</th>
+            <th>方針</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag bad">削除候補</span></td>
+            <td>
+              <code>.agents/tools/trusted-runner/**</code>、<code
+                >.agents/tools/pr-agent-publish*</code
+              >
+            </td>
+            <td>
+              単一publishへ置換後、<code>rg</code>で参照ゼロを確認して削除する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag bad">削除候補</span></td>
+            <td>
+              <code>.agents/tools/agent-run/canonical-*</code
+              >、<code>state-*</code>、<code>orchestrator*</code>、<code>cleanup*</code>、<code>legacy-import*</code>、<code
+                >agent-run-command*</code
+              >
+            </td>
+            <td>
+              新方式で不要になった後、<code>rg</code>で参照ゼロを確認して削除する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag bad">削除候補</span></td>
+            <td>global snapshot、phase log、重複diff/evidence</td>
+            <td>JSON 1枚と計画MD 1枚へまとめる。</td>
+          </tr>
+          <tr>
+            <td><span class="tag">統合</span></td>
+            <td>
+              重複する役割MD、<code>package.json</code>の<code>rules:check</code>、<code>agent:plan:generate</code>、<code>agent:run</code>、<code>trusted-runner:check</code>等
+            </td>
+            <td>
+              参照ゼロを確認後、短いAGENTS.md、計画MD、JSON、<code>verify</code>、<code>publish</code>へ整理する。
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag good">維持</span></td>
+            <td>feature制限、main保護、force push禁止、typecheck/test</td>
+            <td>安全の中心としてプログラムで強制する。</td>
+          </tr>
+          <tr>
+            <td><span class="tag good">維持</span></td>
+            <td>ローカルDB限定、秘密情報保護、CI確認</td>
+            <td>本番事故と秘密漏えいを防ぐ。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>5. 最小のデータと書き方</h2>
+      <div class="two">
+        <div class="card">
+          <h3>JSONは引き継ぎ用ホワイトボード</h3>
+          <p>
+            AI交代時に最初に読むメモです。branch名とSHAは正本ではなく、必要な時にGitで読み直します。
+          </p>
+          <pre>
+{
+  "runId": "20260917-example",
+  "goal": "招待リンクを追加する",
+  "currentPhase": 1,
+  "nextAction": "typecheckを実行する",
+  "lastVerification": "pending",
+  "blocker": null,
+  "updatedAt": "2026-09-17T12:00:00+09:00"
+}</pre>
+        </div>
+        <div class="card">
+          <h3>MDはチェックリスト</h3>
+          <p>
+            人が読む計画を1枚にします。終わったらAIが<code>[x]</code>にします。
+          </p>
+          <pre>
+## Phase 1：APIを作る
+- [ ] apps/backend/...を変更
+- [ ] 招待確認処理を追加
+- [ ] typecheck PASS
+- [ ] test PASS
+- [ ] feature branchへpush
+- [ ] 版branchなら同一SHAのCI確認
+- [ ] 機能branchなら通常PR作成</pre>
+          <p class="small">計画外の変更だけREPLANし、計画MDを再承認します。</p>
+        </div>
+      </div>
+
+      <h2>6. AIが決めること／プログラムが止めること</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>AIに残す判断</th>
+            <th>プログラムで強制する最小ルール</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>仕様、変更ファイル、DB・依存・API・権限、テスト、Phase順</td>
+            <td>差分が計画外ならREPLANで停止</td>
+          </tr>
+          <tr>
+            <td>小規模/大規模、FAIL原因、修正方法、PR本文</td>
+            <td>
+              <code>agent:publish</code>自身が同じ実行内で<code
+                >pnpm verify:phase</code
+              >を実行し、PASSするまで公開しない（別のPASS状態ファイルを作らない）
+            </td>
+          </tr>
+          <tr>
+            <td>migrationのタイミング（承認済みの場合）</td>
+            <td>本番URL・資格情報を拒否し、ローカルDBだけ許可</td>
+          </tr>
+          <tr>
+            <td>人へ相談する仕様判断</td>
+            <td>
+              main操作、force push、branch削除、任意shell、秘密値出力を禁止
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>7. 実行Phase</h2>
+      <div class="phase">
+        <h3>Phase 1：最小publishを先に開通する</h3>
+        <p class="label">変更対象</p>
+        <ul>
+          <li><code>AGENTS.md</code>とPR作成手順</li>
+          <li>公開関連script（既存entrypointはPhase 3で整理）</li>
+          <li>公開判定</li>
+        </ul>
+        <p class="label">実装内容</p>
+        <ul>
+          <li>trusted runner未実装を理由に止める記述をなくす。</li>
+          <li>
+            <code>agent:publish</code>自身が同一実行で<code
+              >pnpm verify:phase</code
+            >を行い、PASS時だけ公開する。
+          </li>
+          <li>
+            <code>feature/vX.Y.Z</code
+            >は同名originへpushし、同一SHAのCI成功確認で完了（PR不要）。
+          </li>
+          <li>
+            <code>feature/&lt;slug&gt;-vX.Y.Z</code
+            >はpushして<code>feature/vX.Y.Z</code>向け通常PRを作成して完了。
+          </li>
+          <li>main・force push・branch削除・本番操作を禁止する。</li>
+        </ul>
+        <p class="label">完了条件</p>
+        <ul class="check">
+          <li>- [ ] 版branchのpushと同一SHA CI確認が動く</li>
+          <li>- [ ] 機能branchのpushと通常PR作成が動く</li>
+          <li>- [ ] 危険な操作が拒否される</li>
+          <li>- [ ] PR #11のマージ済み状態と矛盾する説明がない</li>
+        </ul>
+        <p class="label">品質ゲート</p>
+        <ul class="check">
+          <li>- [ ] typecheck PASS</li>
+          <li>- [ ] test PASS</li>
+          <li>- [ ] publish安全テスト PASS</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <h3>Phase 2：JSONとMDを1枚ずつにまとめる</h3>
+        <p class="label">変更対象</p>
+        <ul>
+          <li><code>ai/</code>のrun記録、計画テンプレート、引き継ぎ手順</li>
+          <li>重複するstate・証跡生成</li>
+        </ul>
+        <p class="label">実装内容</p>
+        <ul>
+          <li>最小JSON schemaを定義する。</li>
+          <li>計画MDのPhaseと<code>[ ]</code>を進捗の中心にする。</li>
+          <li>branch/SHAはGitから再確認する。</li>
+        </ul>
+        <p class="label">完了条件</p>
+        <ul class="check">
+          <li>- [ ] JSON 1枚と計画MD 1枚で新規runを開始できる</li>
+          <li>- [ ] AI交代時にJSONを読む</li>
+          <li>- [ ] 旧形式を新規runで作らない</li>
+        </ul>
+        <p class="label">品質ゲート</p>
+        <ul class="check">
+          <li>- [ ] typecheck PASS</li>
+          <li>- [ ] test PASS</li>
+          <li>- [ ] 引き継ぎテスト PASS</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <h3>Phase 3：旧entrypointと状態管理を削除し、2つへ集約する</h3>
+        <p class="label">変更対象</p>
+        <ul>
+          <li>
+            <code>package.json</code
+            >の<code>rules:check</code>、<code>agent:plan:generate</code>、<code>agent:run</code>、<code>trusted-runner:check</code>等
+          </li>
+          <li>
+            <code>.agents/tools/trusted-runner/**</code
+            >、<code>agent-run/canonical-*</code>、<code>state-*</code>、<code>orchestrator*</code>、<code>cleanup*</code>、<code>legacy-import*</code>、<code>agent-run-command*</code>、<code
+              >pr-agent-publish*</code
+            >
+          </li>
+        </ul>
+        <p class="label">実装内容</p>
+        <ul>
+          <li>Phase 1のverify内実行を正本にし、別PASS記録を要求しない。</li>
+          <li>上記対象を<code>rg</code>で参照ゼロ確認後に削除する。</li>
+          <li>
+            package
+            scriptsを<code>verify</code>と<code>publish</code>中心へ集約する。
+          </li>
+          <li>push後のSHAとPRのhead SHAを確認する。</li>
+        </ul>
+        <p class="label">完了条件</p>
+        <ul class="check">
+          <li>- [ ] 旧entrypoint/state/trusted runnerの参照ゼロを確認</li>
+          <li>- [ ] verify入口が1つ</li>
+          <li>- [ ] FAIL時はpublish不可</li>
+          <li>- [ ] branch別の完了条件が動く</li>
+        </ul>
+        <p class="label">品質ゲート</p>
+        <ul class="check">
+          <li>- [ ] typecheck PASS</li>
+          <li>- [ ] test PASS</li>
+          <li>- [ ] main操作拒否テスト PASS</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <h3>Phase 4：古い仕組みを片付ける</h3>
+        <p class="label">変更対象</p>
+        <ul>
+          <li>
+            参照されなくなったtrusted runner、state machine、cleanup、重複証跡
+          </li>
+          <li>古い説明とリンク</li>
+        </ul>
+        <p class="label">実装内容</p>
+        <ul>
+          <li>参照元がないことを確認して削除する。</li>
+          <li>旧run履歴を読み取るコードは必要な間残す。</li>
+          <li>READMEとAI指示を短い流れへ更新する。</li>
+        </ul>
+        <p class="label">完了条件</p>
+        <ul class="check">
+          <li>- [ ] 新方式が使うファイルを一覧化</li>
+          <li>- [ ] 未参照コードを削除</li>
+          <li>- [ ] 旧run履歴を読める</li>
+          <li>- [ ] 版branchのpush+CIと機能branchの通常PRを各1回確認</li>
+        </ul>
+        <p class="label">品質ゲート</p>
+        <ul class="check">
+          <li>- [ ] typecheck PASS</li>
+          <li>- [ ] test PASS</li>
+        </ul>
+      </div>
+
+      <h2>8. 互換性・rollback</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>旧履歴</h3>
+          <p>
+            <code>ai/runs/**</code
+            >と<code>docs/agent-runs/**</code>の両方を削除せずread-onlyで残します。新方式の正本にはしません。
+          </p>
+        </div>
+        <div class="card">
+          <h3>戻し方</h3>
+          <p>
+            各Phaseを小さなcommitにし、FAIL時はそのPhaseをrevertします。main、remote、本番DBは変更しません。
+          </p>
+        </div>
+        <div class="card">
+          <h3>切り替え</h3>
+          <p>
+            Phase 1の公開成功とPhase
+            2の引き継ぎ成功まで旧ツールを削除せず、Phase
+            3で参照ゼロを確認してから整理します。
+          </p>
+        </div>
+      </div>
+
+      <h2>9. リスクと対策</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>リスク</th>
+            <th>対策</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>mainを変更する</td>
+            <td>branch名を検査し、main/releaseへのpushとforce pushを拒否。</td>
+          </tr>
+          <tr>
+            <td>計画外のDB/API変更</td>
+            <td>計画MDに先に書き、差分があればREPLAN。</td>
+          </tr>
+          <tr>
+            <td>verifyなしでPR</td>
+            <td>
+              publish自身が同じ実行で<code>pnpm verify:phase</code
+              >を実行し、PASS時だけpush/PRを行う。
+            </td>
+          </tr>
+          <tr>
+            <td>履歴や秘密の漏えい</td>
+            <td>
+              <code>ai/runs/**</code
+              >と<code>docs/agent-runs/**</code>を保持し、秘密値をAI・JSON・ログ・PRへ出さない。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>10. 最終受入条件</h2>
+      <div class="callout">
+        <ul class="check">
+          <li>- [ ] 新規runが計画MD 1枚・JSON 1枚で開始できる</li>
+          <li>- [ ] 計画承認後は計画内Phaseを追加承認なしで進められる</li>
+          <li>- [ ] FAILは修正して再検査、計画外はREPLANで停止する</li>
+          <li>
+            - [ ] <code>agent:publish</code>自身がverifyし、PASS時だけ公開する
+          </li>
+          <li>
+            - [ ] <code>feature/vX.Y.Z</code>は同名originへpushし同一SHA
+            CI確認で完了（PR不要）
+          </li>
+          <li>
+            - [ ]
+            <code>feature/&lt;slug&gt;-vX.Y.Z</code
+            >はpushし版branch向け通常PR作成で完了
+          </li>
+          <li>
+            - [ ] main、force push、branch削除、本番DB、任意shellが拒否される
+          </li>
+          <li>- [ ] 完了報告に必要なCI結果または通常PR URLと検証SHAがある</li>
+          <li>- [ ] 人はPRレビューとmergeだけを担当できる</li>
+        </ul>
+      </div>
+      <p class="small">
+        この資料は実装計画です。承認されるまでコードや設定を変更しません。
+      </p>
+    </main>
+  </body>
+</html>

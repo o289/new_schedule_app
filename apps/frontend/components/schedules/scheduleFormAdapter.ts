@@ -9,6 +9,7 @@ export function toScheduleForm(schedule: ScheduleResponse): ScheduleForm {
     url: schedule.url ?? null,
     categoryId: schedule.categoryId ?? "",
     isTentative: schedule.isTentative,
+    allowOverwrite: schedule.allowOverwrite,
     dates: schedule.dates.map((date) => ({ ...date })),
   };
 }

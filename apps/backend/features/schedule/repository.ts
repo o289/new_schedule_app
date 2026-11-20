@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, lt, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
 
 import type {
   ScheduleCreate,
@@ -15,6 +15,13 @@ export type Schedule = typeof schedules.$inferSelect & {
   dates: ScheduleDate[];
 };
 
+export class ScheduleTimeOverlapError extends Error {
+  constructor() {
+    super("SCHEDULE_TIME_OVERLAP");
+    this.name = "ScheduleTimeOverlapError";
+  }
+}
+
 export class ScheduleRepository extends BaseRepository {
   private async hydrate(scheduleId: string): Promise<Schedule | null> {
     const schedule = await this.database.query.schedules.findFirst({
@@ -27,6 +34,63 @@ export class ScheduleRepository extends BaseRepository {
 
   async create(input: ScheduleCreate, userId: string): Promise<Schedule> {
     return this.database.transaction(async (transaction) => {
+      await this.lockUserSchedules(transaction, userId);
+
+      const overlaps = await transaction
+        .select({
+          dateId: scheduleDates.id,
+          scheduleId: schedules.id,
+          allowOverwrite: schedules.allowOverwrite,
+        })
+        .from(scheduleDates)
+        .innerJoin(schedules, eq(scheduleDates.scheduleId, schedules.id))
+        .where(
+          and(
+            eq(schedules.userId, userId),
+            or(
+              ...input.dates.map((date) =>
+                and(
+                  lt(scheduleDates.startDate, date.endDate),
+                  gt(scheduleDates.endDate, date.startDate),
+                ),
+              ),
+            ),
+          ),
+        );
+
+      if (overlaps.some((overlap) => !overlap.allowOverwrite)) {
+        throw new ScheduleTimeOverlapError();
+      }
+
+      if (overlaps.length > 0) {
+        await transaction.delete(scheduleDates).where(
+          inArray(
+            scheduleDates.id,
+            overlaps.map((overlap) => overlap.dateId),
+          ),
+        );
+
+        const emptiedScheduleIds = [
+          ...new Set(overlaps.map((overlap) => overlap.scheduleId)),
+        ];
+        const remainingDates = await transaction
+          .select({ scheduleId: scheduleDates.scheduleId })
+          .from(scheduleDates)
+          .where(inArray(scheduleDates.scheduleId, emptiedScheduleIds));
+        const schedulesWithDates = new Set(
+          remainingDates.map((date) => date.scheduleId),
+        );
+        const emptyScheduleIds = emptiedScheduleIds.filter(
+          (scheduleId) => !schedulesWithDates.has(scheduleId),
+        );
+
+        if (emptyScheduleIds.length > 0) {
+          await transaction
+            .delete(schedules)
+            .where(inArray(schedules.id, emptyScheduleIds));
+        }
+      }
+
       const [schedule] = await transaction
         .insert(schedules)
         .values({
@@ -35,6 +99,7 @@ export class ScheduleRepository extends BaseRepository {
           url: input.url,
           categoryId: input.categoryId,
           isTentative: input.isTentative,
+          allowOverwrite: input.allowOverwrite,
           userId,
         })
         .returning({ id: schedules.id });
@@ -104,13 +169,18 @@ export class ScheduleRepository extends BaseRepository {
   async update(
     scheduleId: string,
     input: ScheduleUpdate,
+    userId: string,
   ): Promise<Schedule | null> {
-    const current = await this.hydrate(scheduleId);
-    if (!current) {
-      return null;
-    }
-
     return this.database.transaction(async (transaction) => {
+      await this.lockUserSchedules(transaction, userId);
+
+      const current = await transaction.query.schedules.findFirst({
+        where: and(eq(schedules.id, scheduleId), eq(schedules.userId, userId)),
+        with: { category: true, dates: true },
+      });
+      if (!current) {
+        return null;
+      }
       const { dates, ...fields } = input;
       if (Object.keys(fields).length > 0) {
         await transaction
@@ -179,11 +249,23 @@ export class ScheduleRepository extends BaseRepository {
   }
 
   async delete(scheduleId: string, userId: string): Promise<boolean> {
-    const deleted = await this.database
-      .delete(schedules)
-      .where(and(eq(schedules.id, scheduleId), eq(schedules.userId, userId)))
-      .returning({ id: schedules.id });
+    const deleted = await this.database.transaction(async (transaction) => {
+      await this.lockUserSchedules(transaction, userId);
+      return transaction
+        .delete(schedules)
+        .where(and(eq(schedules.id, scheduleId), eq(schedules.userId, userId)))
+        .returning({ id: schedules.id });
+    });
 
     return deleted.length > 0;
+  }
+
+  private async lockUserSchedules(
+    transaction: Parameters<Parameters<typeof this.database.transaction>[0]>[0],
+    userId: string,
+  ): Promise<void> {
+    await transaction.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${userId}::text, 0))`,
+    );
   }
 }
